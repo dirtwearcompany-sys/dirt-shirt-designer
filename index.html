@@ -133,15 +133,6 @@
             margin-bottom: 20px;
             font-size: 14px;
         }
-        .info-message {
-            background: #DBEAFE;
-            border: 1px solid #93C5FD;
-            color: #1E40AF;
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
         .btn-primary {
             width: 100%;
             padding: 16px;
@@ -292,7 +283,7 @@
             cursor: not-allowed;
             transform: none;
         }
-        /* Realistic Shirt Canvas */
+        /* Shirt Canvas with Image Background */
         .shirt-canvas-wrapper {
             position: relative;
             width: 100%;
@@ -328,7 +319,6 @@
             font-size: 48px;
             margin-bottom: 12px;
         }
-        /* Size Warning Overlay */
         .size-warning {
             position: absolute;
             top: 10px;
@@ -347,7 +337,6 @@
         .size-warning.show {
             display: block;
         }
-        /* Measurement Overlay */
         .measurement-overlay {
             position: absolute;
             top: 0;
@@ -484,33 +473,6 @@
             background: #C85A3F;
             color: white;
         }
-        .color-picker-group {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .color-input {
-            width: 48px;
-            height: 48px;
-            border: 2px solid #E5E7EB;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-        .btn-reset-color {
-            flex: 1;
-            padding: 12px;
-            background: #F3F4F6;
-            border: 1px solid #E5E7EB;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            color: #374151;
-            font-family: inherit;
-        }
-        .btn-reset-color:hover {
-            background: #E5E7EB;
-        }
         .slider-container {
             margin-bottom: 20px;
         }
@@ -568,7 +530,6 @@
         .btn-center:hover {
             background: #E5E7EB;
         }
-        /* Enhanced Specs Panel */
         .specs-panel {
             background: linear-gradient(135deg, #FEF3C7, #FDE68A);
             border-radius: 16px;
@@ -615,7 +576,6 @@
             color: #92400E;
             line-height: 1.5;
         }
-        /* Live Size Display */
         .live-size-display {
             background: linear-gradient(135deg, #DBEAFE, #BFDBFE);
             border: 2px solid #3B82F6;
@@ -721,13 +681,11 @@
             <h1 class="login-title">Dirt Shirt Designer</h1>
             <p class="login-subtitle">Custom Logo Printing Platform</p>
             
-            <!-- Tab Buttons -->
             <div class="form-tabs">
                 <button class="tab-btn active" id="signinTab">Sign In</button>
                 <button class="tab-btn" id="signupTab">Sign Up</button>
             </div>
             
-            <!-- Sign In Form -->
             <form id="loginForm">
                 <div class="form-group">
                     <label class="form-label">Email Address</label>
@@ -739,13 +697,11 @@
                 </div>
                 <div id="errorMessage" class="error-message hidden"></div>
                 <div id="successMessage" class="success-message hidden"></div>
-                <div id="infoMessage" class="info-message hidden"></div>
                 <button type="submit" class="btn-primary" id="loginBtn">
                     <span id="loginBtnText">Sign In</span>
                 </button>
             </form>
             
-            <!-- Sign Up Form -->
             <form id="signupForm" class="hidden">
                 <div class="form-group">
                     <label class="form-label">Email Address</label>
@@ -770,7 +726,6 @@
     
     <!-- Main Application -->
     <div id="mainApp" class="main-app">
-        <!-- Header -->
         <header class="header">
             <div class="header-content">
                 <div class="logo-section">
@@ -787,9 +742,7 @@
             </div>
         </header>
         
-        <!-- Main Content -->
         <div class="main-content">
-            <!-- Left: Canvas Area -->
             <div>
                 <div class="canvas-section">
                     <div class="view-controls">
@@ -813,16 +766,13 @@
                                 <p style="font-size: 18px; font-weight: 600;">Upload your logo</p>
                             </div>
                             
-                            <!-- Measurement Overlay -->
                             <div class="measurement-overlay" id="measurementOverlay"></div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Right: Controls -->
             <div class="controls-section">
-                <!-- Upload Panel -->
                 <div class="control-panel">
                     <h3 class="panel-title">Logo Upload</h3>
                     <input type="file" id="logoUpload" accept="image/*" style="display: none;">
@@ -835,7 +785,6 @@
                     </div>
                 </div>
                 
-                <!-- Shirt Configuration -->
                 <div class="control-panel">
                     <h3 class="panel-title">Shirt Configuration</h3>
                     
@@ -865,17 +814,8 @@
                             <button class="btn-sleeve" id="longSleeveBtn">Long Sleeve</button>
                         </div>
                     </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Shirt Color</label>
-                        <div class="color-picker-group">
-                            <input type="color" id="shirtColor" class="color-input" value="#C85A3F">
-                            <button class="btn-reset-color" id="resetColorBtn">Reset to Dirt Orange</button>
-                        </div>
-                    </div>
                 </div>
                 
-                <!-- Logo Adjustments -->
                 <div class="control-panel" id="logoAdjustments" style="display: none;">
                     <h3 class="panel-title">Logo Adjustments</h3>
                     
@@ -901,7 +841,6 @@
                     <button class="btn-center" id="centerBtn">Reset Position</button>
                 </div>
                 
-                <!-- Live Size Display -->
                 <div class="live-size-display" id="liveSizeDisplay" style="display: none;">
                     <div class="live-size-title">
                         📏 Real-Time Measurements
@@ -924,7 +863,6 @@
                     </div>
                 </div>
                 
-                <!-- Print Specifications -->
                 <div class="specs-panel" id="specsPanel" style="display: none;">
                     <div class="specs-header">
                         <span style="font-size: 20px;">📐</span>
@@ -961,7 +899,7 @@
                     </div>
                     
                     <p class="specs-note">
-                        <strong>💡 Professional Tip:</strong> For best results, keep logos within recommended dimensions. Oversized logos may require special printing considerations.
+                        <strong>💡 Professional Tip:</strong> For best results, keep logos within recommended dimensions.
                     </p>
                 </div>
             </div>
@@ -983,6 +921,64 @@
         
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
+        
+        // ========================================
+        // SHIRT IMAGES (Base64 embedded)
+        // ========================================
+        const shirtImages = {
+            shortSleeve: {
+                front: null,
+                back: null
+            },
+            longSleeve: {
+                front: null,
+                back: null
+            }
+        };
+        
+        // Load shirt images
+        function loadShirtImages() {
+            return new Promise((resolve) => {
+                let loadedCount = 0;
+                const totalImages = 4;
+                
+                // Short sleeve front
+                const shortFront = new Image();
+                shortFront.onload = () => {
+                    shirtImages.shortSleeve.front = shortFront;
+                    loadedCount++;
+                    if (loadedCount === totalImages) resolve();
+                };
+                shortFront.src = '/mnt/user-data/uploads/shortsleeve.jpg';
+                
+                // Short sleeve back (same image)
+                const shortBack = new Image();
+                shortBack.onload = () => {
+                    shirtImages.shortSleeve.back = shortBack;
+                    loadedCount++;
+                    if (loadedCount === totalImages) resolve();
+                };
+                shortBack.src = '/mnt/user-data/uploads/shortsleeve.jpg';
+                
+                // Long sleeve front
+                const longFront = new Image();
+                longFront.onload = () => {
+                    shirtImages.longSleeve.front = longFront;
+                    loadedCount++;
+                    if (loadedCount === totalImages) resolve();
+                };
+                longFront.src = '/mnt/user-data/uploads/longsleeve.jpg';
+                
+                // Long sleeve back (same image)
+                const longBack = new Image();
+                longBack.onload = () => {
+                    shirtImages.longSleeve.back = longBack;
+                    loadedCount++;
+                    if (loadedCount === totalImages) resolve();
+                };
+                longBack.src = '/mnt/user-data/uploads/longsleeve.jpg';
+            });
+        }
         
         // ========================================
         // SIZE SPECIFICATIONS
@@ -1134,7 +1130,6 @@
             shirtView: 'front',
             shirtSize: 'adult-m',
             sleeveType: 'short',
-            shirtColor: '#C85A3F',
             logoImage: null,
             logoImageObj: null,
             logoPosition: { x: 50, y: 45 },
@@ -1150,22 +1145,18 @@
         const loginScreen = document.getElementById('loginScreen');
         const mainApp = document.getElementById('mainApp');
         
-        // Auth tabs and forms
         const signinTab = document.getElementById('signinTab');
         const signupTab = document.getElementById('signupTab');
         const loginForm = document.getElementById('loginForm');
         const signupForm = document.getElementById('signupForm');
         
-        // Sign in elements
         const emailInput = document.getElementById('emailInput');
         const passwordInput = document.getElementById('passwordInput');
         const errorMessage = document.getElementById('errorMessage');
         const successMessage = document.getElementById('successMessage');
-        const infoMessage = document.getElementById('infoMessage');
         const loginBtn = document.getElementById('loginBtn');
         const loginBtnText = document.getElementById('loginBtnText');
         
-        // Sign up elements
         const signupEmailInput = document.getElementById('signupEmailInput');
         const signupPasswordInput = document.getElementById('signupPasswordInput');
         const confirmPasswordInput = document.getElementById('confirmPasswordInput');
@@ -1177,7 +1168,6 @@
         const userEmailDisplay = document.getElementById('userEmail');
         const logoutBtn = document.getElementById('logoutBtn');
         
-        // Canvas elements
         const shirtCanvas = document.getElementById('shirtCanvas');
         const shirtRenderCanvas = document.getElementById('shirtRenderCanvas');
         const ctx = shirtRenderCanvas.getContext('2d');
@@ -1196,8 +1186,6 @@
         const shirtSizeSelect = document.getElementById('shirtSize');
         const shortSleeveBtn = document.getElementById('shortSleeveBtn');
         const longSleeveBtn = document.getElementById('longSleeveBtn');
-        const shirtColorInput = document.getElementById('shirtColor');
-        const resetColorBtn = document.getElementById('resetColorBtn');
         
         const logoAdjustments = document.getElementById('logoAdjustments');
         const logoSizeSlider = document.getElementById('logoSize');
@@ -1245,7 +1233,6 @@
         function clearMessages() {
             errorMessage.classList.add('hidden');
             successMessage.classList.add('hidden');
-            infoMessage.classList.add('hidden');
             signupErrorMessage.classList.add('hidden');
             signupSuccessMessage.classList.add('hidden');
         }
@@ -1324,7 +1311,7 @@
         }
         
         // ========================================
-        // PHOTOREALISTIC SHIRT RENDERING
+        // SHIRT RENDERING WITH IMAGES
         // ========================================
         function renderShirt() {
             const width = shirtRenderCanvas.width;
@@ -1332,198 +1319,33 @@
             
             ctx.clearRect(0, 0, width, height);
             
-            // Create photorealistic t-shirt
-            ctx.save();
+            // Get the appropriate shirt image
+            const sleeveType = state.sleeveType === 'short' ? 'shortSleeve' : 'longSleeve';
+            const view = state.shirtView === 'front' ? 'front' : 'back';
+            const shirtImg = shirtImages[sleeveType][view];
             
-            // Main shirt body with realistic fabric gradient
-            const bodyGradient = ctx.createLinearGradient(width * 0.3, 0, width * 0.7, height);
-            const baseColor = hexToRgb(state.shirtColor);
-            
-            // Create realistic fabric shading
-            bodyGradient.addColorStop(0, lightenColor(state.shirtColor, 25));
-            bodyGradient.addColorStop(0.15, lightenColor(state.shirtColor, 15));
-            bodyGradient.addColorStop(0.4, state.shirtColor);
-            bodyGradient.addColorStop(0.65, darkenColor(state.shirtColor, 8));
-            bodyGradient.addColorStop(1, darkenColor(state.shirtColor, 18));
-            
-            ctx.fillStyle = bodyGradient;
-            
-            // Draw realistic t-shirt shape
-            ctx.beginPath();
-            
-            // Shoulders
-            ctx.moveTo(width * 0.2, height * 0.12);
-            
-            // Left shoulder curve
-            ctx.quadraticCurveTo(width * 0.25, height * 0.1, width * 0.35, height * 0.095);
-            
-            // Neckline left
-            ctx.quadraticCurveTo(width * 0.42, height * 0.09, width * 0.46, height * 0.095);
-            ctx.lineTo(width * 0.54, height * 0.095);
-            
-            // Neckline right
-            ctx.quadraticCurveTo(width * 0.58, height * 0.09, width * 0.65, height * 0.095);
-            
-            // Right shoulder curve
-            ctx.quadraticCurveTo(width * 0.75, height * 0.1, width * 0.8, height * 0.12);
-            
-            // Right sleeve
-            if (state.sleeveType === 'short') {
-                ctx.lineTo(width * 0.88, height * 0.15);
-                ctx.quadraticCurveTo(width * 0.89, height * 0.19, width * 0.87, height * 0.21);
-                ctx.lineTo(width * 0.78, height * 0.18);
-            } else {
-                ctx.lineTo(width * 0.92, height * 0.18);
-                ctx.quadraticCurveTo(width * 0.94, height * 0.28, width * 0.91, height * 0.30);
-                ctx.lineTo(width * 0.78, height * 0.22);
-            }
-            
-            // Right side seam
-            ctx.lineTo(width * 0.77, height * 0.55);
-            
-            // Bottom right hem
-            ctx.quadraticCurveTo(width * 0.77, height * 0.58, width * 0.75, height * 0.585);
-            ctx.lineTo(width * 0.25, height * 0.585);
-            
-            // Bottom left hem
-            ctx.quadraticCurveTo(width * 0.23, height * 0.58, width * 0.23, height * 0.55);
-            
-            // Left side seam
-            ctx.lineTo(width * 0.22, height * 0.18);
-            
-            // Left sleeve
-            if (state.sleeveType === 'short') {
-                ctx.lineTo(width * 0.13, height * 0.21);
-                ctx.quadraticCurveTo(width * 0.11, height * 0.19, width * 0.12, height * 0.15);
-            } else {
-                ctx.lineTo(width * 0.09, height * 0.30);
-                ctx.quadraticCurveTo(width * 0.06, height * 0.28, width * 0.08, height * 0.18);
-            }
-            
-            ctx.closePath();
-            ctx.fill();
-            
-            // Add subtle fabric texture with noise
-            ctx.globalAlpha = 0.03;
-            for (let i = 0; i < 3000; i++) {
-                const x = Math.random() * width;
-                const y = Math.random() * height;
-                ctx.fillStyle = Math.random() > 0.5 ? '#000' : '#fff';
-                ctx.fillRect(x, y, 1, 1);
-            }
-            ctx.globalAlpha = 1;
-            
-            // Add realistic shadows and depth
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-            ctx.shadowBlur = 20;
-            ctx.shadowOffsetX = 8;
-            ctx.shadowOffsetY = 8;
-            ctx.fill();
-            
-            ctx.shadowColor = 'transparent';
-            
-            // Sleeve shadows for depth
-            if (state.sleeveType === 'short') {
-                // Left sleeve shadow
-                const leftSleeveGrad = ctx.createLinearGradient(width * 0.12, height * 0.15, width * 0.22, height * 0.18);
-                leftSleeveGrad.addColorStop(0, 'rgba(0,0,0,0.15)');
-                leftSleeveGrad.addColorStop(1, 'rgba(0,0,0,0)');
-                ctx.fillStyle = leftSleeveGrad;
-                ctx.beginPath();
-                ctx.moveTo(width * 0.12, height * 0.15);
-                ctx.lineTo(width * 0.13, height * 0.21);
-                ctx.lineTo(width * 0.22, height * 0.18);
-                ctx.closePath();
-                ctx.fill();
+            if (shirtImg) {
+                // Draw shirt image (show only front view for now since we have front/back in same image)
+                const imgAspect = shirtImg.width / shirtImg.height;
                 
-                // Right sleeve shadow
-                const rightSleeveGrad = ctx.createLinearGradient(width * 0.88, height * 0.15, width * 0.78, height * 0.18);
-                rightSleeveGrad.addColorStop(0, 'rgba(0,0,0,0.15)');
-                rightSleeveGrad.addColorStop(1, 'rgba(0,0,0,0)');
-                ctx.fillStyle = rightSleeveGrad;
-                ctx.beginPath();
-                ctx.moveTo(width * 0.88, height * 0.15);
-                ctx.lineTo(width * 0.87, height * 0.21);
-                ctx.lineTo(width * 0.78, height * 0.18);
-                ctx.closePath();
-                ctx.fill();
+                // Use left half for front view, right half for back view
+                const sourceX = view === 'front' ? 0 : shirtImg.width / 2;
+                const sourceWidth = shirtImg.width / 2;
+                const sourceHeight = shirtImg.height;
+                
+                // Calculate scaling to fit canvas
+                const targetWidth = width;
+                const targetHeight = (sourceHeight / sourceWidth) * targetWidth;
+                
+                // Center vertically if needed
+                const offsetY = (height - targetHeight) / 2;
+                
+                ctx.drawImage(
+                    shirtImg,
+                    sourceX, 0, sourceWidth, sourceHeight,
+                    0, offsetY, targetWidth, targetHeight
+                );
             }
-            
-            // Neckline collar with ribbing effect
-            const collarGradient = ctx.createRadialGradient(
-                width * 0.5, height * 0.095, 0,
-                width * 0.5, height * 0.095, width * 0.1
-            );
-            collarGradient.addColorStop(0, darkenColor(state.shirtColor, 15));
-            collarGradient.addColorStop(1, darkenColor(state.shirtColor, 25));
-            
-            ctx.fillStyle = collarGradient;
-            ctx.beginPath();
-            ctx.ellipse(width * 0.5, height * 0.095, width * 0.09, height * 0.02, 0, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Inner collar shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.2)';
-            ctx.beginPath();
-            ctx.ellipse(width * 0.5, height * 0.093, width * 0.085, height * 0.018, 0, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Collar stitching detail
-            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.ellipse(width * 0.5, height * 0.095, width * 0.09, height * 0.02, 0, 0, Math.PI * 2);
-            ctx.stroke();
-            
-            // Side seam details
-            ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-            ctx.lineWidth = 2;
-            
-            // Left seam
-            ctx.beginPath();
-            ctx.moveTo(width * 0.22, height * 0.18);
-            ctx.lineTo(width * 0.23, height * 0.55);
-            ctx.stroke();
-            
-            // Right seam
-            ctx.beginPath();
-            ctx.moveTo(width * 0.78, height * 0.18);
-            ctx.lineTo(width * 0.77, height * 0.55);
-            ctx.stroke();
-            
-            // Bottom hem detail
-            ctx.beginPath();
-            ctx.moveTo(width * 0.25, height * 0.585);
-            ctx.lineTo(width * 0.75, height * 0.585);
-            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
-            
-            // Add fabric wrinkles for realism
-            ctx.strokeStyle = 'rgba(0,0,0,0.04)';
-            ctx.lineWidth = 1;
-            
-            // Subtle wrinkle 1
-            ctx.beginPath();
-            ctx.moveTo(width * 0.3, height * 0.25);
-            ctx.quadraticCurveTo(width * 0.35, height * 0.3, width * 0.32, height * 0.35);
-            ctx.stroke();
-            
-            // Subtle wrinkle 2
-            ctx.beginPath();
-            ctx.moveTo(width * 0.7, height * 0.3);
-            ctx.quadraticCurveTo(width * 0.65, height * 0.35, width * 0.68, height * 0.4);
-            ctx.stroke();
-            
-            // Highlight along shoulders for fabric sheen
-            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(width * 0.25, height * 0.12);
-            ctx.quadraticCurveTo(width * 0.5, height * 0.09, width * 0.75, height * 0.12);
-            ctx.stroke();
-            
-            ctx.restore();
             
             // Draw logo if exists
             if (state.logoImageObj) {
@@ -1563,36 +1385,6 @@
             ctx.shadowOffsetY = 4;
             ctx.drawImage(state.logoImageObj, x, y, logoWidth, logoHeight);
             ctx.restore();
-        }
-        
-        // Color manipulation helpers
-        function hexToRgb(hex) {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? {
-                r: parseInt(result[1], 16),
-                g: parseInt(result[2], 16),
-                b: parseInt(result[3], 16)
-            } : null;
-        }
-        
-        function rgbToHex(r, g, b) {
-            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-        }
-        
-        function lightenColor(hex, percent) {
-            const rgb = hexToRgb(hex);
-            const r = Math.min(255, Math.floor(rgb.r + (255 - rgb.r) * percent / 100));
-            const g = Math.min(255, Math.floor(rgb.g + (255 - rgb.g) * percent / 100));
-            const b = Math.min(255, Math.floor(rgb.b + (255 - rgb.b) * percent / 100));
-            return rgbToHex(r, g, b);
-        }
-        
-        function darkenColor(hex, percent) {
-            const rgb = hexToRgb(hex);
-            const r = Math.max(0, Math.floor(rgb.r * (1 - percent / 100)));
-            const g = Math.max(0, Math.floor(rgb.g * (1 - percent / 100)));
-            const b = Math.max(0, Math.floor(rgb.b * (1 - percent / 100)));
-            return rgbToHex(r, g, b);
         }
         
         // ========================================
@@ -1641,7 +1433,7 @@
             const height = canvas.height;
             
             const printAreaWidth = width * 0.55;
-            const printAreaHeight = width * 0.45;
+            const printAreaHeight = height * 0.45;
             const printAreaX = width * 0.225;
             const printAreaY = height * 0.25;
             
@@ -1730,7 +1522,6 @@
             }
         });
         
-        // Sign In
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = emailInput.value.trim();
@@ -1742,7 +1533,6 @@
             
             try {
                 await auth.signInWithEmailAndPassword(email, password);
-                // Success will be handled by onAuthStateChanged
             } catch (error) {
                 console.error('Login error:', error);
                 let errorMsg = 'Login failed. Please try again.';
@@ -1777,7 +1567,6 @@
             }
         });
         
-        // Sign Up
         signupForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = signupEmailInput.value.trim();
@@ -1788,7 +1577,6 @@
             signupBtnText.innerHTML = '<span class="loading"></span>';
             clearMessages();
             
-            // Validate passwords match
             if (password !== confirmPassword) {
                 signupErrorMessage.textContent = 'Passwords do not match.';
                 signupErrorMessage.classList.remove('hidden');
@@ -1797,7 +1585,6 @@
                 return;
             }
             
-            // Validate password length
             if (password.length < 6) {
                 signupErrorMessage.textContent = 'Password must be at least 6 characters.';
                 signupErrorMessage.classList.remove('hidden');
@@ -1808,7 +1595,6 @@
             
             try {
                 await auth.createUserWithEmailAndPassword(email, password);
-                // Success will be handled by onAuthStateChanged
             } catch (error) {
                 console.error('Signup error:', error);
                 let errorMsg = 'Sign up failed. Please try again.';
@@ -1837,7 +1623,6 @@
             }
         });
         
-        // Logout
         logoutBtn.addEventListener('click', async () => {
             try {
                 await auth.signOut();
@@ -1847,12 +1632,11 @@
             }
         });
         
-        function showMainApp() {
+        async function showMainApp() {
             loginScreen.style.display = 'none';
             mainApp.style.display = 'block';
             userEmailDisplay.textContent = state.userEmail;
             
-            // Reset forms
             loginForm.reset();
             signupForm.reset();
             loginBtn.disabled = false;
@@ -1860,6 +1644,11 @@
             loginBtnText.textContent = 'Sign In';
             signupBtnText.textContent = 'Create Account';
             clearMessages();
+            
+            // Load shirt images if not already loaded
+            if (!shirtImages.shortSleeve.front) {
+                await loadShirtImages();
+            }
             
             renderShirt();
         }
@@ -1871,12 +1660,14 @@
             state.shirtView = 'front';
             frontViewBtn.classList.add('active');
             backViewBtn.classList.remove('active');
+            renderShirt();
         });
         
         backViewBtn.addEventListener('click', () => {
             state.shirtView = 'back';
             backViewBtn.classList.add('active');
             frontViewBtn.classList.remove('active');
+            renderShirt();
         });
         
         // ========================================
@@ -1944,17 +1735,6 @@
             state.sleeveType = 'long';
             longSleeveBtn.classList.add('active');
             shortSleeveBtn.classList.remove('active');
-            renderShirt();
-        });
-        
-        shirtColorInput.addEventListener('input', (e) => {
-            state.shirtColor = e.target.value;
-            renderShirt();
-        });
-        
-        resetColorBtn.addEventListener('click', () => {
-            state.shirtColor = '#C85A3F';
-            shirtColorInput.value = '#C85A3F';
             renderShirt();
         });
         
@@ -2113,13 +1893,11 @@
             exportCtx.save();
             exportCtx.scale(scale, scale);
             
-            // Redraw everything on export canvas
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = 800;
             tempCanvas.height = 1000;
             const tempCtx = tempCanvas.getContext('2d');
             
-            // Copy current canvas
             const originalCanvas = shirtRenderCanvas;
             tempCtx.drawImage(originalCanvas, 0, 0);
             
@@ -2132,8 +1910,10 @@
             link.click();
         });
         
-        // Initialize
-        renderShirt();
+        // Initialize - load shirt images
+        loadShirtImages().then(() => {
+            renderShirt();
+        });
     </script>
 </body>
 </html>
