@@ -1,6 +1,7 @@
 // ========================================
 // APPLICATION STATE
 // ========================================
+// Note: auth variable is defined in config.js and globally available
 let state = {
     isAuthenticated: false,
     userEmail: '',
@@ -15,6 +16,15 @@ let state = {
     logoPlacement: 'center',
     shirtImagesLoaded: false
 };
+
+// Check if Firebase auth is available
+if (typeof auth === 'undefined' || !auth) {
+    console.error('❌ Firebase auth not found! Make sure config.js is loaded before app.js');
+    alert('Authentication system not initialized. Please check console and refresh.');
+}
+
+// Also check window.auth as a fallback
+const authInstance = auth || window.auth;
 
 // Shirt images storage
 const shirtImages = {
@@ -209,36 +219,53 @@ signupTab.addEventListener('click', () => {
 // ========================================
 // FIREBASE AUTHENTICATION
 // ========================================
-auth.onAuthStateChanged((user) => {
-    if (user) {
-        state.isAuthenticated = true;
-        state.userEmail = user.email;
-        showMainApp();
-    } else {
-        state.isAuthenticated = false;
-        loginScreen.style.display = 'flex';
-        mainApp.style.display = 'none';
-    }
-});
+if (authInstance) {
+    authInstance.onAuthStateChanged((user) => {
+        if (user) {
+            state.isAuthenticated = true;
+            state.userEmail = user.email;
+            showMainApp();
+        } else {
+            state.isAuthenticated = false;
+            loginScreen.style.display = 'flex';
+            mainApp.style.display = 'none';
+        }
+    });
+} else {
+    console.error('Cannot set up auth state listener - auth not available');
+}
 
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = emailInput.value.trim();
     const password = passwordInput.value;
     
+    console.log('Login attempt for:', email);
+    
     loginBtn.disabled = true;
     loginBtnText.innerHTML = '<span class="loading"></span>';
     clearMessages();
     
+    // Check if Firebase is initialized
+    const firebaseAuth = authInstance || window.auth;
+    if (!firebaseAuth) {
+        console.error('Firebase auth not initialized');
+        showError(errorMessage, 'Authentication system not ready. Please refresh the page.');
+        loginBtn.disabled = false;
+        loginBtnText.textContent = 'Sign In';
+        return;
+    }
+    
     try {
-        await auth.signInWithEmailAndPassword(email, password);
+        const userCredential = await firebaseAuth.signInWithEmailAndPassword(email, password);
+        console.log('Login successful:', userCredential.user.email);
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('Login error:', error.code, error.message);
         let errorMsg = 'Login failed. Please try again.';
         
         switch(error.code) {
             case 'auth/invalid-email':
-                errorMsg = 'Invalid email address.';
+                errorMsg = 'Invalid email address format.';
                 break;
             case 'auth/user-disabled':
                 errorMsg = 'This account has been disabled.';
@@ -250,13 +277,16 @@ loginForm.addEventListener('submit', async (e) => {
                 errorMsg = 'Incorrect password.';
                 break;
             case 'auth/invalid-credential':
-                errorMsg = 'Invalid email or password. If you don\'t have an account, please sign up.';
+                errorMsg = 'Invalid email or password. Please check your credentials and try again.';
                 break;
             case 'auth/too-many-requests':
-                errorMsg = 'Too many failed attempts. Try again later.';
+                errorMsg = 'Too many failed attempts. Please wait a few minutes and try again.';
+                break;
+            case 'auth/network-request-failed':
+                errorMsg = 'Network error. Please check your internet connection.';
                 break;
             default:
-                errorMsg = error.message;
+                errorMsg = `Error: ${error.message}`;
         }
         
         showError(errorMessage, errorMsg);
@@ -289,8 +319,16 @@ signupForm.addEventListener('submit', async (e) => {
         return;
     }
     
+    const firebaseAuth = authInstance || window.auth;
+    if (!firebaseAuth) {
+        showError(signupErrorMessage, 'Authentication system not ready. Please refresh the page.');
+        signupBtn.disabled = false;
+        signupBtnText.textContent = 'Create Account';
+        return;
+    }
+    
     try {
-        await auth.createUserWithEmailAndPassword(email, password);
+        await firebaseAuth.createUserWithEmailAndPassword(email, password);
     } catch (error) {
         console.error('Signup error:', error);
         let errorMsg = 'Sign up failed. Please try again.';
@@ -320,7 +358,10 @@ signupForm.addEventListener('submit', async (e) => {
 
 logoutBtn.addEventListener('click', async () => {
     try {
-        await auth.signOut();
+        const firebaseAuth = authInstance || window.auth;
+        if (firebaseAuth) {
+            await firebaseAuth.signOut();
+        }
     } catch (error) {
         console.error('Logout error:', error);
         alert('Error logging out. Please try again.');
