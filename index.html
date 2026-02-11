@@ -936,49 +936,54 @@
             }
         };
         
-        // Load shirt images
-        function loadShirtImages() {
-            return new Promise((resolve) => {
-                let loadedCount = 0;
-                const totalImages = 4;
-                
-                // Short sleeve front
-                const shortFront = new Image();
-                shortFront.onload = () => {
-                    shirtImages.shortSleeve.front = shortFront;
-                    loadedCount++;
-                    if (loadedCount === totalImages) resolve();
-                };
-                shortFront.src = '/mnt/user-data/uploads/shortsleeve.jpg';
-                
-                // Short sleeve back (same image)
-                const shortBack = new Image();
-                shortBack.onload = () => {
-                    shirtImages.shortSleeve.back = shortBack;
-                    loadedCount++;
-                    if (loadedCount === totalImages) resolve();
-                };
-                shortBack.src = '/mnt/user-data/uploads/shortsleeve.jpg';
-                
-                // Long sleeve front
-                const longFront = new Image();
-                longFront.onload = () => {
-                    shirtImages.longSleeve.front = longFront;
-                    loadedCount++;
-                    if (loadedCount === totalImages) resolve();
-                };
-                longFront.src = '/mnt/user-data/uploads/longsleeve.jpg';
-                
-                // Long sleeve back (same image)
-                const longBack = new Image();
-                longBack.onload = () => {
-                    shirtImages.longSleeve.back = longBack;
-                    loadedCount++;
-                    if (loadedCount === totalImages) resolve();
-                };
-                longBack.src = '/mnt/user-data/uploads/longsleeve.jpg';
-            });
-        }
+        
+     // Embedded shirt images as base64
+const SHIRT_IMAGES_BASE64 = {
+    shortSleeve: 'data:image/jpeg;base64,SHORTSLEEVE_BASE64_HERE',
+    longSleeve: 'data:image/jpeg;base64,LONGSLEEVE_BASE64_HERE'
+};
+
+// Load shirt images from embedded base64
+function loadShirtImages() {
+    return new Promise((resolve) => {
+        let loadedCount = 0;
+        const totalImages = 4;
+        
+        // Short sleeve front & back (same image, split in rendering)
+        const shortFront = new Image();
+        shortFront.onload = () => {
+            shirtImages.shortSleeve.front = shortFront;
+            loadedCount++;
+            if (loadedCount === totalImages) resolve();
+        };
+        shortFront.src = SHIRT_IMAGES_BASE64.shortSleeve;
+        
+        const shortBack = new Image();
+        shortBack.onload = () => {
+            shirtImages.shortSleeve.back = shortBack;
+            loadedCount++;
+            if (loadedCount === totalImages) resolve();
+        };
+        shortBack.src = SHIRT_IMAGES_BASE64.shortSleeve;
+        
+        // Long sleeve front & back
+        const longFront = new Image();
+        longFront.onload = () => {
+            shirtImages.longSleeve.front = longFront;
+            loadedCount++;
+            if (loadedCount === totalImages) resolve();
+        };
+        longFront.src = SHIRT_IMAGES_BASE64.longSleeve;
+        
+        const longBack = new Image();
+        longBack.onload = () => {
+            shirtImages.longSleeve.back = longBack;
+            loadedCount++;
+            if (loadedCount === totalImages) resolve();
+        };
+        longBack.src = SHIRT_IMAGES_BASE64.longSleeve;
+    });
+}
         
         // ========================================
         // SIZE SPECIFICATIONS
