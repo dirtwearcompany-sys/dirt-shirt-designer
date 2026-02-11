@@ -14,16 +14,24 @@ const firebaseConfig = {
     appId: "1:268887622342:web:53d7386623156b06494dc7"
 };
 
-// Initialize Firebase
-let app, auth;
+// Initialize Firebase - these variables are globally available
+window.app = null;
+window.auth = null;
+
 try {
-    app = firebase.initializeApp(firebaseConfig);
-    auth = firebase.auth();
-    console.log('Firebase initialized successfully');
+    console.log('Initializing Firebase...');
+    window.app = firebase.initializeApp(firebaseConfig);
+    window.auth = firebase.auth();
+    console.log('✅ Firebase initialized successfully');
+    console.log('Auth domain:', firebaseConfig.authDomain);
 } catch (error) {
-    console.error('Firebase initialization error:', error);
+    console.error('❌ Firebase initialization error:', error);
     alert('Error initializing authentication. Please refresh the page.');
 }
+
+// Make them available as regular variables too (for backward compatibility)
+const app = window.app;
+const auth = window.auth;
 
 // ========================================
 // SHIRT IMAGE URLs
