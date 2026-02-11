@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+Here's the complete HTML file, ready to copy and paste:
+html<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -701,101 +702,29 @@
                     <span id="loginBtnText">Sign In</span>
                 </button>
             </form>
-            <script>
-                const signupForm = document.getElementById('signupForm');
-                const signupEmailInput = document.getElementById('signupEmailInput');
-                const signupPasswordInput = document.getElementById('signupPasswordInput');
-                const confirmPasswordInput = document.getElementById('confirmPasswordInput');
-                const signupBtn = document.getElementById('signupBtn');
-                const signupBtnText = document.getElementById('signupBtnText');
-                const signupErrorMessage = document.getElementById('signupErrorMessage');
-                const signupSuccessMessage = document.getElementById('signupSuccessMessage');
             
-                // Make sure Firebase auth is initialized
-                const auth = firebase.auth();
-            
-                function clearMessages() {
-                    signupErrorMessage.classList.add('hidden');
-                    signupSuccessMessage.classList.add('hidden');
-                    signupErrorMessage.textContent = '';
-                    signupSuccessMessage.textContent = '';
-                }
-            
-                signupForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-            
-                    const email = signupEmailInput.value.trim();
-                    const password = signupPasswordInput.value;
-                    const confirmPassword = confirmPasswordInput.value;
-            
-                    clearMessages();
-            
-                    // Basic validation
-                    if (!email) {
-                        signupErrorMessage.textContent = 'Email is required.';
-                        signupErrorMessage.classList.remove('hidden');
-                        return;
-                    }
-            
-                    if (password !== confirmPassword) {
-                        signupErrorMessage.textContent = 'Passwords do not match.';
-                        signupErrorMessage.classList.remove('hidden');
-                        return;
-                    }
-            
-                    if (password.length < 6) {
-                        signupErrorMessage.textContent = 'Password must be at least 6 characters.';
-                        signupErrorMessage.classList.remove('hidden');
-                        return;
-                    }
-            
-                    // Disable button while processing
-                    signupBtn.disabled = true;
-                    signupBtnText.textContent = 'Creating...';
-            
-                    try {
-                        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-            
-                        console.log('User created:', userCredential.user.email);
-            
-                        signupSuccessMessage.textContent = 'Account created successfully! Redirecting...';
-                        signupSuccessMessage.classList.remove('hidden');
-            
-                        // Optional redirect
-                        setTimeout(() => {
-                            window.location.href = "dashboard.html";
-                        }, 2000);
-            
-                    } catch (error) {
-                        let errorMsg = 'Sign up failed. Please try again.';
-            
-                        switch (error.code) {
-                            case 'auth/email-already-in-use':
-                                errorMsg = 'An account with this email already exists.';
-                                break;
-                            case 'auth/invalid-email':
-                                errorMsg = 'Invalid email address.';
-                                break;
-                            case 'auth/operation-not-allowed':
-                                errorMsg = 'Email/password sign up is not enabled.';
-                                break;
-                            case 'auth/weak-password':
-                                errorMsg = 'Password is too weak.';
-                                break;
-                            default:
-                                errorMsg = error.message;
-                        }
-            
-                        signupErrorMessage.textContent = errorMsg;
-                        signupErrorMessage.classList.remove('hidden');
-            
-                    } finally {
-                        signupBtn.disabled = false;
-                        signupBtnText.textContent = 'Create Account';
-                    }
-                });
-            </script>
-
+            <form id="signupForm" class="hidden">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" id="signupEmailInput" class="form-input" placeholder="you@company.com" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="signupPasswordInput" class="form-input" placeholder="••••••••" minlength="6" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Confirm Password</label>
+                    <input type="password" id="confirmPasswordInput" class="form-input" placeholder="••••••••" minlength="6" required>
+                </div>
+                <div id="signupErrorMessage" class="error-message hidden"></div>
+                <div id="signupSuccessMessage" class="success-message hidden"></div>
+                <button type="submit" class="btn-primary" id="signupBtn">
+                    <span id="signupBtnText">Create Account</span>
+                </button>
+            </form>
+        </div>
+    </div>
+    
     <!-- Main Application -->
     <div id="mainApp" class="main-app">
         <header class="header">
@@ -991,8 +920,16 @@
             appId: "1:268887622342:web:53d7386623156b06494dc7"
         };
         
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
+        // Initialize Firebase
+        let app, auth;
+        try {
+            app = firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            console.log('Firebase initialized successfully');
+        } catch (error) {
+            console.error('Firebase initialization error:', error);
+            alert('Error initializing authentication. Please refresh the page.');
+        }
         
         // ========================================
         // SHIRT IMAGES (Base64 embedded)
