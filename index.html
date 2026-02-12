@@ -4,29 +4,238 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dirt Shirt Designer</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="configuration.js"></script>
-    <script src="app.js"></script>
+    
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK - MUST BE LOADED FIRST -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: linear-gradient(to bottom, #F8F9FA 0%, #E9ECEF 100%);
+            min-height: 100vh;
+        }
+
+        /* Login Screen Styles */
+        .login-screen {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #2C1810 0%, #5A3428 50%, #8B4513 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            padding: 48px;
+            max-width: 440px;
+            width: 100%;
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.3);
+        }
+
+        .login-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #C85A3F, #A0452F);
+            border-radius: 20px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 16px rgba(200, 90, 63, 0.3);
+            font-size: 40px;
+        }
+
+        .login-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2C1810;
+            margin: 0 0 8px 0;
+            text-align: center;
+        }
+
+        .login-subtitle {
+            font-size: 16px;
+            color: #666;
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .form-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            background: #F3F4F6;
+            border-radius: 12px;
+            padding: 4px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #6B7280;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #2C1810;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border: 2px solid #E5E7EB;
+            border-radius: 12px;
+            outline: none;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            border-color: #C85A3F;
+        }
+
+        .error-message {
+            background: #FEE2E2;
+            border: 1px solid #FCA5A5;
+            color: #991B1B;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .success-message {
+            background: #D1FAE5;
+            border: 1px solid #6EE7B7;
+            color: #065F46;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #C85A3F, #A0452F);
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-family: inherit;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(200, 90, 63, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .main-app {
+            display: none;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Simple main app placeholder */
+        .header {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .app-title {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .btn-logout {
+            padding: 10px 20px;
+            background: #E5E7EB;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .main-content {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-    <!-- Processing Overlay -->
-    <div id="processingOverlay" class="processing-overlay hidden">
-        <div class="processing-content">
-            <div class="spinner"></div>
-            <h3 style="margin: 0 0 8px 0; color: #1F2937;">Processing Image</h3>
-            <p style="margin: 0; color: #6B7280; font-size: 14px;">Optimizing your logo...</p>
-        </div>
-    </div>
-    
     <!-- Login Screen -->
     <div id="loginScreen" class="login-screen">
         <div class="login-container">
@@ -49,7 +258,6 @@
                     <input type="password" id="passwordInput" class="form-input" placeholder="••••••••" required>
                 </div>
                 <div id="errorMessage" class="error-message hidden"></div>
-                <div id="successMessage" class="success-message hidden"></div>
                 <button type="submit" class="btn-primary" id="loginBtn">
                     <span id="loginBtnText">Sign In</span>
                 </button>
@@ -69,7 +277,6 @@
                     <input type="password" id="confirmPasswordInput" class="form-input" placeholder="••••••••" minlength="6" required>
                 </div>
                 <div id="signupErrorMessage" class="error-message hidden"></div>
-                <div id="signupSuccessMessage" class="success-message hidden"></div>
                 <button type="submit" class="btn-primary" id="signupBtn">
                     <span id="signupBtnText">Create Account</span>
                 </button>
@@ -81,188 +288,218 @@
     <div id="mainApp" class="main-app">
         <header class="header">
             <div class="header-content">
-                <div class="logo-section">
-                    <div class="app-icon">👕</div>
-                    <div>
-                        <div class="app-title">Dirt Shirt Designer</div>
-                        <div class="app-subtitle">Photorealistic Custom Logo Printing</div>
-                    </div>
-                </div>
-                <div class="user-section">
-                    <span class="user-email" id="userEmail"></span>
+                <div class="app-title">Dirt Shirt Designer</div>
+                <div>
+                    <span id="userEmail" style="margin-right: 16px;"></span>
                     <button class="btn-logout" id="logoutBtn">Logout</button>
                 </div>
             </div>
         </header>
-        
         <div class="main-content">
-            <div>
-                <div class="canvas-section">
-                    <div class="view-controls">
-                        <div class="view-toggle">
-                            <button class="view-btn active" id="frontViewBtn">Front View</button>
-                            <button class="view-btn" id="backViewBtn">Back View</button>
-                        </div>
-                        <button class="btn-download" id="downloadBtn" disabled>Download Design</button>
-                    </div>
-                    
-                    <div class="shirt-canvas-wrapper">
-                        <div class="size-warning" id="sizeWarning">
-                            ⚠️ Logo exceeds recommended print area
-                        </div>
-                        
-                        <div class="shirt-canvas" id="shirtCanvas">
-                            <canvas id="shirtRenderCanvas" width="800" height="1000"></canvas>
-                            
-                            <div class="empty-state" id="emptyState">
-                                <div class="empty-icon">📤</div>
-                                <p style="font-size: 18px; font-weight: 600;">Upload your logo</p>
-                            </div>
-                            
-                            <div class="measurement-overlay" id="measurementOverlay"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="controls-section">
-                <div class="control-panel">
-                    <h3 class="panel-title">Logo Upload</h3>
-                    <input type="file" id="logoUpload" accept="image/*" style="display: none;">
-                    <button class="btn-upload" id="uploadBtn">Choose Logo File</button>
-                    <button class="btn-delete" id="deleteBtn">🗑️ Delete Logo</button>
-                    
-                    <div class="checkbox-group" style="display: none;">
-                        <input type="checkbox" id="removeBgCheckbox">
-                        <label for="removeBgCheckbox">Automatically remove background (Beta)</label>
-                    </div>
-                    <p style="font-size: 12px; color: #6B7280; margin-top: 12px;">
-                        💡 For best results, upload logos with transparent backgrounds (PNG format)
-                    </p>
-                </div>
-                
-                <div class="control-panel">
-                    <h3 class="panel-title">Shirt Configuration</h3>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Shirt Size</label>
-                        <select id="shirtSize">
-                            <optgroup label="Adult Sizes">
-                                <option value="adult-s">Adult Small</option>
-                                <option value="adult-m" selected>Adult Medium</option>
-                                <option value="adult-l">Adult Large</option>
-                                <option value="adult-xl">Adult XL</option>
-                                <option value="adult-2xl">Adult 2XL</option>
-                            </optgroup>
-                            <optgroup label="Youth Sizes">
-                                <option value="youth-s">Youth Small</option>
-                                <option value="youth-m">Youth Medium</option>
-                                <option value="youth-l">Youth Large</option>
-                                <option value="youth-xl">Youth XL</option>
-                            </optgroup>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Sleeve Type</label>
-                        <div class="sleeve-buttons">
-                            <button class="btn-sleeve active" id="shortSleeveBtn">Short Sleeve</button>
-                            <button class="btn-sleeve" id="longSleeveBtn">Long Sleeve</button>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="control-panel" id="logoAdjustments" style="display: none;">
-                    <h3 class="panel-title">Logo Adjustments</h3>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Logo Placement</label>
-                        <div class="sleeve-buttons">
-                            <button class="btn-sleeve active" id="centerLogoBtn">Center Chest</button>
-                            <button class="btn-sleeve" id="leftChestBtn">Left Chest</button>
-                        </div>
-                    </div>
-                    
-                    <div class="slider-container">
-                        <div class="slider-header">
-                            <label class="form-label" style="margin: 0;">Logo Size</label>
-                            <span class="slider-value" id="sizeValue">40%</span>
-                        </div>
-                        <input type="range" id="logoSize" min="5" max="150" value="40">
-                        <p style="font-size: 12px; color: #6B7280; margin-top: 8px;">
-                            💡 No size limits - scale as large as you need!
-                        </p>
-                    </div>
-                    
-                    <button class="btn-center" id="centerBtn">Reset Position</button>
-                </div>
-                
-                <div class="live-size-display" id="liveSizeDisplay" style="display: none;">
-                    <div class="live-size-title">
-                        📏 Real-Time Measurements
-                    </div>
-                    <div class="size-metric">
-                        <span class="metric-label">Logo Width:</span>
-                        <span class="metric-value" id="liveLogoWidth">0"</span>
-                    </div>
-                    <div class="size-metric">
-                        <span class="metric-label">Logo Height:</span>
-                        <span class="metric-value" id="liveLogoHeight">0"</span>
-                    </div>
-                    <div class="size-metric">
-                        <span class="metric-label">% of Print Area:</span>
-                        <span class="metric-value" id="livePrintPercent">0%</span>
-                    </div>
-                    <div class="size-metric">
-                        <span class="metric-label">Shirt Size:</span>
-                        <span class="metric-value" id="liveShirtSize">-</span>
-                    </div>
-                </div>
-                
-                <div class="specs-panel" id="specsPanel" style="display: none;">
-                    <div class="specs-header">
-                        <span style="font-size: 20px;">📐</span>
-                        <h3 class="panel-title" style="margin: 0;">Print Specifications</h3>
-                    </div>
-                    
-                    <div class="specs-content">
-                        <div class="spec-row">
-                            <span class="spec-label">Max Print Width:</span>
-                            <span class="spec-value" id="maxPrintArea">0"</span>
-                        </div>
-                        <div class="spec-row">
-                            <span class="spec-label">Chest Width:</span>
-                            <span class="spec-value" id="chestWidth">0"</span>
-                        </div>
-                        <div class="spec-row">
-                            <span class="spec-label">Recommended Max:</span>
-                            <span class="spec-value" id="recommendedLogoSize">0"</span>
-                        </div>
-                    </div>
-                    
-                    <div class="specs-content" style="margin-top: 12px;">
-                        <h4 style="font-size: 13px; font-weight: 700; color: #92400E; margin: 0 0 8px 0;">
-                            <span id="placementTitle">Center Chest Placement</span>
-                        </h4>
-                        <div class="spec-row">
-                            <span class="spec-label">From Collar (down):</span>
-                            <span class="spec-value" id="collarDistance">0"</span>
-                        </div>
-                        <div class="spec-row" id="leftChestSpecs" style="display: none;">
-                            <span class="spec-label">From Left Seam:</span>
-                            <span class="spec-value" id="leftSeamDistance">0"</span>
-                        </div>
-                    </div>
-                    
-                    <p class="specs-note">
-                        <strong>💡 Professional Tip:</strong> For best results, keep logos within recommended dimensions.
-                    </p>
-                </div>
-            </div>
+            <h2>✅ Login Successful!</h2>
+            <p style="margin: 20px 0;">You are now logged in as: <strong id="userEmailDisplay"></strong></p>
+            <p>The full design interface will load here.</p>
         </div>
     </div>
     
-    <script src="config.js"></script>
-    <script src="app.js"></script>
+    <script>
+        // Firebase Configuration
+        console.log('Step 1: Checking Firebase SDK...');
+        console.log('Firebase available:', typeof firebase !== 'undefined');
+        
+        if (typeof firebase === 'undefined') {
+            alert('ERROR: Firebase SDK not loaded. Check your internet connection.');
+        }
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyC7emcD5iDYSLsjOH0NwstwM_0rRhkDpDA",
+            authDomain: "dirt-shirt-designer.firebaseapp.com",
+            projectId: "dirt-shirt-designer",
+            storageBucket: "dirt-shirt-designer.firebasestorage.app",
+            messagingSenderId: "268887622342",
+            appId: "1:268887622342:web:53d7386623156b06494dc7"
+        };
+        
+        // Initialize Firebase
+        console.log('Step 2: Initializing Firebase...');
+        let app, auth;
+        
+        try {
+            app = firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            console.log('✅ Firebase initialized successfully');
+        } catch (error) {
+            console.error('❌ Firebase initialization error:', error);
+            alert('Failed to initialize Firebase: ' + error.message);
+        }
+        
+        // DOM Elements
+        const loginScreen = document.getElementById('loginScreen');
+        const mainApp = document.getElementById('mainApp');
+        const signinTab = document.getElementById('signinTab');
+        const signupTab = document.getElementById('signupTab');
+        const loginForm = document.getElementById('loginForm');
+        const signupForm = document.getElementById('signupForm');
+        const emailInput = document.getElementById('emailInput');
+        const passwordInput = document.getElementById('passwordInput');
+        const errorMessage = document.getElementById('errorMessage');
+        const loginBtn = document.getElementById('loginBtn');
+        const loginBtnText = document.getElementById('loginBtnText');
+        const signupEmailInput = document.getElementById('signupEmailInput');
+        const signupPasswordInput = document.getElementById('signupPasswordInput');
+        const confirmPasswordInput = document.getElementById('confirmPasswordInput');
+        const signupErrorMessage = document.getElementById('signupErrorMessage');
+        const signupBtn = document.getElementById('signupBtn');
+        const signupBtnText = document.getElementById('signupBtnText');
+        const userEmail = document.getElementById('userEmail');
+        const userEmailDisplay = document.getElementById('userEmailDisplay');
+        const logoutBtn = document.getElementById('logoutBtn');
+        
+        // Tab Switching
+        signinTab.addEventListener('click', () => {
+            signinTab.classList.add('active');
+            signupTab.classList.remove('active');
+            loginForm.classList.remove('hidden');
+            signupForm.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            signupErrorMessage.classList.add('hidden');
+        });
+        
+        signupTab.addEventListener('click', () => {
+            signupTab.classList.add('active');
+            signinTab.classList.remove('active');
+            signupForm.classList.remove('hidden');
+            loginForm.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            signupErrorMessage.classList.add('hidden');
+        });
+        
+        // Auth State Listener
+        if (auth) {
+            console.log('Step 3: Setting up auth listener...');
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    console.log('✅ User logged in:', user.email);
+                    loginScreen.style.display = 'none';
+                    mainApp.style.display = 'block';
+                    userEmail.textContent = user.email;
+                    userEmailDisplay.textContent = user.email;
+                } else {
+                    console.log('No user logged in');
+                    loginScreen.style.display = 'flex';
+                    mainApp.style.display = 'none';
+                }
+            });
+        }
+        
+        // Login Form
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+            
+            console.log('Login attempt:', email);
+            loginBtn.disabled = true;
+            loginBtnText.innerHTML = '<span class="loading"></span>';
+            errorMessage.classList.add('hidden');
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                console.log('Login successful');
+            } catch (error) {
+                console.error('Login error:', error.code, error.message);
+                let msg = 'Login failed. ';
+                
+                switch(error.code) {
+                    case 'auth/user-not-found':
+                        msg += 'No account found. Please sign up first.';
+                        break;
+                    case 'auth/wrong-password':
+                        msg += 'Incorrect password.';
+                        break;
+                    case 'auth/invalid-credential':
+                        msg += 'Invalid email or password.';
+                        break;
+                    case 'auth/invalid-email':
+                        msg += 'Invalid email format.';
+                        break;
+                    default:
+                        msg += error.message;
+                }
+                
+                errorMessage.textContent = msg;
+                errorMessage.classList.remove('hidden');
+                loginBtn.disabled = false;
+                loginBtnText.textContent = 'Sign In';
+            }
+        });
+        
+        // Signup Form
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = signupEmailInput.value.trim();
+            const password = signupPasswordInput.value;
+            const confirm = confirmPasswordInput.value;
+            
+            signupBtn.disabled = true;
+            signupBtnText.innerHTML = '<span class="loading"></span>';
+            signupErrorMessage.classList.add('hidden');
+            
+            if (password !== confirm) {
+                signupErrorMessage.textContent = 'Passwords do not match.';
+                signupErrorMessage.classList.remove('hidden');
+                signupBtn.disabled = false;
+                signupBtnText.textContent = 'Create Account';
+                return;
+            }
+            
+            if (password.length < 6) {
+                signupErrorMessage.textContent = 'Password must be at least 6 characters.';
+                signupErrorMessage.classList.remove('hidden');
+                signupBtn.disabled = false;
+                signupBtnText.textContent = 'Create Account';
+                return;
+            }
+            
+            try {
+                await auth.createUserWithEmailAndPassword(email, password);
+                console.log('Signup successful');
+            } catch (error) {
+                console.error('Signup error:', error.code, error.message);
+                let msg = 'Sign up failed. ';
+                
+                switch(error.code) {
+                    case 'auth/email-already-in-use':
+                        msg += 'An account already exists. Please sign in.';
+                        break;
+                    case 'auth/invalid-email':
+                        msg += 'Invalid email format.';
+                        break;
+                    case 'auth/weak-password':
+                        msg += 'Password is too weak.';
+                        break;
+                    default:
+                        msg += error.message;
+                }
+                
+                signupErrorMessage.textContent = msg;
+                signupErrorMessage.classList.remove('hidden');
+                signupBtn.disabled = false;
+                signupBtnText.textContent = 'Create Account';
+            }
+        });
+        
+        // Logout
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await auth.signOut();
+                console.log('Logged out');
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        });
+        
+        console.log('✅ All scripts loaded successfully');
+    </script>
 </body>
 </html>
