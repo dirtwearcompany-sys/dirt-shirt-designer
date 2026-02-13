@@ -477,12 +477,7 @@ const SHIRT_IMAGES = {
 // ═══════════════════════════════════
 const SIZE_DATA = {"adult": {"S": {"chest": 18, "print_w": 10, "print_h": 12}, "M": {"chest": 20, "print_w": 11, "print_h": 13}, "L": {"chest": 22, "print_w": 12, "print_h": 14}, "XL": {"chest": 24, "print_w": 13, "print_h": 15}, "XXL": {"chest": 26, "print_w": 14, "print_h": 16}, "XXXL": {"chest": 28, "print_w": 14, "print_h": 16}, "XXXXL": {"chest": 30, "print_w": 14, "print_h": 16}}, "youth": {"XS": {"chest": 13, "print_w": 7, "print_h": 8}, "S": {"chest": 14, "print_w": 8, "print_h": 9}, "M": {"chest": 15, "print_w": 9, "print_h": 10}, "L": {"chest": 16, "print_w": 10, "print_h": 11}, "XL": {"chest": 17, "print_w": 10, "print_h": 12}}};
 
-// Canvas is 400x460px, shirt print area is roughly 180x190px = 9" x 12" on a real shirt (adult M)
-// Scale: canvas print area width = 180px = 11" on adult M
-// So 1 inch = 180/11 = ~16.36px
-const CANVAS_PRINT_W = 180; // px
-const REAL_PRINT_W_INCHES = 11; // inches on adult M
-const PX_PER_INCH = CANVAS_PRINT_W / REAL_PRINT_W_INCHES; // ~16.36
+// PX_PER_INCH defined in LIVE MEASUREMENTS section below
 
 // ═══════════════════════════════════
 // FIREBASE
@@ -560,9 +555,41 @@ document.getElementById('signupTab').addEventListener('click', () => {
 });
 document.getElementById('googleBtn').addEventListener('click', async () => {
   const btn=document.getElementById('googleBtn'), txt=document.getElementById('googleBtnText');
+  const errEl=document.getElementById('errorMessage');
   btn.disabled=true; txt.innerHTML='<span class="loading-dark"></span>';
-  try { const p=new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({prompt:'select_account'}); await auth.signInWithPopup(p); }
-  catch(e) { document.getElementById('errorMessage').textContent=e.message; document.getElementById('errorMessage').classList.remove('hidden'); btn.disabled=false; txt.textContent='Continue with Google'; }
+  errEl.classList.add('hidden');
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({prompt:'select_account'});
+  try {
+    await auth.signInWithPopup(provider);
+  } catch(e) {
+    console.error('Google popup error:', e.code, e.message);
+    if(e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+      // Fallback to redirect
+      try {
+        await auth.signInWithRedirect(provider);
+      } catch(e2) {
+        errEl.textContent = 'Sign-in failed: ' + e2.message;
+        errEl.classList.remove('hidden');
+        btn.disabled=false; txt.textContent='Continue with Google';
+      }
+    } else if(e.code === 'auth/unauthorized-domain') {
+      errEl.textContent = 'Domain not authorized. Add this domain in Firebase Console → Authentication → Settings → Authorized domains.';
+      errEl.classList.remove('hidden');
+      btn.disabled=false; txt.textContent='Continue with Google';
+    } else {
+      errEl.textContent = e.message || 'Google sign-in failed.';
+      errEl.classList.remove('hidden');
+      btn.disabled=false; txt.textContent='Continue with Google';
+    }
+  }
+});
+
+// Handle redirect result on page load
+auth.getRedirectResult().then(result => {
+  if(result && result.user) console.log('Redirect sign-in success:', result.user.email);
+}).catch(e => {
+  if(e.code !== 'auth/no-auth-event') console.error('Redirect result error:', e);
 });
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault(); const btn=document.getElementById('loginBtn'),txt=document.getElementById('loginBtnText');
