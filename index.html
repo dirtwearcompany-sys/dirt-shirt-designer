@@ -657,12 +657,26 @@ function applyShirtImage() {
   const baseImg = new Image();
   baseImg.onload = () => {
     shirtColorCtx.clearRect(0,0,520,560);
-    // Fix alignment for longsleeve_back by offsetting left by 20px
+    
+    // Calculate proportionate sizing based on image dimensions
+    const canvasWidth = 520;
+    const canvasHeight = 560;
+    let drawWidth = canvasWidth;
+    let drawHeight = canvasHeight;
+    let offsetX = 0;
+    let offsetY = 0;
+    
+    // Special handling for longsleeve_back to fit it properly
     if (key === 'longsleeve_back') {
-      shirtColorCtx.drawImage(baseImg,-20,0,520,560);
-    } else {
-      shirtColorCtx.drawImage(baseImg,0,0,520,560);
+      // Scale down the longsleeve back to fit in the frame
+      const scale = 0.85; // Scale to 85% to fit properly
+      drawWidth = canvasWidth * scale;
+      drawHeight = canvasHeight * scale;
+      offsetX = (canvasWidth - drawWidth) / 2; // Center horizontally
+      offsetY = (canvasHeight - drawHeight) / 2; // Center vertically
     }
+    
+    shirtColorCtx.drawImage(baseImg, offsetX, offsetY, drawWidth, drawHeight);
     applyColorTint();
   };
   baseImg.src = src;
@@ -714,12 +728,26 @@ function applyColorTint() {
   baseImg.crossOrigin = 'anonymous';
   baseImg.onload = () => {
     shirtColorCtx.clearRect(0,0,520,560);
-    // Fix alignment for longsleeve_back by offsetting left by 20px
+    
+    // Calculate proportionate sizing based on image dimensions
+    const canvasWidth = 520;
+    const canvasHeight = 560;
+    let drawWidth = canvasWidth;
+    let drawHeight = canvasHeight;
+    let offsetX = 0;
+    let offsetY = 0;
+    
+    // Special handling for longsleeve_back to fit it properly
     if (key === 'longsleeve_back') {
-      shirtColorCtx.drawImage(baseImg,-20,0,520,560);
-    } else {
-      shirtColorCtx.drawImage(baseImg,0,0,520,560);
+      // Scale down the longsleeve back to fit in the frame
+      const scale = 0.85; // Scale to 85% to fit properly
+      drawWidth = canvasWidth * scale;
+      drawHeight = canvasHeight * scale;
+      offsetX = (canvasWidth - drawWidth) / 2; // Center horizontally
+      offsetY = (canvasHeight - drawHeight) / 2; // Center vertically
     }
+    
+    shirtColorCtx.drawImage(baseImg, offsetX, offsetY, drawWidth, drawHeight);
     const imgData = shirtColorCtx.getImageData(0,0,520,560);
     const d = imgData.data;
 
