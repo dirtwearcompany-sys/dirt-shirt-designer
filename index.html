@@ -657,7 +657,12 @@ function applyShirtImage() {
   const baseImg = new Image();
   baseImg.onload = () => {
     shirtColorCtx.clearRect(0,0,520,560);
-    shirtColorCtx.drawImage(baseImg,0,0,520,560);
+    // Fix alignment for longsleeve_back by offsetting left by 20px
+    if (key === 'longsleeve_back') {
+      shirtColorCtx.drawImage(baseImg,-20,0,520,560);
+    } else {
+      shirtColorCtx.drawImage(baseImg,0,0,520,560);
+    }
     applyColorTint();
   };
   baseImg.src = src;
@@ -709,7 +714,12 @@ function applyColorTint() {
   baseImg.crossOrigin = 'anonymous';
   baseImg.onload = () => {
     shirtColorCtx.clearRect(0,0,520,560);
-    shirtColorCtx.drawImage(baseImg,0,0,520,560);
+    // Fix alignment for longsleeve_back by offsetting left by 20px
+    if (key === 'longsleeve_back') {
+      shirtColorCtx.drawImage(baseImg,-20,0,520,560);
+    } else {
+      shirtColorCtx.drawImage(baseImg,0,0,520,560);
+    }
     const imgData = shirtColorCtx.getImageData(0,0,520,560);
     const d = imgData.data;
 
