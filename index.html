@@ -503,18 +503,30 @@ try { app=firebase.initializeApp(firebaseConfig); auth=firebase.auth(); db=fireb
 // ═══════════════════════════════════
 // STATE
 // ═══════════════════════════════════
-// Shirt size configuration - defines relative sizes for each shirt style
+// Shirt size configuration - all shirts start at same base scale
 const SHIRT_SIZES = {
   'shortsleeve_front': { scale: 1.0, offsetX: 0, offsetY: 0 },
   'shortsleeve_back': { scale: 1.0, offsetX: 0, offsetY: 0 },
-  'longsleeve_front': { scale: 1.15, offsetX: 0, offsetY: 0 },
-  'longsleeve_back': { scale: 0.68, offsetX: 0, offsetY: 0 }
+  'longsleeve_front': { scale: 1.0, offsetX: 0, offsetY: 0 },
+  'longsleeve_back': { scale: 0.85, offsetX: 0, offsetY: 0 }
+};
+
+// Size multipliers for S, M, L, XL, etc.
+const SIZE_MULTIPLIERS = {
+  'S': 0.85,
+  'M': 1.0,
+  'L': 1.15,
+  'XL': 1.30,
+  'XXL': 1.45,
+  'XXXL': 1.60,
+  'XXXXL': 1.75
 };
 
 let currentUser = null;
 let shirtColor = '#FFFFFF';
 let shirtStyle = 'shortsleeve';
 let currentView = 'front'; // 'front' | 'back'
+let selectedSize = 'M'; // Track selected shirt size
 // layers per view: { front: [...], back: [...] }
 let allLayers = { front: [], back: [] };
 let selectedLayerId = null;
@@ -670,10 +682,13 @@ function applyShirtImage() {
     // Get size configuration for this shirt style
     const sizeConfig = SHIRT_SIZES[key] || { scale: 1.0, offsetX: 0, offsetY: 0 };
     
-    // Calculate proportionate sizing based on configuration
+    // Get size multiplier based on selected size (S, M, L, XL, etc.)
+    const sizeMultiplier = SIZE_MULTIPLIERS[selectedSize] || 1.0;
+    
+    // Calculate proportionate sizing based on configuration and selected size
     const canvasWidth = 520;
     const canvasHeight = 560;
-    const scale = sizeConfig.scale;
+    const scale = sizeConfig.scale * sizeMultiplier;
     
     // Calculate dimensions maintaining aspect ratio
     let drawWidth = canvasWidth * scale;
@@ -739,10 +754,13 @@ function applyColorTint() {
     // Get size configuration for this shirt style
     const sizeConfig = SHIRT_SIZES[key] || { scale: 1.0, offsetX: 0, offsetY: 0 };
     
-    // Calculate proportionate sizing based on configuration
+    // Get size multiplier based on selected size (S, M, L, XL, etc.)
+    const sizeMultiplier = SIZE_MULTIPLIERS[selectedSize] || 1.0;
+    
+    // Calculate proportionate sizing based on configuration and selected size
     const canvasWidth = 520;
     const canvasHeight = 560;
-    const scale = sizeConfig.scale;
+    const scale = sizeConfig.scale * sizeMultiplier;
     
     // Calculate dimensions maintaining aspect ratio
     let drawWidth = canvasWidth * scale;
@@ -1195,7 +1213,12 @@ sizeGroupSelect.addEventListener('change',()=>{
   sizeSelect.value=sizes[Math.floor(sizes.length/2)];
   updateTransferGuide();
 });
-sizeSelect.addEventListener('change',updateTransferGuide);
+sizeSelect.addEventListener('change', () => {
+  selectedSize = sizeSelect.value;
+  applyShirtImage();
+  renderCanvas();
+  updateTransferGuide();
+});
 
 function getCurrentDesignSizeInches() {
   const layers=getLayers();
