@@ -503,6 +503,14 @@ try { app=firebase.initializeApp(firebaseConfig); auth=firebase.auth(); db=fireb
 // ═══════════════════════════════════
 // STATE
 // ═══════════════════════════════════
+// Shirt size configuration - defines relative sizes for each shirt style
+const SHIRT_SIZES = {
+  'shortsleeve_front': { scale: 1.0, offsetX: 0, offsetY: 0 },
+  'shortsleeve_back': { scale: 1.0, offsetX: 0, offsetY: 0 },
+  'longsleeve_front': { scale: 1.08, offsetX: 0, offsetY: -10 },
+  'longsleeve_back': { scale: 0.78, offsetX: 0, offsetY: 10 }
+};
+
 let currentUser = null;
 let shirtColor = '#FFFFFF';
 let shirtStyle = 'shortsleeve';
@@ -658,23 +666,21 @@ function applyShirtImage() {
   baseImg.onload = () => {
     shirtColorCtx.clearRect(0,0,520,560);
     
-    // Calculate proportionate sizing based on image dimensions
+    // Get size configuration for this shirt style
+    const sizeConfig = SHIRT_SIZES[key] || { scale: 1.0, offsetX: 0, offsetY: 0 };
+    
+    // Calculate proportionate sizing based on configuration
     const canvasWidth = 520;
     const canvasHeight = 560;
-    let drawWidth = canvasWidth;
-    let drawHeight = canvasHeight;
-    let offsetX = 0;
-    let offsetY = 0;
+    const scale = sizeConfig.scale;
     
-    // Special handling for longsleeve_back to fit it properly
-    if (key === 'longsleeve_back') {
-      // Scale down the longsleeve back to fit in the frame
-      const scale = 0.85; // Scale to 85% to fit properly
-      drawWidth = canvasWidth * scale;
-      drawHeight = canvasHeight * scale;
-      offsetX = (canvasWidth - drawWidth) / 2; // Center horizontally
-      offsetY = (canvasHeight - drawHeight) / 2; // Center vertically
-    }
+    // Calculate dimensions maintaining aspect ratio
+    let drawWidth = canvasWidth * scale;
+    let drawHeight = canvasHeight * scale;
+    
+    // Center the image and apply custom offsets
+    let offsetX = (canvasWidth - drawWidth) / 2 + sizeConfig.offsetX;
+    let offsetY = (canvasHeight - drawHeight) / 2 + sizeConfig.offsetY;
     
     shirtColorCtx.drawImage(baseImg, offsetX, offsetY, drawWidth, drawHeight);
     applyColorTint();
@@ -729,23 +735,21 @@ function applyColorTint() {
   baseImg.onload = () => {
     shirtColorCtx.clearRect(0,0,520,560);
     
-    // Calculate proportionate sizing based on image dimensions
+    // Get size configuration for this shirt style
+    const sizeConfig = SHIRT_SIZES[key] || { scale: 1.0, offsetX: 0, offsetY: 0 };
+    
+    // Calculate proportionate sizing based on configuration
     const canvasWidth = 520;
     const canvasHeight = 560;
-    let drawWidth = canvasWidth;
-    let drawHeight = canvasHeight;
-    let offsetX = 0;
-    let offsetY = 0;
+    const scale = sizeConfig.scale;
     
-    // Special handling for longsleeve_back to fit it properly
-    if (key === 'longsleeve_back') {
-      // Scale down the longsleeve back to fit in the frame
-      const scale = 0.85; // Scale to 85% to fit properly
-      drawWidth = canvasWidth * scale;
-      drawHeight = canvasHeight * scale;
-      offsetX = (canvasWidth - drawWidth) / 2; // Center horizontally
-      offsetY = (canvasHeight - drawHeight) / 2; // Center vertically
-    }
+    // Calculate dimensions maintaining aspect ratio
+    let drawWidth = canvasWidth * scale;
+    let drawHeight = canvasHeight * scale;
+    
+    // Center the image and apply custom offsets
+    let offsetX = (canvasWidth - drawWidth) / 2 + sizeConfig.offsetX;
+    let offsetY = (canvasHeight - drawHeight) / 2 + sizeConfig.offsetY;
     
     shirtColorCtx.drawImage(baseImg, offsetX, offsetY, drawWidth, drawHeight);
     const imgData = shirtColorCtx.getImageData(0,0,520,560);
