@@ -118,7 +118,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .shirt-mockup{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
 .shirt-mockup img{width:100%;height:100%;object-fit:contain;}
 #designCanvas{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
-.print-area-hint{position:absolute;border:1.5px dashed rgba(200,90,63,0.35);border-radius:3px;pointer-events:none;transition:opacity 0.3s;}
+.print-area-hint{position:absolute;border:1.5px dashed rgba(200,90,63,0.35);border-radius:3px;pointer-events:none;transition:opacity 0.3s;opacity:0;display:none;}
 .print-area-hint.hide{opacity:0;}
 
 /* Color overlay for shirt recoloring */
@@ -507,8 +507,8 @@ try { app=firebase.initializeApp(firebaseConfig); auth=firebase.auth(); db=fireb
 const SHIRT_SIZES = {
   'shortsleeve_front': { scale: 1.0, offsetX: 0, offsetY: 0 },
   'shortsleeve_back': { scale: 1.0, offsetX: 0, offsetY: 0 },
-  'longsleeve_front': { scale: 1.08, offsetX: 0, offsetY: -10 },
-  'longsleeve_back': { scale: 0.78, offsetX: 0, offsetY: 10 }
+  'longsleeve_front': { scale: 1.15, offsetX: 0, offsetY: 0 },
+  'longsleeve_back': { scale: 0.68, offsetX: 0, offsetY: 0 }
 };
 
 let currentUser = null;
@@ -654,6 +654,7 @@ document.querySelectorAll('.style-btn').forEach(btn => {
     btn.classList.add('active');
     shirtStyle = btn.dataset.style;
     applyShirtImage();
+    renderCanvas();
     updateInfoPanel();
     updateTransferGuide();
   });
