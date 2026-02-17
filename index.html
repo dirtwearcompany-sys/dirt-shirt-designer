@@ -508,18 +508,18 @@ const SHIRT_SIZES = {
   'shortsleeve_front': { scale: 1.0, offsetX: 0, offsetY: 0 },
   'shortsleeve_back': { scale: 1.0, offsetX: 0, offsetY: 0 },
   'longsleeve_front': { scale: 1.0, offsetX: 0, offsetY: 0 },
-  'longsleeve_back': { scale: 0.75, offsetX: 0, offsetY: 0 }
+  'longsleeve_back': { scale: 1.0, offsetX: 0, offsetY: 0 }
 };
 
-// Size multipliers for S, M, L, XL, etc. - kept conservative to fit in frame
+// Size multipliers for S, M, L, XL, etc. - makes shirt extend in width and height
 const SIZE_MULTIPLIERS = {
-  'S': 0.75,
-  'M': 0.90,
-  'L': 1.0,
-  'XL': 1.10,
-  'XXL': 1.20,
-  'XXXL': 1.28,
-  'XXXXL': 1.35
+  'S': { width: 0.85, height: 0.90 },
+  'M': { width: 0.95, height: 0.97 },
+  'L': { width: 1.0, height: 1.0 },
+  'XL': { width: 1.08, height: 1.05 },
+  'XXL': { width: 1.16, height: 1.10 },
+  'XXXL': { width: 1.24, height: 1.14 },
+  'XXXXL': { width: 1.30, height: 1.18 }
 };
 
 let currentUser = null;
@@ -683,16 +683,15 @@ function applyShirtImage() {
     const sizeConfig = SHIRT_SIZES[key] || { scale: 1.0, offsetX: 0, offsetY: 0 };
     
     // Get size multiplier based on selected size (S, M, L, XL, etc.)
-    const sizeMultiplier = SIZE_MULTIPLIERS[selectedSize] || 1.0;
+    const sizeMultiplier = SIZE_MULTIPLIERS[selectedSize] || { width: 1.0, height: 1.0 };
     
-    // Calculate proportionate sizing based on configuration and selected size
+    // Calculate proportionate sizing - shirts extend in width and height separately
     const canvasWidth = 520;
     const canvasHeight = 560;
-    const scale = sizeConfig.scale * sizeMultiplier;
     
-    // Calculate dimensions maintaining aspect ratio
-    let drawWidth = canvasWidth * scale;
-    let drawHeight = canvasHeight * scale;
+    // Apply base scale and then size-specific width/height multipliers
+    let drawWidth = canvasWidth * sizeConfig.scale * sizeMultiplier.width;
+    let drawHeight = canvasHeight * sizeConfig.scale * sizeMultiplier.height;
     
     // Center the image and apply custom offsets
     let offsetX = (canvasWidth - drawWidth) / 2 + sizeConfig.offsetX;
@@ -755,16 +754,15 @@ function applyColorTint() {
     const sizeConfig = SHIRT_SIZES[key] || { scale: 1.0, offsetX: 0, offsetY: 0 };
     
     // Get size multiplier based on selected size (S, M, L, XL, etc.)
-    const sizeMultiplier = SIZE_MULTIPLIERS[selectedSize] || 1.0;
+    const sizeMultiplier = SIZE_MULTIPLIERS[selectedSize] || { width: 1.0, height: 1.0 };
     
-    // Calculate proportionate sizing based on configuration and selected size
+    // Calculate proportionate sizing - shirts extend in width and height separately
     const canvasWidth = 520;
     const canvasHeight = 560;
-    const scale = sizeConfig.scale * sizeMultiplier;
     
-    // Calculate dimensions maintaining aspect ratio
-    let drawWidth = canvasWidth * scale;
-    let drawHeight = canvasHeight * scale;
+    // Apply base scale and then size-specific width/height multipliers
+    let drawWidth = canvasWidth * sizeConfig.scale * sizeMultiplier.width;
+    let drawHeight = canvasHeight * sizeConfig.scale * sizeMultiplier.height;
     
     // Center the image and apply custom offsets
     let offsetX = (canvasWidth - drawWidth) / 2 + sizeConfig.offsetX;
