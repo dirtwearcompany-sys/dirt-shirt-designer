@@ -18,6 +18,27 @@
   window.$fb={db,storage,auth,gp,collection,addDoc,getDocs,deleteDoc,doc,updateDoc,query,where,ref,uploadString,getDownloadURL,signInWithPopup,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,onAuthStateChanged};
   onAuthStateChanged(auth,u=>{window.$user=u;window.dispatchEvent(new CustomEvent('authChange',{detail:u}));});
   window.dispatchEvent(new Event('fbReady'));
+
+  npm install firebase
+  import { initializeApp } from "firebase/app";
+
+const firebaseConfig = {
+npm install firebase
+  import { initializeApp } from "firebase/app";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC7emcD5iDYSLsjOH0NwstwM_0rRhkDpDA",
+  authDomain: "dirt-shirt-designer.firebaseapp.com",
+  projectId: "dirt-shirt-designer",
+  storageBucket: "dirt-shirt-designer.firebasestorage.app",
+  messagingSenderId: "268887622342",
+  appId: "1:268887622342:web:53d7386623156b06494dc7" // optional, for Analytics
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+export default app;
 </script>
 <style>
 :root{
