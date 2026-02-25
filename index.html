@@ -323,13 +323,10 @@ header h1 {
   position:absolute; inset:0; pointer-events:none; z-index:1;
   display:flex; align-items:center; justify-content:center;
 }
-.shirt-img-wrap img {
-  /* Base display size — will be overridden by JS transform-based scaling */
+/* shirt-color-canvas replaces the img — sized by JS */
+#shirt-color-canvas {
   display:block;
-  object-fit:contain;
-  filter:none;
-  transition:filter .15s, width .25s ease, height .25s ease;
-  transform-origin:center center;
+  transition:width .3s ease, height .3s ease;
 }
 
 /* Design canvas — fixed size, transparent, no border */
@@ -634,10 +631,12 @@ header h1 {
 
   <div class="canvas-wrapper">
     <div class="shirt-stage" id="shirt-stage">
-      <!-- Shirt photo behind canvas -->
+      <!-- Shirt rendered onto canvas so we can colorize accurately without CSS filter artifacts -->
       <div class="shirt-img-wrap" id="shirt-img-wrap">
-        <img id="shirt-photo" src="" alt="Shirt">
+        <canvas id="shirt-color-canvas"></canvas>
       </div>
+      <!-- Hidden img used to load the source photo -->
+      <img id="shirt-photo" src="" alt="Shirt" style="display:none;">
       <!-- Fabric design canvas (transparent background) -->
       <canvas id="shirt-canvas"></canvas>
     </div>
@@ -791,70 +790,82 @@ let canvas;
 let histStack = [], histIdx = -1, ignoreHist = false;
 
 // ============================================================
-// COLOR UTILITY - convert hex to CSS filter for shirt coloring
-// This is the KEY improvement: we use CSS hue-rotate + saturate
-// to tint the white shirt photo without affecting the page background
+// SHIRT COLORIZATION — canvas-based, pixel-accurate
+// We draw the shirt photo onto a hidden canvas, then colorize
+// it using multiply/screen blend modes so the result matches
+// the actual target hex color without any yellow/sepia artifacts.
 // ============================================================
-function hexToHsl(hex) {
-  let r = parseInt(hex.slice(1,3),16)/255;
-  let g = parseInt(hex.slice(3,5),16)/255;
-  let b = parseInt(hex.slice(5,7),16)/255;
-  const max=Math.max(r,g,b), min=Math.min(r,g,b);
-  let h,s,l=(max+min)/2;
-  if(max===min){ h=s=0; }
-  else {
-    const d=max-min;
-    s=l>0.5?d/(2-max-min):d/(max+min);
-    switch(max){
-      case r: h=(g-b)/d+(g<b?6:0); break;
-      case g: h=(b-r)/d+2; break;
-      case b: h=(r-g)/d+4; break;
-    }
-    h/=6;
-  }
-  return {h:Math.round(h*360), s:Math.round(s*100), l:Math.round(l*100)};
+
+// Parse hex → {r,g,b} 0-255
+function hexToRgb(hex) {
+  const h = hex.replace('#','');
+  return {
+    r: parseInt(h.slice(0,2),16),
+    g: parseInt(h.slice(2,4),16),
+    b: parseInt(h.slice(4,6),16),
+  };
 }
 
-function getShirtFilter(hex) {
-  // For white/near-white: no tint
-  if(!hex||hex==='#FFFFFF'||hex==='#ffffff'||hex==='#EEEEEE'||hex==='#eeeeee') return 'none';
-  if(hex==='#F5F5DC'||hex==='#f5f5dc') return 'sepia(0.15) brightness(0.98)';
+// Draw the shirt source image onto the color canvas, colorized to targetHex.
+// Technique: 
+//   1. Draw original photo (grayscale perceived luminance preserved via desaturate)
+//   2. Multiply blend the target color on top — this tints whites to the color
+//      and keeps darks dark (realistic shadows/folds)
+function renderShirtColor() {
+  const srcImg = document.getElementById('shirt-photo');
+  if (!srcImg || !srcImg.complete || srcImg.naturalWidth === 0) return;
 
-  const hsl = hexToHsl(hex);
-  const h = hsl.h;
-  const s = hsl.s;
-  const l = hsl.l;
+  const cc = document.getElementById('shirt-color-canvas');
+  cc.width  = shirtImgW;
+  cc.height = shirtImgH;
+  const ctx = cc.getContext('2d');
 
-  // Strategy: 
-  // 1. Desaturate + darken slightly to make shirt "grey base"
-  // 2. Apply hue rotation to target hue
-  // 3. Saturate strongly
-  // 4. Adjust brightness based on target lightness
+  // Step 1: draw the shirt photo desaturated (greyscale) — preserves fold/shadow detail
+  ctx.filter = 'grayscale(1) brightness(1.05)';
+  ctx.drawImage(srcImg, 0, 0, shirtImgW, shirtImgH);
+  ctx.filter = 'none';
 
-  // The white shirt starts at hue=0, saturation=0
-  // We want to shift to the target hue and add color
-  
-  const brightness = Math.min(1.0, l / 55 * 0.85 + 0.15);
-  const saturate = Math.max(0.5, s / 100 * 5.5 + 0.8);
-  
-  // sepia(1) gives us a warm brown base (hue ~35)
-  // then rotate from 35 to target
-  const hueRotate = h - 35;
+  const hex = state.shirtColor || '#B5451B';
+  const isWhite = /^#(fff|ffffff|eee|eeeeee|f5f5dc)$/i.test(hex);
 
-  if(l < 18) {
-    // Very dark colors: mostly darken
-    return `brightness(${brightness}) saturate(0.5)`;
+  if (!isWhite) {
+    const {r,g,b} = hexToRgb(hex);
+
+    // Step 2: multiply the color over the greyscale shirt
+    // multiply blend: result = src × color/255
+    // This naturally tints the shirt: white areas → target color, black → black
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(0, 0, shirtImgW, shirtImgH);
+
+    // Step 3: boost saturation/vibrancy with a lighter screen layer
+    // This lifts the midtones so the color feels vivid, not muddy
+    ctx.globalCompositeOperation = 'screen';
+    // screen amount scales with how light/colorful the target color is
+    const luminance = (r*0.299 + g*0.587 + b*0.114) / 255;
+    const screenAlpha = Math.min(0.22, luminance * 0.28);
+    ctx.fillStyle = `rgba(${r},${g},${b},${screenAlpha.toFixed(3)})`;
+    ctx.fillRect(0, 0, shirtImgW, shirtImgH);
+
+    ctx.globalCompositeOperation = 'source-over';
   }
-
-  return `sepia(1) hue-rotate(${hueRotate}deg) saturate(${saturate}) brightness(${brightness})`;
+  
+  // Restore transparent pixels from the original PNG alpha
+  // (the shirt PNG has a transparent background — we need to cut it out)
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.filter = 'none';
+  ctx.drawImage(srcImg, 0, 0, shirtImgW, shirtImgH);
+  ctx.globalCompositeOperation = 'source-over';
 }
 
 function applyShirtColor() {
   const img = document.getElementById('shirt-photo');
   if (!img) return;
-  const filter = getShirtFilter(state.shirtColor);
-  img.style.filter = filter;
-  // Don't reset transition here — updateShirtSize manages that
+  if (img.complete && img.naturalWidth > 0) {
+    renderShirtColor();
+  } else {
+    img.onload = renderShirtColor;
+  }
 }
 
 // ============================================================
@@ -957,9 +968,34 @@ function initApp() {
 }
 
 function applyThumbFilters() {
-  const f = getShirtFilter(state.shirtColor);
-  const imgs = document.querySelectorAll('.shirt-thumb img');
-  imgs.forEach(img => img.style.filter = f);
+  // For thumbnails, use a simple CSS hue-rotate from the target color
+  // (acceptable for small thumbnails — full canvas render only for main view)
+  const hex = state.shirtColor || '#B5451B';
+  const isWhite = /^#(fff|ffffff|eee|eeeeee|f5f5dc)$/i.test(hex);
+  let filter = 'none';
+  if (!isWhite) {
+    // Parse to HSL for hue rotation
+    const h = hex.replace('#','');
+    const r = parseInt(h.slice(0,2),16)/255;
+    const g = parseInt(h.slice(2,4),16)/255;
+    const b = parseInt(h.slice(4,6),16)/255;
+    const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+    let hue=0, sat=0, lum=(max+min)/2;
+    if(d>0){
+      sat = lum>0.5 ? d/(2-max-min) : d/(max+min);
+      if(max===r) hue=((g-b)/d+(g<b?6:0))/6;
+      else if(max===g) hue=((b-r)/d+2)/6;
+      else hue=((r-g)/d+4)/6;
+    }
+    hue = Math.round(hue*360);
+    const s = Math.round(sat*100);
+    const l = Math.round(lum*100);
+    // grayscale first, then hue-rotate + saturate — avoids yellow sepia
+    const br = Math.min(1, l/50*0.8+0.2).toFixed(2);
+    const sat2 = Math.min(10, s/100*6+1).toFixed(1);
+    filter = `grayscale(1) brightness(${br}) sepia(1) hue-rotate(${hue-35}deg) saturate(${sat2})`;
+  }
+  document.querySelectorAll('.shirt-thumb img').forEach(img => img.style.filter = filter);
 }
 
 function initCanvas() {
@@ -984,13 +1020,15 @@ function updateShirtSize() {
   const scale = SIZE_SCALE[state.size] || {w:1, h:1};
   shirtImgW = Math.round(BASE_SHIRT_W * scale.w);
   shirtImgH = Math.round(BASE_SHIRT_H * scale.h);
-  // Update the shirt photo img element size directly
-  const img = document.getElementById('shirt-photo');
-  if (img) {
-    img.style.width  = shirtImgW + 'px';
-    img.style.height = shirtImgH + 'px';
-    img.style.transition = 'width .3s ease, height .3s ease, filter .15s';
+  // Resize the color canvas (the visible shirt display)
+  const cc = document.getElementById('shirt-color-canvas');
+  if (cc) {
+    cc.style.width  = shirtImgW + 'px';
+    cc.style.height = shirtImgH + 'px';
+    cc.style.transition = 'width .3s ease, height .3s ease';
   }
+  // Re-render with current color at new size
+  renderShirtColor();
 }
 
 function setupEvents() {
@@ -1008,9 +1046,15 @@ function setupEvents() {
 function updateShirtPhoto() {
   const img = document.getElementById('shirt-photo');
   const key = state.shirtType + '_' + state.view;
-  img.src = SHIRT_IMAGES[key] || SHIRT_IMAGES[state.shirtType+'_front'];
-  updateShirtSize(); // reapply current size dimensions
-  applyShirtColor();
+  const newSrc = SHIRT_IMAGES[key] || SHIRT_IMAGES[state.shirtType+'_front'];
+  
+  if (img.src !== newSrc) {
+    img.onload = () => { updateShirtSize(); renderShirtColor(); };
+    img.src = newSrc;
+  } else {
+    updateShirtSize();
+    renderShirtColor();
+  }
 }
 
 function setShirtType(type) {
@@ -1437,39 +1481,32 @@ function confirmDownload() {
 }
 
 function downloadWithShirt() {
-  const scale=2;
-  const tmpC=document.createElement('canvas');
-  tmpC.width=shirtW*scale; tmpC.height=shirtH*scale;
-  const ctx=tmpC.getContext('2d');
-  ctx.scale(scale,scale);
-  // Transparent background - just shirt + design
-  const sImg=new Image();
-  sImg.crossOrigin='anonymous';
-  sImg.onload=()=>{
-    // Draw the shirt with color filter applied via canvas ops
-    ctx.save();
-    ctx.drawImage(sImg,0,0,shirtW,shirtH);
-    
-    // Apply color tinting using globalCompositeOperation
-    const hex=state.shirtColor;
-    if(hex!=='#FFFFFF'&&hex!=='#EEEEEE'&&hex!=='#F5F5DC') {
-      ctx.globalCompositeOperation='multiply';
-      ctx.fillStyle=hex;
-      ctx.fillRect(0,0,shirtW,shirtH);
-    }
-    ctx.restore();
-    
-    // Draw design canvas on top
-    const dImg=new Image();
-    dImg.onload=()=>{
-      ctx.save(); ctx.globalCompositeOperation='source-over';
-      ctx.drawImage(dImg,0,0,shirtW,shirtH); ctx.restore();
-      const a=document.createElement('a');
-      a.download='shirt-mockup.png'; a.href=tmpC.toDataURL('image/png'); a.click();
-    };
-    dImg.src=canvas.toDataURL({format:'png',multiplier:1});
+  // Grab the already-rendered colorized shirt canvas and the design canvas
+  const shirtCC = document.getElementById('shirt-color-canvas');
+  if (!shirtCC) return;
+
+  const scale = 2;
+  const tmpC = document.createElement('canvas');
+  tmpC.width  = shirtImgW * scale;
+  tmpC.height = shirtImgH * scale;
+  const ctx = tmpC.getContext('2d');
+  ctx.scale(scale, scale);
+
+  // Draw colorized shirt (already correctly colored by renderShirtColor)
+  ctx.drawImage(shirtCC, 0, 0, shirtImgW, shirtImgH);
+
+  // Draw design canvas centered over the shirt
+  const designImg = new Image();
+  designImg.onload = () => {
+    const offsetX = (shirtImgW - CANVAS_W) / 2;
+    const offsetY = (shirtImgH - CANVAS_H) / 2;
+    ctx.drawImage(designImg, offsetX, offsetY, CANVAS_W, CANVAS_H);
+    const a = document.createElement('a');
+    a.download = 'shirt-mockup.png';
+    a.href = tmpC.toDataURL('image/png');
+    a.click();
   };
-  sImg.src=SHIRT_IMAGES[state.shirtType+'_'+state.view]||SHIRT_IMAGES[state.shirtType+'_front'];
+  designImg.src = canvas.toDataURL({ format:'png', multiplier:1 });
 }
 
 function downloadDesignOnly(transparent) {
