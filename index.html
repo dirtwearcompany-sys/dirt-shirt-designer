@@ -146,6 +146,23 @@
 <script type="text/babel">
 const { useState, useRef, useEffect, useCallback } = React;
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🖼️  SHIRT IMAGES — REPLACE THE "#" PATHS WITH YOUR OWN IMAGE URLS OR FILE PATHS
+//     Example:  short_front: "images/short-front.png"
+//               short_front: "https://yoursite.com/shirt-front.jpg"
+// ═══════════════════════════════════════════════════════════════════════════════
+const SHIRT_IMAGE_SRCS = {
+  // ── Short Sleeve ──────────────────────────────────────────
+  short_front:  "shortsleeve_front.png",   // Short Sleeve Front
+  short_back:   "shortsleeve_back.png",   // Short Sleeve Back
+  short_sleeve: "shortsleeve_side.png",   // Short Sleeve Sleeve
+  // ── Long Sleeve ───────────────────────────────────────────
+  long_front:   "longsleeve_front.png",   // Long Sleeve Front
+  long_back:    "longsleeve_back.png",   // Long Sleeve Back
+  long_sleeve:  "longsleeve_side.png",   // Long Sleeve Sleeve
+};
+// ═══════════════════════════════════════════════════════════════════════════════
+
 // ─── Data ────────────────────────────────────────────────────────────────────
 const SHIRT_COLORS = [
   { name:"White",       hex:"#FFFFFF" }, { name:"Black",      hex:"#1a1a1a" },
@@ -186,13 +203,22 @@ function calcDTF(pctW, pctH, maxW, maxH) {
 }
 
 function blankDesign(name="New Design") {
+  // Load images from SHIRT_IMAGE_SRCS config above — "#" means not set yet
+  function srcOrNull(key) { const s = SHIRT_IMAGE_SRCS[key]; return (s && s !== "#") ? s : null; }
   return {
     id: Date.now() + Math.random(),
     name,
     shirtColor: "#FFFFFF",
     shirtType: "short",
     activeZone: "short_front",
-    shirtImages: { short_front:null, short_back:null, short_sleeve:null, long_front:null, long_back:null, long_sleeve:null },
+    shirtImages: {
+      short_front:  srcOrNull("short_front"),
+      short_back:   srcOrNull("short_back"),
+      short_sleeve: srcOrNull("short_sleeve"),
+      long_front:   srcOrNull("long_front"),
+      long_back:    srcOrNull("long_back"),
+      long_sleeve:  srcOrNull("long_sleeve"),
+    },
     zones: { short_front:{layers:[]}, short_back:{layers:[]}, short_sleeve:{layers:[]}, long_front:{layers:[]}, long_back:{layers:[]}, long_sleeve:{layers:[]} },
   };
 }
@@ -207,10 +233,10 @@ function ShirtBackground({ zoneId, shirtImage, onUpload }) {
     reader.readAsDataURL(file);
     e.target.value = "";
   }
-  return (
-    <div style={{position:"absolute",inset:0,zIndex:0}}>
-      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile} />
-      {shirtImage ? (
+  if (shirtImage) {
+    return (
+      <div style={{position:"absolute",inset:0,zIndex:0}}>
+        <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile} />
         <div className="shirt-img-wrap">
           <img src={shirtImage} alt="shirt" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}} draggable={false} />
           <div className="shirt-replace-overlay" onClick={() => fileRef.current.click()}>
@@ -218,20 +244,109 @@ function ShirtBackground({ zoneId, shirtImage, onUpload }) {
             <div style={{fontSize:11,color:"#fff",marginTop:6}}>Replace Shirt Image</div>
           </div>
         </div>
-      ) : (
-        <div className="shirt-placeholder" onClick={() => fileRef.current.click()}>
-          <div style={{background:"#1a1a1a",border:"1px solid #2a2a2a",borderRadius:6,padding:"10px 16px",fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:1.8,userSelect:"none",textAlign:"left",marginBottom:12}}>
-            <span style={{color:"#555"}}>&lt;</span>
-            <span style={{color:"#7c3aed"}}>img</span>
-            <span style={{color:"#0d9488"}}> src</span>
-            <span style={{color:"#555"}}>=</span>
-            <span style={{color:"#f97316"}}>"#"</span>
-            <span style={{color:"#0d9488"}}> alt</span>
-            <span style={{color:"#555"}}>=</span>
-            <span style={{color:"#f97316"}}>"{ZONE_LABELS[zoneId]}"</span>
-            <span style={{color:"#555"}}> /&gt;</span>
+      </div>
+    );
+  }
+  return null;
+}
+
+// ─── ImgSrcPanel ─────────────────────────────────────────────────────────────
+// Shown in center when no shirt images are uploaded yet — displays all 6 img src="#" codes
+const ALL_ZONES_ORDERED = [
+  { id:"short_front",  label:"Short Sleeve Front"  },
+  { id:"short_back",   label:"Short Sleeve Back"   },
+  { id:"short_sleeve", label:"Short Sleeve Sleeve" },
+  { id:"long_front",   label:"Long Sleeve Front"   },
+  { id:"long_back",    label:"Long Sleeve Back"    },
+  { id:"long_sleeve",  label:"Long Sleeve Sleeve"  },
+];
+
+function ImgSrcPanel({ shirtImages, onUpload }) {
+  const fileRefs = useRef({});
+  ALL_ZONES_ORDERED.forEach(z => { if (!fileRefs.current[z.id]) fileRefs.current[z.id] = React.createRef(); });
+
+  function handleFile(zoneId, e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => onUpload(zoneId, ev.target.result);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  const shortDone = ["short_front","short_back","short_sleeve"].every(id => shirtImages[id]);
+  const longDone  = ["long_front","long_back","long_sleeve"].every(id => shirtImages[id]);
+  const allDone   = shortDone && longDone;
+
+  if (allDone) return null;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,padding:"24px 32px",gap:10}}>
+      <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:15,color:"#555",letterSpacing:2,marginBottom:4}}>REPLACE # WITH YOUR IMAGE PATHS</div>
+      {/* Hidden file inputs */}
+      {ALL_ZONES_ORDERED.map(z=>(
+        <input key={z.id} ref={fileRefs.current[z.id]} type="file" accept="image/*" style={{display:"none"}}
+          onChange={e=>handleFile(z.id,e)} />
+      ))}
+      {/* Short sleeve group */}
+      {!shortDone && (
+        <div style={{width:"100%",maxWidth:540}}>
+          <div style={{fontSize:10,color:"#444",textTransform:"uppercase",letterSpacing:2,marginBottom:6,fontFamily:"'DM Mono',monospace"}}>Short Sleeve</div>
+          <div style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,overflow:"hidden"}}>
+            {["short_front","short_back","short_sleeve"].filter(id=>!shirtImages[id]).map((id,i,arr)=>{
+              const label = ZONE_LABELS[id];
+              return (
+                <div key={id}
+                  style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:i<arr.length-1?"1px solid #1a1a1a":"none",cursor:"pointer",transition:"background 0.15s",gap:10}}
+                  onClick={()=>fileRefs.current[id].current.click()}
+                  onMouseEnter={e=>e.currentTarget.style.background="#1a1a1a"}
+                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <code style={{flex:1,fontFamily:"'DM Mono',monospace",fontSize:13,lineHeight:1,letterSpacing:"0.01em"}}>
+                    <span style={{color:"#555"}}>&lt;</span>
+                    <span style={{color:"#7c3aed"}}>img</span>
+                    <span style={{color:"#0d9488"}}> src</span>
+                    <span style={{color:"#6b7280"}}>=</span>
+                    <span style={{color:"#f97316"}}>"#"</span>
+                    <span style={{color:"#0d9488"}}> alt</span>
+                    <span style={{color:"#6b7280"}}>=</span>
+                    <span style={{color:"#f59e0b"}}>"{label}"</span>
+                    <span style={{color:"#555"}}> /&gt;</span>
+                  </code>
+                  <span style={{fontSize:10,color:"#444",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace"}}>click to upload ↑</span>
+                </div>
+              );
+            })}
           </div>
-          <div className="ph-btn">Click to upload image</div>
+        </div>
+      )}
+      {/* Long sleeve group */}
+      {!longDone && (
+        <div style={{width:"100%",maxWidth:540}}>
+          <div style={{fontSize:10,color:"#444",textTransform:"uppercase",letterSpacing:2,marginBottom:6,fontFamily:"'DM Mono',monospace"}}>Long Sleeve</div>
+          <div style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,overflow:"hidden"}}>
+            {["long_front","long_back","long_sleeve"].filter(id=>!shirtImages[id]).map((id,i,arr)=>{
+              const label = ZONE_LABELS[id];
+              return (
+                <div key={id}
+                  style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:i<arr.length-1?"1px solid #1a1a1a":"none",cursor:"pointer",transition:"background 0.15s",gap:10}}
+                  onClick={()=>fileRefs.current[id].current.click()}
+                  onMouseEnter={e=>e.currentTarget.style.background="#1a1a1a"}
+                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <code style={{flex:1,fontFamily:"'DM Mono',monospace",fontSize:13,lineHeight:1,letterSpacing:"0.01em"}}>
+                    <span style={{color:"#555"}}>&lt;</span>
+                    <span style={{color:"#7c3aed"}}>img</span>
+                    <span style={{color:"#0d9488"}}> src</span>
+                    <span style={{color:"#6b7280"}}>=</span>
+                    <span style={{color:"#f97316"}}>"#"</span>
+                    <span style={{color:"#0d9488"}}> alt</span>
+                    <span style={{color:"#6b7280"}}>=</span>
+                    <span style={{color:"#f59e0b"}}>"{label}"</span>
+                    <span style={{color:"#555"}}> /&gt;</span>
+                  </code>
+                  <span style={{fontSize:10,color:"#444",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace"}}>click to upload ↑</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -604,54 +719,64 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
       </div>
 
       {/* CENTER */}
-      <div className="center-area">
-        <div className="zone-badge">{zoneInfo?.label} · max print {zoneInfo?.maxW}" × {zoneInfo?.maxH}"</div>
+      <div className="center-area" style={{flexDirection:"column"}}>
+        {/* If any shirt images are missing, show the img src panel filling the whole center */}
+        {!Object.values(d.shirtImages).every(Boolean) && (
+          <ImgSrcPanel shirtImages={d.shirtImages} onUpload={(zid,src)=>setShirtImg(zid,src)} />
+        )}
 
-        <div ref={canvasRef} className="canvas-area"
-          style={{position:"relative",width:cW,height:cH,borderRadius:10,overflow:"hidden",
-            boxShadow:"0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56)",
-            cursor:zone.layers.length>0&&hasShirtImg?"crosshair":"default"}}
-          onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
+        {/* Once all 6 shirt images are uploaded, show the normal canvas editor */}
+        {Object.values(d.shirtImages).every(Boolean) && (
+          <>
+            <div className="zone-badge">{zoneInfo?.label} · max print {zoneInfo?.maxW}" × {zoneInfo?.maxH}"</div>
 
-          <ShirtBackground zoneId={d.activeZone} shirtImage={d.shirtImages?.[d.activeZone]} onUpload={src=>setShirtImg(d.activeZone,src)} />
+            <div ref={canvasRef} className="canvas-area"
+              style={{position:"relative",width:cW,height:cH,borderRadius:10,overflow:"hidden",
+                boxShadow:"0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56)",
+                cursor:zone.layers.length>0?"crosshair":"default"}}
+              onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
 
-          {hasShirtImg&&<div className="print-guide" />}
+              <ShirtBackground zoneId={d.activeZone} shirtImage={d.shirtImages?.[d.activeZone]} onUpload={src=>setShirtImg(d.activeZone,src)} />
 
-          {zone.layers.map(layer=>{
-            const lx=(layer.x/100)*cW,ly=(layer.y/100)*cH,lw=(layer.w/100)*cW,lh=(layer.h/100)*cH;
-            const isSel=layer.id===selectedLayer;
-            return (
-              <div key={layer.id} style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:10,
-                opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",
-                outline:isSel?"2px solid #f97316":"none",cursor:layer.locked?"not-allowed":"move"}}>
-                <img src={layer.src} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",pointerEvents:"none"}} alt="" draggable={false} />
-                {isSel&&(
-                  <div className="resize-handle"
-                    onMouseDown={e=>{
-                      e.stopPropagation();
-                      const sx=e.clientX,sy=e.clientY,sw=layer.w,sh=layer.h;
-                      const mv=ev=>updLayer(layer.id,{w:Math.max(5,sw+((ev.clientX-sx)/cW)*100),h:Math.max(5,sh+((ev.clientY-sy)/cH)*100)});
-                      const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};
-                      window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up);
-                    }} />
-                )}
-              </div>
-            );
-          })}
+              <div className="print-guide" />
 
-          {hasShirtImg&&zone.layers.length===0&&(
-            <div className="art-hint">
-              <div style={{fontSize:22,opacity:0.25,marginBottom:6}}>🎨</div>
-              <div style={{color:"rgba(255,255,255,0.1)",fontSize:11,textAlign:"center"}}>Add art layer →</div>
+              {zone.layers.map(layer=>{
+                const lx=(layer.x/100)*cW,ly=(layer.y/100)*cH,lw=(layer.w/100)*cW,lh=(layer.h/100)*cH;
+                const isSel=layer.id===selectedLayer;
+                return (
+                  <div key={layer.id} style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:10,
+                    opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",
+                    outline:isSel?"2px solid #f97316":"none",cursor:layer.locked?"not-allowed":"move"}}>
+                    <img src={layer.src} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",pointerEvents:"none"}} alt="" draggable={false} />
+                    {isSel&&(
+                      <div className="resize-handle"
+                        onMouseDown={e=>{
+                          e.stopPropagation();
+                          const sx=e.clientX,sy=e.clientY,sw=layer.w,sh=layer.h;
+                          const mv=ev=>updLayer(layer.id,{w:Math.max(5,sw+((ev.clientX-sx)/cW)*100),h:Math.max(5,sh+((ev.clientY-sy)/cH)*100)});
+                          const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};
+                          window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up);
+                        }} />
+                    )}
+                  </div>
+                );
+              })}
+
+              {zone.layers.length===0&&(
+                <div className="art-hint">
+                  <div style={{fontSize:22,opacity:0.25,marginBottom:6}}>🎨</div>
+                  <div style={{color:"rgba(255,255,255,0.1)",fontSize:11,textAlign:"center"}}>Add art layer →</div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {dtfInfo&&selLayer&&(
-          <div className="dtf-badge">
-            <span className="dtf-label">DTF Transfer Size</span>
-            <span className="dtf-value">{dtfInfo.w}" × {dtfInfo.h}"</span>
-          </div>
+            {dtfInfo&&selLayer&&(
+              <div className="dtf-badge" style={{marginTop:14}}>
+                <span className="dtf-label">DTF Transfer Size</span>
+                <span className="dtf-value">{dtfInfo.w}" × {dtfInfo.h}"</span>
+              </div>
+            )}
+          </>
         )}
       </div>
 
