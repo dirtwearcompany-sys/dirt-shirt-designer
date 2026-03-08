@@ -220,9 +220,18 @@ function ShirtBackground({ zoneId, shirtImage, onUpload }) {
         </div>
       ) : (
         <div className="shirt-placeholder" onClick={() => fileRef.current.click()}>
-          <div className="ph-icon">👕</div>
-          <div className="ph-label">Upload {ZONE_LABELS[zoneId]} Image</div>
-          <div className="ph-btn">Click to browse</div>
+          <div style={{background:"#1a1a1a",border:"1px solid #2a2a2a",borderRadius:6,padding:"10px 16px",fontFamily:"'DM Mono',monospace",fontSize:12,lineHeight:1.8,userSelect:"none",textAlign:"left",marginBottom:12}}>
+            <span style={{color:"#555"}}>&lt;</span>
+            <span style={{color:"#7c3aed"}}>img</span>
+            <span style={{color:"#0d9488"}}> src</span>
+            <span style={{color:"#555"}}>=</span>
+            <span style={{color:"#f97316"}}>"#"</span>
+            <span style={{color:"#0d9488"}}> alt</span>
+            <span style={{color:"#555"}}>=</span>
+            <span style={{color:"#f97316"}}>"{ZONE_LABELS[zoneId]}"</span>
+            <span style={{color:"#555"}}> /&gt;</span>
+          </div>
+          <div className="ph-btn">Click to upload image</div>
         </div>
       )}
     </div>
