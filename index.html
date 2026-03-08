@@ -153,13 +153,13 @@ const { useState, useRef, useEffect, useCallback } = React;
 // ═══════════════════════════════════════════════════════════════════════════════
 const SHIRT_IMAGE_SRCS = {
   // ── Short Sleeve ──────────────────────────────────────────
-  short_front:  "shortsleeve_front.png",   // Short Sleeve Front
-  short_back:   "shortsleeve_back.png",   // Short Sleeve Back
-  short_sleeve: "shortsleeve_side.png",   // Short Sleeve Sleeve
+  short_front:  "#",   // Short Sleeve Front
+  short_back:   "#",   // Short Sleeve Back
+  short_sleeve: "#",   // Short Sleeve Sleeve
   // ── Long Sleeve ───────────────────────────────────────────
-  long_front:   "longsleeve_front.png",   // Long Sleeve Front
-  long_back:    "longsleeve_back.png",   // Long Sleeve Back
-  long_sleeve:  "longsleeve_side.png",   // Long Sleeve Sleeve
+  long_front:   "#",   // Long Sleeve Front
+  long_back:    "#",   // Long Sleeve Back
+  long_sleeve:  "#",   // Long Sleeve Sleeve
 };
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -239,10 +239,6 @@ function ShirtBackground({ zoneId, shirtImage, onUpload }) {
         <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile} />
         <div className="shirt-img-wrap">
           <img src={shirtImage} alt="shirt" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}} draggable={false} />
-          <div className="shirt-replace-overlay" onClick={() => fileRef.current.click()}>
-            <div style={{fontSize:26}}>🔄</div>
-            <div style={{fontSize:11,color:"#fff",marginTop:6}}>Replace Shirt Image</div>
-          </div>
         </div>
       </div>
     );
