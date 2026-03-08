@@ -1,291 +1,360 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dirt Shirt Designer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body { background: #0f0f0f; color: #e8e8e8; font-family: 'DM Mono', monospace; overflow: hidden; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #1a1a1a; }
+    ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+    .btn {
+      padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer;
+      font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500;
+      transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #f97316; color: #000; }
+    .btn-primary:hover:not(:disabled) { background: #fb923c; }
+    .btn-ghost { background: transparent; color: #aaa; border: 1px solid #333; }
+    .btn-ghost:hover:not(:disabled) { border-color: #666; color: #eee; }
+    .btn-danger { background: transparent; color: #ef4444; border: 1px solid rgba(239,68,68,0.27); }
+    .btn-danger:hover:not(:disabled) { background: rgba(239,68,68,0.13); }
+    .btn-type { padding: 5px 0; font-size: 11px; border: none; cursor: pointer; border-radius: 6px; flex: 1; font-family: 'DM Mono', monospace; transition: all 0.15s; }
+
+    .zone-tab {
+      padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px;
+      border: 1px solid transparent; transition: all 0.15s; white-space: nowrap;
+      text-align: left; background: none; width: 100%; color: #888;
+      border-color: #333; font-family: 'DM Mono', monospace;
+    }
+    .zone-tab:hover { border-color: #555; color: #ccc; }
+    .zone-tab.active { background: #f97316 !important; color: #000 !important; border-color: #f97316 !important; }
+
+    .layer-row {
+      display: flex; align-items: center; gap: 6px; padding: 5px 6px;
+      border-radius: 6px; margin-bottom: 3px; cursor: pointer;
+      border: 1px solid transparent; transition: background 0.1s;
+    }
+    .layer-row:hover { background: rgba(255,255,255,0.04); }
+    .layer-row.selected { background: rgba(249,115,22,0.09); border-color: rgba(249,115,22,0.27); }
+
+    .design-card {
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px;
+      padding: 16px; transition: border-color 0.2s;
+    }
+    .design-card:hover { border-color: #f97316; }
+
+    .shirt-placeholder {
+      width: 100%; height: 100%;
+      border: 2px dashed #2e2e2e; border-radius: 10px;
+      background: #141414;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.2s; user-select: none;
+    }
+    .shirt-placeholder:hover { border-color: #f97316; background: rgba(249,115,22,0.03); }
+    .shirt-placeholder:hover .ph-icon { opacity: 0.55; }
+    .shirt-placeholder:hover .ph-label { color: #f97316; }
+    .shirt-placeholder:hover .ph-btn { border-color: #f97316; color: #f97316; }
+
+    .ph-icon { font-size: 44px; margin-bottom: 12px; opacity: 0.3; transition: opacity 0.2s; }
+    .ph-label { font-size: 13px; font-weight: 500; color: #555; text-align: center; line-height: 1.6; transition: color 0.2s; font-family: 'DM Mono', monospace; }
+    .ph-btn {
+      margin-top: 10px; padding: 5px 14px; border: 1px solid #333; border-radius: 20px;
+      font-size: 11px; color: #444; transition: all 0.2s; font-family: 'DM Mono', monospace;
+    }
+
+    .shirt-img-wrap { position: relative; width: 100%; height: 100%; }
+    .shirt-replace-overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.6);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; opacity: 0; transition: opacity 0.2s;
+    }
+    .shirt-img-wrap:hover .shirt-replace-overlay { opacity: 1; }
+
+    input[type="range"] { accent-color: #f97316; width: 100%; height: 4px; cursor: pointer; }
+    input[type="color"] { cursor: pointer; }
+
+    .canvas-area { position: relative; user-select: none; }
+    .resize-handle {
+      position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px;
+      background: #f97316; border-radius: 2px; cursor: se-resize; z-index: 20;
+    }
+
+    .header { background: #141414; border-bottom: 1px solid #222; padding: 11px 24px; display: flex; align-items: center; gap: 14px; height: 53px; flex-shrink: 0; }
+    .logo-dirt  { font-family: 'Bebas Neue', cursive; font-size: 26px; color: #f97316; letter-spacing: 3px; }
+    .logo-shirt { font-family: 'Bebas Neue', cursive; font-size: 26px; color: #e8e8e8; letter-spacing: 2px; }
+    .logo-des   { font-family: 'Bebas Neue', cursive; font-size: 26px; color: #f97316; letter-spacing: 2px; }
+    .logo-sub   { color: #444; font-size: 11px; }
+
+    .left-panel  { width: 218px; background: #141414; border-right: 1px solid #222; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+    .right-panel { width: 242px; background: #141414; border-left: 1px solid #222; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+    .center-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0a0a0a; position: relative; overflow: hidden; }
+    .editor-wrap { display: flex; overflow: hidden; }
+
+    .panel-section { padding: 12px; border-bottom: 1px solid #1e1e1e; }
+    .panel-label { font-size: 10px; color: #555; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    .scrollable { flex: 1; overflow-y: auto; padding: 12px; }
+
+    .color-swatch { width: 100%; aspect-ratio: 1; border-radius: 4px; cursor: pointer; border: 2px solid #2a2a2a; transition: transform 0.1s; }
+    .color-swatch:hover { transform: scale(1.1); }
+
+    .zone-badge { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 20px; padding: 4px 16px; font-size: 11px; color: #666; white-space: nowrap; z-index: 20; pointer-events: none; }
+    .dtf-badge { margin-top: 14px; background: #161616; border: 1px solid rgba(249,115,22,0.2); border-radius: 8px; padding: 8px 20px; display: flex; gap: 16px; align-items: center; }
+    .dtf-label { font-size: 10px; color: #f97316; text-transform: uppercase; letter-spacing: 1px; }
+    .dtf-value { font-family: 'Bebas Neue', cursive; font-size: 22px; color: #fff; letter-spacing: 1px; }
+
+    .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 16px; }
+    .lib-wrap { padding: 32px; max-width: 1100px; margin: 0 auto; overflow-y: auto; height: 100%; }
+    .lib-header { display: flex; align-items: center; margin-bottom: 24px; }
+    .lib-title { font-family: 'Bebas Neue', cursive; font-size: 28px; color: #f97316; letter-spacing: 1px; margin: 0; }
+
+    .empty-state { text-align: center; color: #555; padding-top: 80px; }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+    .print-guide { position: absolute; left: 15%; top: 14%; width: 70%; height: 72%; border: 1px dashed rgba(255,255,255,0.07); border-radius: 4px; pointer-events: none; z-index: 2; }
+    .art-hint { position: absolute; left: 15%; top: 14%; width: 70%; height: 72%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; z-index: 5; }
+
+    .slider-row { margin-bottom: 10px; }
+    .slider-top { display: flex; justify-content: space-between; margin-bottom: 3px; }
+    .slider-key { font-size: 10px; color: #666; }
+    .slider-val { font-size: 10px; color: #999; }
+
+    .name-display { cursor: text; font-weight: 500; font-size: 13px; color: #e8e8e8; display: flex; align-items: center; gap: 6px; }
+    .name-input { width: 100%; background: #222; border: 1px solid #f97316; border-radius: 4px; padding: 4px 8px; color: #fff; font-size: 13px; outline: none; font-family: 'DM Mono', monospace; }
+
+    .dtf-box { margin-top: 14px; background: #0f0f0f; border: 1px solid rgba(249,115,22,0.13); border-radius: 8px; padding: 10px; }
+    .dtf-box-label { font-size: 10px; color: #f97316; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+    .dtf-box-val { font-family: 'Bebas Neue', cursive; font-size: 22px; color: #fff; letter-spacing: 1px; }
+    .dtf-box-sub { font-size: 10px; color: #555; margin-top: 2px; }
+
+    .dot-indicator { display: inline-block; width: 6px; height: 6px; border-radius: 50%; vertical-align: middle; margin-left: 6px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+// ─── Data ────────────────────────────────────────────────────────────────────
 const SHIRT_COLORS = [
-  { name: "White", hex: "#FFFFFF" },
-  { name: "Black", hex: "#1a1a1a" },
-  { name: "Navy", hex: "#1B2A4A" },
-  { name: "Royal Blue", hex: "#2563EB" },
-  { name: "Red", hex: "#DC2626" },
-  { name: "Forest Green", hex: "#166534" },
-  { name: "Charcoal", hex: "#374151" },
-  { name: "Maroon", hex: "#7F1D1D" },
-  { name: "Gold", hex: "#D97706" },
-  { name: "Purple", hex: "#7C3AED" },
-  { name: "Pink", hex: "#EC4899" },
-  { name: "Orange", hex: "#EA580C" },
-  { name: "Teal", hex: "#0D9488" },
-  { name: "Gray", hex: "#9CA3AF" },
-  { name: "Tan", hex: "#D4A574" },
-  { name: "Light Blue", hex: "#93C5FD" },
+  { name:"White",       hex:"#FFFFFF" }, { name:"Black",      hex:"#1a1a1a" },
+  { name:"Navy",        hex:"#1B2A4A" }, { name:"Royal Blue", hex:"#2563EB" },
+  { name:"Red",         hex:"#DC2626" }, { name:"Forest",     hex:"#166534" },
+  { name:"Charcoal",    hex:"#374151" }, { name:"Maroon",     hex:"#7F1D1D" },
+  { name:"Gold",        hex:"#D97706" }, { name:"Purple",     hex:"#7C3AED" },
+  { name:"Pink",        hex:"#EC4899" }, { name:"Orange",     hex:"#EA580C" },
+  { name:"Teal",        hex:"#0D9488" }, { name:"Gray",       hex:"#9CA3AF" },
+  { name:"Tan",         hex:"#D4A574" }, { name:"Lt Blue",    hex:"#93C5FD" },
 ];
 
 const SHIRT_ZONES = {
   short: [
-    { id: "short_front",  label: "Short Sleeve – Front",  maxW: 12, maxH: 14 },
-    { id: "short_back",   label: "Short Sleeve – Back",   maxW: 12, maxH: 14 },
-    { id: "short_sleeve", label: "Short Sleeve – Sleeve", maxW: 4,  maxH: 4  },
+    { id:"short_front",  label:"Short Sleeve – Front",  maxW:12, maxH:14 },
+    { id:"short_back",   label:"Short Sleeve – Back",   maxW:12, maxH:14 },
+    { id:"short_sleeve", label:"Short Sleeve – Sleeve", maxW:4,  maxH:4  },
   ],
   long: [
-    { id: "long_front",  label: "Long Sleeve – Front",  maxW: 12, maxH: 14 },
-    { id: "long_back",   label: "Long Sleeve – Back",   maxW: 12, maxH: 14 },
-    { id: "long_sleeve", label: "Long Sleeve – Sleeve", maxW: 4,  maxH: 14 },
+    { id:"long_front",  label:"Long Sleeve – Front",  maxW:12, maxH:14 },
+    { id:"long_back",   label:"Long Sleeve – Back",   maxW:12, maxH:14 },
+    { id:"long_sleeve", label:"Long Sleeve – Sleeve", maxW:4,  maxH:14 },
   ],
 };
 
-// Canvas pixel dimensions per zone
 const ZONE_SIZE = {
-  short_front:  [320, 380],
-  short_back:   [320, 380],
-  short_sleeve: [320, 210],
-  long_front:   [320, 430],
-  long_back:    [320, 430],
-  long_sleeve:  [220, 430],
+  short_front:[320,380], short_back:[320,380], short_sleeve:[320,210],
+  long_front:[320,430],  long_back:[320,430],  long_sleeve:[220,430],
 };
 
-function calcDTF(pctW, pctH, zoneMaxW, zoneMaxH) {
+const ZONE_LABELS = {
+  short_front:"Short Sleeve Front", short_back:"Short Sleeve Back", short_sleeve:"Short Sleeve Sleeve",
+  long_front:"Long Sleeve Front",   long_back:"Long Sleeve Back",   long_sleeve:"Long Sleeve Sleeve",
+};
+
+function calcDTF(pctW, pctH, maxW, maxH) {
+  return { w:((pctW/100)*maxW).toFixed(1), h:((pctH/100)*maxH).toFixed(1) };
+}
+
+function blankDesign(name="New Design") {
   return {
-    w: ((pctW / 100) * zoneMaxW).toFixed(1),
-    h: ((pctH / 100) * zoneMaxH).toFixed(1),
+    id: Date.now() + Math.random(),
+    name,
+    shirtColor: "#FFFFFF",
+    shirtType: "short",
+    activeZone: "short_front",
+    shirtImages: { short_front:null, short_back:null, short_sleeve:null, long_front:null, long_back:null, long_sleeve:null },
+    zones: { short_front:{layers:[]}, short_back:{layers:[]}, short_sleeve:{layers:[]}, long_front:{layers:[]}, long_back:{layers:[]}, long_sleeve:{layers:[]} },
   };
 }
 
-// ─── Shirt Background Placeholder ────────────────────────────────────────────
+// ─── ShirtBackground ─────────────────────────────────────────────────────────
 function ShirtBackground({ zoneId, shirtImage, onUpload }) {
   const fileRef = useRef(null);
-  const [hovered, setHovered] = useState(false);
-
-  const ZONE_LABELS = {
-    short_front:  "Short Sleeve Front",
-    short_back:   "Short Sleeve Back",
-    short_sleeve: "Short Sleeve",
-    long_front:   "Long Sleeve Front",
-    long_back:    "Long Sleeve Back",
-    long_sleeve:  "Long Sleeve",
-  };
-
   function handleFile(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => onUpload(ev.target.result);
     reader.readAsDataURL(file);
     e.target.value = "";
   }
-
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
-      <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
+    <div style={{position:"absolute",inset:0,zIndex:0}}>
+      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile} />
       {shirtImage ? (
-        <div
-          style={{ position: "relative", width: "100%", height: "100%" }}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-        >
-          <img
-            src={shirtImage}
-            alt="shirt"
-            style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-            draggable={false}
-          />
-          {hovered && (
-            <div
-              onClick={() => fileRef.current?.click()}
-              style={{
-                position: "absolute", inset: 0,
-                background: "rgba(0,0,0,0.6)",
-                display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center",
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ fontSize: 26 }}>🔄</div>
-              <div style={{ fontSize: 11, color: "#fff", marginTop: 6 }}>Replace Shirt Image</div>
-            </div>
-          )}
+        <div className="shirt-img-wrap">
+          <img src={shirtImage} alt="shirt" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}} draggable={false} />
+          <div className="shirt-replace-overlay" onClick={() => fileRef.current.click()}>
+            <div style={{fontSize:26}}>🔄</div>
+            <div style={{fontSize:11,color:"#fff",marginTop:6}}>Replace Shirt Image</div>
+          </div>
         </div>
       ) : (
-        <div
-          onClick={() => fileRef.current?.click()}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          style={{
-            width: "100%", height: "100%",
-            border: `2px dashed ${hovered ? "#f97316" : "#2e2e2e"}`,
-            borderRadius: 10,
-            background: hovered ? "#f9731608" : "#141414",
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            cursor: "pointer", transition: "all 0.2s",
-            userSelect: "none",
-          }}
-        >
-          <div style={{ fontSize: 44, marginBottom: 12, opacity: 0.35 }}>👕</div>
-          <div style={{
-            fontSize: 13, fontWeight: 500,
-            color: hovered ? "#f97316" : "#555",
-            textAlign: "center", lineHeight: 1.6,
-          }}>
-            Upload {ZONE_LABELS[zoneId]} Image
-          </div>
-          <div style={{
-            marginTop: 10, padding: "5px 14px",
-            border: `1px solid ${hovered ? "#f97316" : "#333"}`,
-            borderRadius: 20, fontSize: 11,
-            color: hovered ? "#f97316" : "#444",
-            transition: "all 0.2s",
-          }}>
-            Click to browse
-          </div>
+        <div className="shirt-placeholder" onClick={() => fileRef.current.click()}>
+          <div className="ph-icon">👕</div>
+          <div className="ph-label">Upload {ZONE_LABELS[zoneId]} Image</div>
+          <div className="ph-btn">Click to browse</div>
         </div>
       )}
     </div>
   );
 }
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
-export default function DirtShirtDesigner() {
+// ─── Slider ──────────────────────────────────────────────────────────────────
+function Slider({ label, value, min, max, onChange }) {
+  return (
+    <div className="slider-row">
+      <div className="slider-top">
+        <span className="slider-key">{label}</span>
+        <span className="slider-val">{Math.round(value)}</span>
+      </div>
+      <input type="range" min={min} max={max} step={label.includes("°")?1:0.5}
+        value={value} onChange={e => onChange(parseFloat(e.target.value))} />
+    </div>
+  );
+}
+
+// ─── App ─────────────────────────────────────────────────────────────────────
+function App() {
   const [designs, setDesigns] = useState([]);
-  const [activeDesign, setActiveDesign] = useState(null);
+  const [activeId, setActiveId] = useState(null);
   const [view, setView] = useState("editor");
 
-  function newDesign(name = "New Design") {
-    const d = {
-      id: Date.now(),
-      name,
-      shirtColor: "#FFFFFF",
-      shirtType: "short",
-      activeZone: "short_front",
-      shirtImages: {
-        short_front: null, short_back: null, short_sleeve: null,
-        long_front: null,  long_back: null,  long_sleeve: null,
-      },
-      zones: {
-        short_front:  { layers: [] },
-        short_back:   { layers: [] },
-        short_sleeve: { layers: [] },
-        long_front:   { layers: [] },
-        long_back:    { layers: [] },
-        long_sleeve:  { layers: [] },
-      },
-    };
+  function createDesign(name) {
+    const d = blankDesign(name || "New Design");
     setDesigns(prev => [d, ...prev]);
-    setActiveDesign(d);
+    setActiveId(d.id);
     setView("editor");
+    return d;
   }
 
   function saveDesign(updated) {
     setDesigns(prev => prev.map(d => d.id === updated.id ? updated : d));
-    setActiveDesign(updated);
+    setActiveId(updated.id);
   }
 
   function duplicateDesign(d) {
     const copy = JSON.parse(JSON.stringify(d));
-    copy.id = Date.now();
+    copy.id = Date.now() + Math.random();
     copy.name = d.name + " (Copy)";
     setDesigns(prev => [copy, ...prev]);
-    setActiveDesign(copy);
+    setActiveId(copy.id);
     setView("editor");
   }
 
   function deleteDesign(id) {
     setDesigns(prev => prev.filter(d => d.id !== id));
-    if (activeDesign?.id === id) { setActiveDesign(null); setView("library"); }
+    if (activeId === id) { setActiveId(null); setView("library"); }
   }
 
-  useEffect(() => { newDesign("My First Design"); }, []);
+  function openDesign(d) { setActiveId(d.id); setView("editor"); }
+
+  useEffect(() => { createDesign("My First Design"); }, []);
+
+  const activeDesign = designs.find(d => d.id === activeId) || null;
 
   return (
-    <div style={{ fontFamily: "'DM Mono', monospace", background: "#0f0f0f", minHeight: "100vh", color: "#e8e8e8" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&display=swap');
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: #1a1a1a; }
-        ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
-        .btn { padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; transition: all 0.15s; }
-        .btn-primary { background: #f97316; color: #000; }
-        .btn-primary:hover { background: #fb923c; }
-        .btn-ghost { background: transparent; color: #aaa; border: 1px solid #333; }
-        .btn-ghost:hover { border-color: #666; color: #eee; }
-        .btn-danger { background: transparent; color: #ef4444; border: 1px solid #ef444444; }
-        .btn-danger:hover { background: #ef444422; }
-        .layer-row:hover { background: #ffffff0a; }
-        .zone-tab { padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; border: 1px solid transparent; transition: all 0.15s; white-space: nowrap; text-align: left; background: none; width: 100%; }
-        .zone-tab.active { background: #f97316; color: #000; border-color: #f97316; }
-        .zone-tab:not(.active) { color: #888; border-color: #333; }
-        .zone-tab:not(.active):hover { border-color: #555; color: #ccc; }
-        input[type=range] { accent-color: #f97316; }
-        .canvas-area { position: relative; user-select: none; }
-        .design-card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 16px; transition: all 0.2s; }
-        .design-card:hover { border-color: #f97316; }
-      `}</style>
-
-      {/* ── Header ── */}
-      <div style={{ background: "#141414", borderBottom: "1px solid #222", padding: "11px 24px", display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-          <span style={{ fontFamily: "'Bebas Neue'", fontSize: 26, color: "#f97316", letterSpacing: 3 }}>DIRT</span>
-          <span style={{ fontFamily: "'Bebas Neue'", fontSize: 26, color: "#e8e8e8", letterSpacing: 2 }}>SHIRT</span>
-          <span style={{ fontFamily: "'Bebas Neue'", fontSize: 26, color: "#f97316", letterSpacing: 2 }}>DESIGNER</span>
-        </div>
-        <span style={{ color: "#2a2a2a", fontSize: 20, lineHeight: 1 }}>|</span>
-        <span style={{ color: "#444", fontSize: 11 }}>DTF Transfer Studio</span>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+    <div style={{display:"flex",flexDirection:"column",height:"100vh",overflow:"hidden"}}>
+      {/* Header */}
+      <div className="header">
+        <span className="logo-dirt">DIRT</span>
+        <span className="logo-shirt">SHIRT</span>
+        <span className="logo-des">DESIGNER</span>
+        <span style={{color:"#2a2a2a",fontSize:20,lineHeight:1,margin:"0 4px"}}>|</span>
+        <span className="logo-sub">DTF Transfer Studio</span>
+        <div style={{marginLeft:"auto",display:"flex",gap:8}}>
           <button className="btn btn-ghost" onClick={() => setView("library")}>📂 My Designs ({designs.length})</button>
-          <button className="btn btn-primary" onClick={() => newDesign()}>+ New Design</button>
+          <button className="btn btn-primary" onClick={() => createDesign()}>+ New Design</button>
         </div>
       </div>
 
-      {view === "library" ? (
-        <DesignLibrary designs={designs} onOpen={d => { setActiveDesign(d); setView("editor"); }} onDuplicate={duplicateDesign} onDelete={deleteDesign} onNew={() => newDesign()} />
-      ) : activeDesign ? (
-        <EditorView design={activeDesign} onSave={saveDesign} onDuplicate={() => duplicateDesign(activeDesign)} onBack={() => setView("library")} />
-      ) : (
-        <div style={{ display:"flex", justifyContent:"center", alignItems:"center", height:"80vh", flexDirection:"column", gap:16 }}>
-          <p style={{ color:"#555" }}>No design selected</p>
-          <button className="btn btn-primary" onClick={() => newDesign()}>Create New Design</button>
-        </div>
-      )}
+      {/* Body */}
+      <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        {view === "library" ? (
+          <Library designs={designs} onOpen={openDesign} onDuplicate={duplicateDesign} onDelete={deleteDesign} onNew={() => createDesign()} />
+        ) : activeDesign ? (
+          <Editor
+            key={activeDesign.id}
+            design={activeDesign}
+            onSave={saveDesign}
+            onDuplicate={() => duplicateDesign(activeDesign)}
+            onBack={() => setView("library")}
+          />
+        ) : (
+          <div style={{display:"flex",justifyContent:"center",alignItems:"center",flex:1,flexDirection:"column",gap:16}}>
+            <p style={{color:"#555"}}>No design selected</p>
+            <button className="btn btn-primary" onClick={() => createDesign()}>Create New Design</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ─── Library ──────────────────────────────────────────────────────────────────
-function DesignLibrary({ designs, onOpen, onDuplicate, onDelete, onNew }) {
+// ─── Library ─────────────────────────────────────────────────────────────────
+function Library({ designs, onOpen, onDuplicate, onDelete, onNew }) {
   return (
-    <div style={{ padding: 32, maxWidth: 1100, margin: "0 auto" }}>
-      <div style={{ display:"flex", alignItems:"center", marginBottom:24 }}>
-        <h2 style={{ fontFamily:"'Bebas Neue'", fontSize:28, color:"#f97316", letterSpacing:1, margin:0 }}>MY DESIGNS</h2>
-        <button className="btn btn-primary" style={{ marginLeft:"auto" }} onClick={onNew}>+ New Design</button>
+    <div className="lib-wrap">
+      <div className="lib-header">
+        <h2 className="lib-title">MY DESIGNS</h2>
+        <button className="btn btn-primary" style={{marginLeft:"auto"}} onClick={onNew}>+ New Design</button>
       </div>
       {designs.length === 0 ? (
-        <div style={{ textAlign:"center", color:"#555", paddingTop:80 }}>
-          <div style={{ fontSize:48 }}>👕</div>
-          <p>No designs yet</p>
+        <div className="empty-state">
+          <div className="empty-icon">👕</div>
+          <p style={{marginBottom:16}}>No designs yet</p>
           <button className="btn btn-primary" onClick={onNew}>Create Your First Design</button>
         </div>
       ) : (
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px,1fr))", gap:16 }}>
+        <div className="lib-grid">
           {designs.map(d => {
-            const previewImg = d.shirtImages?.short_front || d.shirtImages?.long_front || Object.values(d.shirtImages||{}).find(Boolean);
-            const totalLayers = Object.values(d.zones).reduce((s,z) => s+z.layers.length, 0);
+            const previewImg = Object.values(d.shirtImages||{}).find(Boolean);
+            const totalLayers = Object.values(d.zones||{}).reduce((s,z) => s+(z.layers?.length||0), 0);
             return (
               <div key={d.id} className="design-card">
-                <div style={{ background:"#111", borderRadius:8, height:130, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:12, cursor:"pointer", overflow:"hidden" }}
+                <div style={{background:"#111",borderRadius:8,height:130,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,cursor:"pointer",overflow:"hidden"}}
                   onClick={() => onOpen(d)}>
                   {previewImg
-                    ? <img src={previewImg} alt="preview" style={{ width:"100%", height:"100%", objectFit:"contain" }} />
-                    : <div style={{ fontSize:42, opacity:0.2 }}>👕</div>
-                  }
+                    ? <img src={previewImg} alt="preview" style={{width:"100%",height:"100%",objectFit:"contain"}} />
+                    : <div style={{fontSize:42,opacity:0.18}}>👕</div>}
                 </div>
-                <div style={{ fontWeight:500, fontSize:13, marginBottom:3 }}>{d.name}</div>
-                <div style={{ fontSize:11, color:"#666", marginBottom:10 }}>
-                  {d.shirtType==="short"?"Short Sleeve":"Long Sleeve"} · {totalLayers} art {totalLayers===1?"layer":"layers"}
+                <div style={{fontWeight:500,fontSize:13,marginBottom:3,color:"#e8e8e8"}}>{d.name}</div>
+                <div style={{fontSize:11,color:"#555",marginBottom:10}}>
+                  {d.shirtType==="short"?"Short Sleeve":"Long Sleeve"} · {totalLayers} art layer{totalLayers!==1?"s":""}
                 </div>
-                <div style={{ display:"flex", gap:6 }}>
-                  <button className="btn btn-primary" style={{ flex:1, padding:"5px 8px", fontSize:11 }} onClick={() => onOpen(d)}>Edit</button>
-                  <button className="btn btn-ghost" style={{ padding:"5px 10px" }} onClick={() => onDuplicate(d)} title="Duplicate">⧉</button>
-                  <button className="btn btn-danger" style={{ padding:"5px 10px" }} onClick={() => onDelete(d.id)}>✕</button>
+                <div style={{display:"flex",gap:6}}>
+                  <button className="btn btn-primary" style={{flex:1,padding:"5px 8px",fontSize:11}} onClick={() => onOpen(d)}>Edit</button>
+                  <button className="btn btn-ghost" style={{padding:"5px 10px"}} onClick={() => onDuplicate(d)} title="Duplicate">⧉</button>
+                  <button className="btn btn-danger" style={{padding:"5px 10px"}} onClick={() => onDelete(d.id)}>✕</button>
                 </div>
               </div>
             );
@@ -296,11 +365,11 @@ function DesignLibrary({ designs, onOpen, onDuplicate, onDelete, onNew }) {
   );
 }
 
-// ─── Editor ───────────────────────────────────────────────────────────────────
-function EditorView({ design, onSave, onDuplicate, onBack }) {
+// ─── Editor ──────────────────────────────────────────────────────────────────
+function Editor({ design, onSave, onDuplicate, onBack }) {
   const [d, setD] = useState(() => JSON.parse(JSON.stringify(design)));
   const [selectedLayer, setSelectedLayer] = useState(null);
-  const [bgRemoveLoading, setBgRemoveLoading] = useState(false);
+  const [bgRemoving, setBgRemoving] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameVal, setNameVal] = useState(d.name);
   const canvasRef = useRef(null);
@@ -309,152 +378,137 @@ function EditorView({ design, onSave, onDuplicate, onBack }) {
   const artFileRef = useRef(null);
 
   const zone = d.zones[d.activeZone];
-  const zoneInfo = [...SHIRT_ZONES.short, ...SHIRT_ZONES.long].find(z => z.id === d.activeZone);
-  const [canvasW, canvasH] = ZONE_SIZE[d.activeZone] || [320, 380];
+  const allZones = [...SHIRT_ZONES.short, ...SHIRT_ZONES.long];
+  const zoneInfo = allZones.find(z => z.id === d.activeZone);
+  const [cW, cH] = ZONE_SIZE[d.activeZone] || [320,380];
+  const hasShirtImg = !!d.shirtImages?.[d.activeZone];
+  const selLayer = zone.layers.find(l => l.id === selectedLayer);
+  const dtfInfo = selLayer ? calcDTF(selLayer.w, selLayer.h, zoneInfo?.maxW||12, zoneInfo?.maxH||14) : null;
 
-  const update = useCallback((patch) => setD(prev => ({ ...prev, ...patch })), []);
+  const upd = useCallback(patch => setD(p => ({...p,...patch})), []);
 
-  const updateZone = useCallback((zoneId, patch) => {
-    setD(prev => ({ ...prev, zones: { ...prev.zones, [zoneId]: { ...prev.zones[zoneId], ...patch } } }));
-  }, []);
+  const updZone = useCallback((zid, patch) => setD(p => ({...p, zones:{...p.zones,[zid]:{...p.zones[zid],...patch}}})), []);
 
-  const updateLayer = useCallback((layerId, patch) => {
-    setD(prev => {
-      const layers = prev.zones[prev.activeZone].layers.map(l => l.id === layerId ? { ...l, ...patch } : l);
-      return { ...prev, zones: { ...prev.zones, [prev.activeZone]: { ...prev.zones[prev.activeZone], layers } } };
+  const updLayer = useCallback((lid, patch) => {
+    setD(p => {
+      const layers = p.zones[p.activeZone].layers.map(l => l.id===lid ? {...l,...patch} : l);
+      return {...p, zones:{...p.zones,[p.activeZone]:{...p.zones[p.activeZone],layers}}};
     });
   }, []);
 
-  function setShirtImage(zoneId, src) {
-    setD(prev => ({ ...prev, shirtImages: { ...prev.shirtImages, [zoneId]: src } }));
-  }
+  function setShirtImg(zid, src) { setD(p => ({...p, shirtImages:{...p.shirtImages,[zid]:src}})); }
 
-  function addImageLayer(dataUrl) {
+  function addArtLayer(dataUrl) {
     const img = new Image();
     img.onload = () => {
-      const aspect = img.width / img.height;
-      const w = 42; const h = w / aspect;
-      const layer = { id: Date.now(), type:"image", src:dataUrl, x:29, y:22, w, h, opacity:100, rotation:0, locked:false };
-      updateZone(d.activeZone, { layers: [...zone.layers, layer] });
+      const asp = img.width/img.height;
+      const w=42, h=w/asp;
+      const layer = {id:Date.now()+Math.random(),src:dataUrl,x:29,y:22,w,h,opacity:100,rotation:0,locked:false};
+      updZone(d.activeZone, {layers:[...zone.layers, layer]});
       setSelectedLayer(layer.id);
     };
     img.src = dataUrl;
   }
 
-  function handleArtUpload(e) {
+  function handleArtFile(e) {
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => addImageLayer(ev.target.result);
+    reader.onload = ev => addArtLayer(ev.target.result);
     reader.readAsDataURL(file);
     e.target.value = "";
   }
 
-  async function clientBgRemove(src, cb) {
-    return new Promise(resolve => {
+  async function removeBg() {
+    if (!selLayer) return;
+    setBgRemoving(true);
+    await new Promise(resolve => {
       const img = new Image();
-      img.crossOrigin = "anonymous";
       img.onload = () => {
         const cv = document.createElement("canvas");
-        cv.width = img.width; cv.height = img.height;
-        const ctx = cv.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-        const data = ctx.getImageData(0, 0, cv.width, cv.height);
-        const px = data.data;
-        const corners = [[0,0],[cv.width-1,0],[0,cv.height-1],[cv.width-1,cv.height-1]];
-        let bgR=0,bgG=0,bgB=0;
-        corners.forEach(([x,y]) => { const i=(y*cv.width+x)*4; bgR+=px[i];bgG+=px[i+1];bgB+=px[i+2]; });
-        bgR=Math.round(bgR/4); bgG=Math.round(bgG/4); bgB=Math.round(bgB/4);
-        const thresh = 40;
-        for (let i=0;i<px.length;i+=4) {
-          if (Math.abs(px[i]-bgR)<thresh && Math.abs(px[i+1]-bgG)<thresh && Math.abs(px[i+2]-bgB)<thresh) px[i+3]=0;
+        cv.width=img.width; cv.height=img.height;
+        const ctx=cv.getContext("2d");
+        ctx.drawImage(img,0,0);
+        const data=ctx.getImageData(0,0,cv.width,cv.height);
+        const px=data.data;
+        const corners=[[0,0],[cv.width-1,0],[0,cv.height-1],[cv.width-1,cv.height-1]];
+        let r=0,g=0,b=0;
+        corners.forEach(([x,y])=>{ const i=(y*cv.width+x)*4; r+=px[i];g+=px[i+1];b+=px[i+2]; });
+        r=Math.round(r/4); g=Math.round(g/4); b=Math.round(b/4);
+        const t=40;
+        for(let i=0;i<px.length;i+=4){
+          if(Math.abs(px[i]-r)<t&&Math.abs(px[i+1]-g)<t&&Math.abs(px[i+2]-b)<t) px[i+3]=0;
         }
-        ctx.putImageData(data, 0, 0);
-        cb(cv.toDataURL("image/png"));
+        ctx.putImageData(data,0,0);
+        updLayer(selLayer.id, {src:cv.toDataURL("image/png")});
         resolve();
       };
-      img.src = src;
+      img.src = selLayer.src;
     });
-  }
-
-  async function removeBackground() {
-    const layer = zone.layers.find(l => l.id === selectedLayer);
-    if (!layer) return;
-    setBgRemoveLoading(true);
-    await clientBgRemove(layer.src, result => updateLayer(selectedLayer, { src: result }));
-    setBgRemoveLoading(false);
+    setBgRemoving(false);
   }
 
   function deleteLayer(id) {
-    updateZone(d.activeZone, { layers: zone.layers.filter(l => l.id !== id) });
-    if (selectedLayer === id) setSelectedLayer(null);
+    updZone(d.activeZone, {layers:zone.layers.filter(l=>l.id!==id)});
+    if (selectedLayer===id) setSelectedLayer(null);
   }
 
-  function moveLayerOrder(id, dir) {
-    const layers = [...zone.layers];
-    const idx = layers.findIndex(l => l.id === id);
-    const newIdx = idx + dir;
-    if (newIdx < 0 || newIdx >= layers.length) return;
-    [layers[idx], layers[newIdx]] = [layers[newIdx], layers[idx]];
-    updateZone(d.activeZone, { layers });
+  function reorderLayer(id, dir) {
+    const layers=[...zone.layers], idx=layers.findIndex(l=>l.id===id), ni=idx+dir;
+    if(ni<0||ni>=layers.length) return;
+    [layers[idx],layers[ni]]=[layers[ni],layers[idx]];
+    updZone(d.activeZone,{layers});
   }
 
-  function getLayerAt(cx, cy) {
-    for (let i = zone.layers.length-1; i >= 0; i--) {
-      const l = zone.layers[i];
-      const lx=(l.x/100)*canvasW, ly=(l.y/100)*canvasH;
-      const lw=(l.w/100)*canvasW, lh=(l.h/100)*canvasH;
-      if (cx>=lx && cx<=lx+lw && cy>=ly && cy<=ly+lh) return l;
+  function layerAt(cx,cy) {
+    for(let i=zone.layers.length-1;i>=0;i--){
+      const l=zone.layers[i];
+      const lx=(l.x/100)*cW,ly=(l.y/100)*cH,lw=(l.w/100)*cW,lh=(l.h/100)*cH;
+      if(cx>=lx&&cx<=lx+lw&&cy>=ly&&cy<=ly+lh) return l;
     }
     return null;
   }
 
-  function onCanvasMouseDown(e) {
-    // Only handle layer selection — don't interfere with ShirtBackground clicks
-    if (e.target.tagName === "IMG" || e.target.closest("[data-shirt-bg]")) return;
-    const rect = canvasRef.current.getBoundingClientRect();
+  function onMD(e) {
+    const rect=canvasRef.current.getBoundingClientRect();
     const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
-    const layer = getLayerAt(cx, cy);
-    if (layer && !layer.locked) {
+    const layer=layerAt(cx,cy);
+    if(layer&&!layer.locked){
       setSelectedLayer(layer.id);
-      isDragging.current = true;
-      dragStart.current = { cx, cy, ox:layer.x, oy:layer.y };
-    } else {
+      isDragging.current=true;
+      dragStart.current={cx,cy,ox:layer.x,oy:layer.y};
+    } else if(!layer) {
       setSelectedLayer(null);
     }
   }
 
-  function onCanvasMouseMove(e) {
-    if (!isDragging.current || !selectedLayer) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
-    const dx=((cx-dragStart.current.cx)/canvasW)*100;
-    const dy=((cy-dragStart.current.cy)/canvasH)*100;
-    updateLayer(selectedLayer, { x:Math.max(0, dragStart.current.ox+dx), y:Math.max(0, dragStart.current.oy+dy) });
+  function onMM(e) {
+    if(!isDragging.current||!selectedLayer) return;
+    const rect=canvasRef.current.getBoundingClientRect();
+    const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
+    const dx=((cx-dragStart.current.cx)/cW)*100;
+    const dy=((cy-dragStart.current.cy)/cH)*100;
+    updLayer(selectedLayer,{x:Math.max(0,dragStart.current.ox+dx),y:Math.max(0,dragStart.current.oy+dy)});
   }
 
-  function onCanvasMouseUp() { isDragging.current = false; }
+  function onMU() { isDragging.current=false; }
 
   async function download(withShirt) {
-    const scale = 2.5;
-    const cv = document.createElement("canvas");
-    cv.width = canvasW*scale; cv.height = canvasH*scale;
-    const ctx = cv.getContext("2d");
-    ctx.clearRect(0,0,cv.width,cv.height);
-    if (withShirt) {
-      const shirtSrc = d.shirtImages?.[d.activeZone];
-      if (shirtSrc) {
-        await new Promise(res => { const img=new Image(); img.onload=()=>{ ctx.drawImage(img,0,0,cv.width,cv.height); res(); }; img.src=shirtSrc; });
-      } else {
-        ctx.fillStyle=d.shirtColor; ctx.fillRect(0,0,cv.width,cv.height);
-      }
+    const sc=2.5, w=cW*sc, h=cH*sc;
+    const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+    const ctx=cv.getContext("2d");
+    ctx.clearRect(0,0,w,h);
+    if(withShirt){
+      const src=d.shirtImages?.[d.activeZone];
+      if(src){
+        await new Promise(res=>{ const img=new Image(); img.onload=()=>{ctx.drawImage(img,0,0,w,h);res();}; img.src=src; });
+      } else { ctx.fillStyle=d.shirtColor; ctx.fillRect(0,0,w,h); }
     }
-    for (const layer of zone.layers) {
-      await new Promise(res => {
+    for(const layer of zone.layers){
+      await new Promise(res=>{
         const img=new Image();
         img.onload=()=>{
           ctx.globalAlpha=layer.opacity/100;
-          const lx=(layer.x/100)*cv.width, ly=(layer.y/100)*cv.height;
-          const lw=(layer.w/100)*cv.width, lh=(layer.h/100)*cv.height;
+          const lx=(layer.x/100)*w,ly=(layer.y/100)*h,lw=(layer.w/100)*w,lh=(layer.h/100)*h;
           ctx.save(); ctx.translate(lx+lw/2,ly+lh/2); ctx.rotate((layer.rotation||0)*Math.PI/180);
           ctx.drawImage(img,-lw/2,-lh/2,lw,lh); ctx.restore(); ctx.globalAlpha=1; res();
         };
@@ -463,227 +517,197 @@ function EditorView({ design, onSave, onDuplicate, onBack }) {
     }
     const a=document.createElement("a");
     a.href=cv.toDataURL("image/png");
-    a.download=`${d.name.replace(/\s/g,"-")}-${d.activeZone}${withShirt?"-with-shirt":"-logo"}.png`;
+    a.download=`${d.name.replace(/\s+/g,"-")}-${d.activeZone}${withShirt?"-with-shirt":"-logo"}.png`;
     a.click();
   }
 
-  const selLayer = zone.layers.find(l => l.id === selectedLayer);
-  const dtfInfo = selLayer ? calcDTF(selLayer.w, selLayer.h, zoneInfo?.maxW||12, zoneInfo?.maxH||14) : null;
-  const hasShirtImg = !!d.shirtImages?.[d.activeZone];
+  const editorH = "calc(100vh - 53px)";
 
   return (
-    <div style={{ display:"flex", height:"calc(100vh - 53px)", overflow:"hidden" }}>
+    <div style={{display:"flex",height:editorH,overflow:"hidden"}} className="editor-wrap">
 
-      {/* ── Left Panel ── */}
-      <div style={{ width:218, background:"#141414", borderRight:"1px solid #222", display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        {/* Type + Zones */}
-        <div style={{ padding:"12px 12px 8px", borderBottom:"1px solid #1e1e1e" }}>
-          <div style={{ fontSize:10, color:"#555", marginBottom:6, textTransform:"uppercase", letterSpacing:1 }}>Shirt Type</div>
-          <div style={{ display:"flex", gap:6, marginBottom:12 }}>
-            {["short","long"].map(t => (
-              <button key={t} className="btn" style={{ flex:1, padding:"5px 0", fontSize:11, background:d.shirtType===t?"#f97316":"#222", color:d.shirtType===t?"#000":"#888", border:"none" }}
-                onClick={() => { update({ shirtType:t, activeZone:t==="short"?"short_front":"long_front" }); setSelectedLayer(null); }}>
-                {t==="short"?"Short":"Long"}
+      {/* LEFT */}
+      <div className="left-panel">
+        <div className="panel-section">
+          <div className="panel-label">Shirt Type</div>
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            {["short","long"].map(t=>(
+              <button key={t} className="btn-type"
+                style={{background:d.shirtType===t?"#f97316":"#222",color:d.shirtType===t?"#000":"#888"}}
+                onClick={()=>{ upd({shirtType:t,activeZone:t==="short"?"short_front":"long_front"}); setSelectedLayer(null); }}>
+                {t==="short"?"Short Sleeve":"Long Sleeve"}
               </button>
             ))}
           </div>
-          <div style={{ fontSize:10, color:"#555", marginBottom:6, textTransform:"uppercase", letterSpacing:1 }}>Zones</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
-            {SHIRT_ZONES[d.shirtType].map(z => (
-              <button key={z.id} className={`zone-tab ${d.activeZone===z.id?"active":""}`}
-                onClick={() => { update({ activeZone:z.id }); setSelectedLayer(null); }}>
-                <span>{z.label.split("–")[1]?.trim()}</span>
-                {d.shirtImages?.[z.id] && (
-                  <span style={{ marginLeft:6, display:"inline-block", width:6, height:6, borderRadius:"50%", background:d.activeZone===z.id?"#000":"#f97316", verticalAlign:"middle" }} title="Shirt image uploaded" />
-                )}
+          <div className="panel-label">Zones</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {SHIRT_ZONES[d.shirtType].map(z=>(
+              <button key={z.id} className={`zone-tab${d.activeZone===z.id?" active":""}`}
+                onClick={()=>{ upd({activeZone:z.id}); setSelectedLayer(null); }}>
+                {z.label.split("–")[1]?.trim()}
+                {d.shirtImages?.[z.id]&&<span className="dot-indicator" style={{background:d.activeZone===z.id?"#000":"#f97316"}} />}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Shirt color */}
-        <div style={{ padding:"12px", borderBottom:"1px solid #1e1e1e" }}>
-          <div style={{ fontSize:10, color:"#555", marginBottom:8, textTransform:"uppercase", letterSpacing:1 }}>Shirt Color</div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:5 }}>
-            {SHIRT_COLORS.map(c => (
-              <div key={c.hex} title={c.name}
-                style={{ width:"100%", aspectRatio:"1", borderRadius:4, background:c.hex, border:d.shirtColor===c.hex?"2px solid #f97316":"2px solid #2a2a2a", cursor:"pointer" }}
-                onClick={() => update({ shirtColor:c.hex })} />
+        <div className="panel-section">
+          <div className="panel-label">Shirt Color</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5}}>
+            {SHIRT_COLORS.map(c=>(
+              <div key={c.hex} title={c.name} className="color-swatch"
+                style={{background:c.hex,borderColor:d.shirtColor===c.hex?"#f97316":"#2a2a2a"}}
+                onClick={()=>upd({shirtColor:c.hex})} />
             ))}
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:8 }}>
-            <span style={{ fontSize:10, color:"#555" }}>Custom:</span>
-            <input type="color" value={d.shirtColor} onChange={e=>update({shirtColor:e.target.value})}
-              style={{ width:32, height:24, border:"1px solid #333", borderRadius:4, background:"none", cursor:"pointer" }} />
+          <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
+            <span style={{fontSize:10,color:"#555"}}>Custom:</span>
+            <input type="color" value={d.shirtColor} onChange={e=>upd({shirtColor:e.target.value})}
+              style={{width:32,height:24,border:"1px solid #333",borderRadius:4,background:"none"}} />
           </div>
         </div>
 
-        {/* Art layers */}
-        <div style={{ flex:1, overflow:"auto", padding:12 }}>
-          <div style={{ fontSize:10, color:"#555", marginBottom:8, textTransform:"uppercase", letterSpacing:1, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-            <span>Art Layers ({zone.layers.length})</span>
-            <button style={{ fontSize:10, color:"#f97316", background:"none", border:"none", cursor:"pointer" }} onClick={()=>artFileRef.current?.click()}>+ Add</button>
+        <div className="scrollable">
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <span className="panel-label" style={{margin:0}}>Art Layers ({zone.layers.length})</span>
+            <button style={{fontSize:10,color:"#f97316",background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Mono',monospace"}}
+              onClick={()=>artFileRef.current.click()}>+ Add</button>
           </div>
-          {zone.layers.length===0 && (
-            <div style={{ color:"#3a3a3a", fontSize:11, textAlign:"center", paddingTop:16, lineHeight:1.8 }}>
+          {zone.layers.length===0&&(
+            <div style={{color:"#3a3a3a",fontSize:11,textAlign:"center",paddingTop:16,lineHeight:1.8}}>
               No art layers yet.<br/>Upload a logo above.
             </div>
           )}
-          {[...zone.layers].reverse().map((layer, i) => (
-            <div key={layer.id} className="layer-row"
-              style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 6px", borderRadius:6, marginBottom:3, cursor:"pointer", background:selectedLayer===layer.id?"#f9731618":"transparent", border:selectedLayer===layer.id?"1px solid #f9731644":"1px solid transparent" }}
-              onClick={() => setSelectedLayer(layer.id===selectedLayer?null:layer.id)}>
-              <div style={{ width:28, height:28, borderRadius:4, overflow:"hidden", flexShrink:0, background:"#222" }}>
-                <img src={layer.src} style={{ width:"100%", height:"100%", objectFit:"cover" }} alt="" />
+          {[...zone.layers].reverse().map((layer,i)=>(
+            <div key={layer.id} className={`layer-row${selectedLayer===layer.id?" selected":""}`}
+              onClick={()=>setSelectedLayer(layer.id===selectedLayer?null:layer.id)}>
+              <div style={{width:28,height:28,borderRadius:4,overflow:"hidden",flexShrink:0,background:"#222"}}>
+                <img src={layer.src} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="" />
               </div>
-              <span style={{ fontSize:11, flex:1, color:"#ccc", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+              <span style={{fontSize:11,flex:1,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {layer.locked?"🔒 ":""}Layer {zone.layers.length-i}
               </span>
-              <button style={{ background:"none", border:"none", color:"#444", cursor:"pointer", fontSize:13, padding:0, lineHeight:1 }}
+              <button style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:13,padding:0,lineHeight:1}}
                 onClick={e=>{e.stopPropagation();deleteLayer(layer.id);}}>✕</button>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── Center Canvas ── */}
-      <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", background:"#0a0a0a", position:"relative", overflow:"hidden" }}>
-        {/* Zone label */}
-        <div style={{ position:"absolute", top:14, left:"50%", transform:"translateX(-50%)", background:"#1a1a1a", border:"1px solid #2a2a2a", borderRadius:20, padding:"4px 16px", fontSize:11, color:"#666", whiteSpace:"nowrap", zIndex:20 }}>
-          {zoneInfo?.label} · max print {zoneInfo?.maxW}" × {zoneInfo?.maxH}"
-        </div>
+      {/* CENTER */}
+      <div className="center-area">
+        <div className="zone-badge">{zoneInfo?.label} · max print {zoneInfo?.maxW}" × {zoneInfo?.maxH}"</div>
 
-        {/* Canvas */}
-        <div
-          ref={canvasRef}
-          className="canvas-area"
-          style={{ position:"relative", width:canvasW, height:canvasH, borderRadius:10, overflow:"hidden", boxShadow:"0 0 0 1px #1e1e1e, 0 30px 80px #00000090", cursor:zone.layers.length>0&&hasShirtImg?"crosshair":"default" }}
-          onMouseDown={onCanvasMouseDown}
-          onMouseMove={onCanvasMouseMove}
-          onMouseUp={onCanvasMouseUp}
-          onMouseLeave={onCanvasMouseUp}
-        >
-          {/* Shirt background — placeholder or uploaded image */}
-          <ShirtBackground
-            zoneId={d.activeZone}
-            shirtImage={d.shirtImages?.[d.activeZone]}
-            onUpload={src => setShirtImage(d.activeZone, src)}
-          />
+        <div ref={canvasRef} className="canvas-area"
+          style={{position:"relative",width:cW,height:cH,borderRadius:10,overflow:"hidden",
+            boxShadow:"0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56)",
+            cursor:zone.layers.length>0&&hasShirtImg?"crosshair":"default"}}
+          onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
 
-          {/* Print area guide (only when shirt image is loaded) */}
-          {hasShirtImg && (
-            <div style={{ position:"absolute", left:"15%", top:"14%", width:"70%", height:"72%", border:"1px dashed #ffffff12", borderRadius:4, pointerEvents:"none", zIndex:2 }} />
-          )}
+          <ShirtBackground zoneId={d.activeZone} shirtImage={d.shirtImages?.[d.activeZone]} onUpload={src=>setShirtImg(d.activeZone,src)} />
 
-          {/* Art layers */}
-          {zone.layers.map(layer => {
-            const lx=(layer.x/100)*canvasW, ly=(layer.y/100)*canvasH;
-            const lw=(layer.w/100)*canvasW, lh=(layer.h/100)*canvasH;
+          {hasShirtImg&&<div className="print-guide" />}
+
+          {zone.layers.map(layer=>{
+            const lx=(layer.x/100)*cW,ly=(layer.y/100)*cH,lw=(layer.w/100)*cW,lh=(layer.h/100)*cH;
             const isSel=layer.id===selectedLayer;
             return (
-              <div key={layer.id} style={{ position:"absolute", left:lx, top:ly, width:lw, height:lh, zIndex:10, opacity:layer.opacity/100, transform:`rotate(${layer.rotation||0}deg)`, transformOrigin:"center center", outline:isSel?"2px solid #f97316":"none", cursor:layer.locked?"not-allowed":"move" }}>
-                <img src={layer.src} style={{ width:"100%", height:"100%", objectFit:"contain", display:"block", pointerEvents:"none" }} alt="" draggable={false} />
-                {isSel && (
-                  <div
-                    style={{ position:"absolute", right:-5, bottom:-5, width:10, height:10, background:"#f97316", borderRadius:2, cursor:"se-resize", zIndex:20 }}
-                    onMouseDown={e => {
+              <div key={layer.id} style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:10,
+                opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",
+                outline:isSel?"2px solid #f97316":"none",cursor:layer.locked?"not-allowed":"move"}}>
+                <img src={layer.src} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",pointerEvents:"none"}} alt="" draggable={false} />
+                {isSel&&(
+                  <div className="resize-handle"
+                    onMouseDown={e=>{
                       e.stopPropagation();
-                      const sx=e.clientX, sy=e.clientY, sw=layer.w, sh=layer.h;
-                      const onMove=ev=>{ updateLayer(layer.id,{w:Math.max(5,sw+((ev.clientX-sx)/canvasW)*100),h:Math.max(5,sh+((ev.clientY-sy)/canvasH)*100)}); };
-                      const onUp=()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
-                      window.addEventListener("mousemove",onMove); window.addEventListener("mouseup",onUp);
-                    }}
-                  />
+                      const sx=e.clientX,sy=e.clientY,sw=layer.w,sh=layer.h;
+                      const mv=ev=>updLayer(layer.id,{w:Math.max(5,sw+((ev.clientX-sx)/cW)*100),h:Math.max(5,sh+((ev.clientY-sy)/cH)*100)});
+                      const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};
+                      window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up);
+                    }} />
                 )}
               </div>
             );
           })}
 
-          {/* Hint overlay for art upload when shirt is set but no layers */}
-          {hasShirtImg && zone.layers.length===0 && (
-            <div style={{ position:"absolute", left:"15%", top:"14%", width:"70%", height:"72%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", pointerEvents:"none", zIndex:5 }}>
-              <div style={{ fontSize:22, opacity:0.3, marginBottom:6 }}>🎨</div>
-              <div style={{ color:"#ffffff1a", fontSize:11, textAlign:"center" }}>Add art layer →</div>
+          {hasShirtImg&&zone.layers.length===0&&(
+            <div className="art-hint">
+              <div style={{fontSize:22,opacity:0.25,marginBottom:6}}>🎨</div>
+              <div style={{color:"rgba(255,255,255,0.1)",fontSize:11,textAlign:"center"}}>Add art layer →</div>
             </div>
           )}
         </div>
 
-        {/* DTF badge */}
-        {dtfInfo && selLayer && (
-          <div style={{ marginTop:14, background:"#161616", border:"1px solid #f9731433", borderRadius:8, padding:"8px 20px", display:"flex", gap:16, alignItems:"center" }}>
-            <span style={{ fontSize:10, color:"#f97316", textTransform:"uppercase", letterSpacing:1 }}>DTF Transfer Size</span>
-            <span style={{ fontFamily:"'Bebas Neue'", fontSize:22, color:"#fff", letterSpacing:1 }}>{dtfInfo.w}" × {dtfInfo.h}"</span>
+        {dtfInfo&&selLayer&&(
+          <div className="dtf-badge">
+            <span className="dtf-label">DTF Transfer Size</span>
+            <span className="dtf-value">{dtfInfo.w}" × {dtfInfo.h}"</span>
           </div>
         )}
       </div>
 
-      {/* ── Right Panel ── */}
-      <div style={{ width:242, background:"#141414", borderLeft:"1px solid #222", display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        {/* Name + actions */}
-        <div style={{ padding:"12px", borderBottom:"1px solid #1e1e1e" }}>
+      {/* RIGHT */}
+      <div className="right-panel">
+        <div className="panel-section">
           {editingName ? (
-            <input autoFocus value={nameVal} onChange={e=>setNameVal(e.target.value)}
-              onBlur={()=>{update({name:nameVal});setEditingName(false);}}
-              onKeyDown={e=>e.key==="Enter"&&(update({name:nameVal}),setEditingName(false))}
-              style={{ width:"100%", background:"#222", border:"1px solid #f97316", borderRadius:4, padding:"4px 8px", color:"#fff", fontSize:13, outline:"none", fontFamily:"inherit" }} />
+            <input className="name-input" autoFocus value={nameVal}
+              onChange={e=>setNameVal(e.target.value)}
+              onBlur={()=>{upd({name:nameVal});setEditingName(false);}}
+              onKeyDown={e=>e.key==="Enter"&&(upd({name:nameVal}),setEditingName(false))} />
           ) : (
-            <div onClick={()=>setEditingName(true)} style={{ cursor:"text", fontWeight:500, fontSize:13, color:"#e8e8e8", display:"flex", alignItems:"center", gap:6 }}>
-              {d.name} <span style={{ color:"#444", fontSize:11 }}>✏️</span>
+            <div className="name-display" onClick={()=>setEditingName(true)}>
+              {d.name} <span style={{color:"#444",fontSize:11}}>✏️</span>
             </div>
           )}
-          <div style={{ display:"flex", gap:6, marginTop:8 }}>
-            <button className="btn btn-primary" style={{ flex:1, fontSize:10, padding:"6px 0" }} onClick={()=>onSave(d)}>💾 Save</button>
-            <button className="btn btn-ghost" style={{ fontSize:10, padding:"6px 8px" }} onClick={onDuplicate} title="Duplicate">⧉</button>
-            <button className="btn btn-ghost" style={{ fontSize:10, padding:"6px 8px" }} onClick={onBack}>← Back</button>
+          <div style={{display:"flex",gap:6,marginTop:8}}>
+            <button className="btn btn-primary" style={{flex:1,fontSize:10,padding:"6px 0"}} onClick={()=>onSave(d)}>💾 Save</button>
+            <button className="btn btn-ghost" style={{fontSize:10,padding:"6px 8px"}} onClick={onDuplicate} title="Duplicate">⧉</button>
+            <button className="btn btn-ghost" style={{fontSize:10,padding:"6px 8px"}} onClick={onBack}>← Back</button>
           </div>
         </div>
 
-        {/* Upload art */}
-        <div style={{ padding:12, borderBottom:"1px solid #1e1e1e" }}>
-          <div style={{ fontSize:10, color:"#555", marginBottom:8, textTransform:"uppercase", letterSpacing:1 }}>Upload Art / Logo</div>
-          <input ref={artFileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handleArtUpload} />
-          <button className="btn btn-primary" style={{ width:"100%", padding:"9px 0", fontSize:12 }} onClick={()=>artFileRef.current?.click()}>
+        <div className="panel-section">
+          <div className="panel-label">Upload Art / Logo</div>
+          <input ref={artFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleArtFile} />
+          <button className="btn btn-primary" style={{width:"100%",padding:"9px 0",fontSize:12}}
+            onClick={()=>artFileRef.current.click()}>
             🎨 Add Art to {zoneInfo?.label.split("–")[1]?.trim()}
           </button>
         </div>
 
-        {/* Layer properties */}
         {selLayer ? (
-          <div style={{ flex:1, overflow:"auto", padding:12 }}>
-            <div style={{ fontSize:10, color:"#555", marginBottom:10, textTransform:"uppercase", letterSpacing:1 }}>Layer Properties</div>
-            <button className="btn btn-ghost" style={{ width:"100%", marginBottom:10, fontSize:11, padding:"7px 0", borderColor:bgRemoveLoading?"#f97316":"#333" }}
-              onClick={removeBackground} disabled={bgRemoveLoading}>
-              {bgRemoveLoading?"⏳ Removing bg...":"✂️ Remove Background"}
+          <div className="scrollable">
+            <div className="panel-label">Layer Properties</div>
+            <button className="btn btn-ghost" style={{width:"100%",marginBottom:10,fontSize:11,padding:"7px 0",borderColor:bgRemoving?"#f97316":"#333"}}
+              onClick={removeBg} disabled={bgRemoving}>
+              {bgRemoving?"⏳ Removing...":"✂️ Remove Background"}
             </button>
-
-            <Slider label="Width %"    value={selLayer.w}           min={5}    max={100} onChange={v=>updateLayer(selLayer.id,{w:v})} />
-            <Slider label="Height %"   value={selLayer.h}           min={5}    max={100} onChange={v=>updateLayer(selLayer.id,{h:v})} />
-            <Slider label="X Position" value={selLayer.x}           min={0}    max={90}  onChange={v=>updateLayer(selLayer.id,{x:v})} />
-            <Slider label="Y Position" value={selLayer.y}           min={0}    max={90}  onChange={v=>updateLayer(selLayer.id,{y:v})} />
-            <Slider label="Opacity"    value={selLayer.opacity}     min={0}    max={100} onChange={v=>updateLayer(selLayer.id,{opacity:v})} />
-            <Slider label="Rotation °" value={selLayer.rotation||0} min={-180} max={180} onChange={v=>updateLayer(selLayer.id,{rotation:v})} />
-
-            <div style={{ marginTop:10, display:"flex", gap:5, flexWrap:"wrap" }}>
-              <button className="btn btn-ghost" style={{ fontSize:10, flex:1 }} onClick={()=>moveLayerOrder(selLayer.id,-1)}>⬆ Fwd</button>
-              <button className="btn btn-ghost" style={{ fontSize:10, flex:1 }} onClick={()=>moveLayerOrder(selLayer.id,1)}>⬇ Back</button>
-              <button className="btn btn-ghost" style={{ fontSize:10, flex:1 }} onClick={()=>updateLayer(selLayer.id,{locked:!selLayer.locked})}>
+            <Slider label="Width %"    value={selLayer.w}           min={5}   max={100} onChange={v=>updLayer(selLayer.id,{w:v})} />
+            <Slider label="Height %"   value={selLayer.h}           min={5}   max={100} onChange={v=>updLayer(selLayer.id,{h:v})} />
+            <Slider label="X Position" value={selLayer.x}           min={0}   max={90}  onChange={v=>updLayer(selLayer.id,{x:v})} />
+            <Slider label="Y Position" value={selLayer.y}           min={0}   max={90}  onChange={v=>updLayer(selLayer.id,{y:v})} />
+            <Slider label="Opacity"    value={selLayer.opacity}     min={0}   max={100} onChange={v=>updLayer(selLayer.id,{opacity:v})} />
+            <Slider label="Rotation °" value={selLayer.rotation||0} min={-180} max={180} onChange={v=>updLayer(selLayer.id,{rotation:v})} />
+            <div style={{marginTop:10,display:"flex",gap:5,flexWrap:"wrap"}}>
+              <button className="btn btn-ghost" style={{fontSize:10,flex:1}} onClick={()=>reorderLayer(selLayer.id,-1)}>⬆ Fwd</button>
+              <button className="btn btn-ghost" style={{fontSize:10,flex:1}} onClick={()=>reorderLayer(selLayer.id,1)}>⬇ Back</button>
+              <button className="btn btn-ghost" style={{fontSize:10,flex:1}} onClick={()=>updLayer(selLayer.id,{locked:!selLayer.locked})}>
                 {selLayer.locked?"🔓":"🔒"}
               </button>
-              <button className="btn btn-danger" style={{ fontSize:10, flex:1 }} onClick={()=>deleteLayer(selLayer.id)}>🗑</button>
+              <button className="btn btn-danger" style={{fontSize:10,flex:1}} onClick={()=>deleteLayer(selLayer.id)}>🗑</button>
             </div>
-
-            {dtfInfo && (
-              <div style={{ marginTop:14, background:"#0f0f0f", border:"1px solid #f9731622", borderRadius:8, padding:10 }}>
-                <div style={{ fontSize:10, color:"#f97316", marginBottom:4, textTransform:"uppercase", letterSpacing:1 }}>DTF Transfer Size</div>
-                <div style={{ fontFamily:"'Bebas Neue'", fontSize:22, color:"#fff", letterSpacing:1 }}>{dtfInfo.w}" × {dtfInfo.h}"</div>
-                <div style={{ fontSize:10, color:"#555", marginTop:2 }}>relative to {zoneInfo?.maxW}"×{zoneInfo?.maxH}" max area</div>
+            {dtfInfo&&(
+              <div className="dtf-box">
+                <div className="dtf-box-label">DTF Transfer Size</div>
+                <div className="dtf-box-val">{dtfInfo.w}" × {dtfInfo.h}"</div>
+                <div className="dtf-box-sub">relative to {zoneInfo?.maxW}"×{zoneInfo?.maxH}" max area</div>
               </div>
             )}
           </div>
         ) : (
-          <div style={{ flex:1, padding:12 }}>
-            <div style={{ fontSize:10, color:"#444", textTransform:"uppercase", letterSpacing:1, marginBottom:8 }}>No Layer Selected</div>
-            <div style={{ fontSize:11, color:"#3a3a3a", lineHeight:1.8 }}>
+          <div style={{flex:1,padding:12}}>
+            <div style={{fontSize:10,color:"#3a3a3a",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>No Layer Selected</div>
+            <div style={{fontSize:11,color:"#333",lineHeight:1.8}}>
               {!hasShirtImg
                 ? "Start by clicking the shirt canvas to upload your shirt image for this zone."
                 : "Upload art using the button above, then click a layer to edit it."}
@@ -691,28 +715,17 @@ function EditorView({ design, onSave, onDuplicate, onBack }) {
           </div>
         )}
 
-        {/* Download */}
-        <div style={{ padding:12, borderTop:"1px solid #1e1e1e", display:"flex", flexDirection:"column", gap:6 }}>
-          <div style={{ fontSize:10, color:"#555", marginBottom:2, textTransform:"uppercase", letterSpacing:1 }}>
-            Download · {zoneInfo?.label.split("–")[1]?.trim()}
-          </div>
-          <button className="btn btn-primary" style={{ fontSize:11 }} onClick={()=>download(true)}>⬇ Design + Shirt</button>
-          <button className="btn btn-ghost" style={{ fontSize:11 }} onClick={()=>download(false)}>⬇ Logo Only (PNG)</button>
+        <div style={{padding:12,borderTop:"1px solid #1e1e1e",display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
+          <div className="panel-label" style={{marginBottom:2}}>Download · {zoneInfo?.label.split("–")[1]?.trim()}</div>
+          <button className="btn btn-primary" style={{fontSize:11}} onClick={()=>download(true)}>⬇ Design + Shirt</button>
+          <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>download(false)}>⬇ Logo Only (PNG)</button>
         </div>
       </div>
     </div>
   );
 }
 
-function Slider({ label, value, min, max, onChange }) {
-  return (
-    <div style={{ marginBottom:10 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
-        <span style={{ fontSize:10, color:"#666" }}>{label}</span>
-        <span style={{ fontSize:10, color:"#999" }}>{Math.round(value)}</span>
-      </div>
-      <input type="range" min={min} max={max} step={label.includes("°")?1:0.5} value={value}
-        onChange={e=>onChange(parseFloat(e.target.value))} style={{ width:"100%", height:4 }} />
-    </div>
-  );
-}
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
