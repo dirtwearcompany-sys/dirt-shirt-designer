@@ -16,11 +16,7 @@
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: #1a1a1a; }
     ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
-    .btn {
-      padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer;
-      font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500;
-      transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center;
-    }
+    .btn { padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-primary { background: #f97316; color: #000; }
     .btn-primary:hover:not(:disabled) { background: #fb923c; }
@@ -29,34 +25,31 @@
     .btn-danger { background: transparent; color: #ef4444; border: 1px solid rgba(239,68,68,0.27); }
     .btn-danger:hover:not(:disabled) { background: rgba(239,68,68,0.13); }
     .btn-type { padding: 5px 0; font-size: 11px; border: none; cursor: pointer; border-radius: 6px; flex: 1; font-family: 'DM Mono', monospace; transition: all 0.15s; }
-    .zone-tab {
-      padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px;
-      border: 1px solid transparent; transition: all 0.15s; white-space: nowrap;
-      text-align: left; background: none; width: 100%; color: #888;
-      border-color: #333; font-family: 'DM Mono', monospace;
-    }
+    .zone-tab { padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; border: 1px solid transparent; transition: all 0.15s; white-space: nowrap; text-align: left; background: none; width: 100%; color: #888; border-color: #333; font-family: 'DM Mono', monospace; }
     .zone-tab:hover { border-color: #555; color: #ccc; }
     .zone-tab.active { background: #f97316 !important; color: #000 !important; border-color: #f97316 !important; }
-    .layer-row {
-      display: flex; align-items: center; gap: 6px; padding: 5px 6px;
-      border-radius: 6px; margin-bottom: 3px; cursor: pointer;
-      border: 1px solid transparent; transition: background 0.1s;
-    }
+    .layer-row { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; margin-bottom: 3px; cursor: pointer; border: 1px solid transparent; transition: background 0.1s; }
     .layer-row:hover { background: rgba(255,255,255,0.04); }
     .layer-row.selected { background: rgba(249,115,22,0.09); border-color: rgba(249,115,22,0.27); }
-    .design-card {
-      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px;
-      padding: 16px; transition: border-color 0.2s;
-    }
+    .design-card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 16px; transition: border-color 0.2s; }
     .design-card:hover { border-color: #f97316; }
-    .shirt-img-wrap { position: relative; width: 100%; height: 100%; }
+
+    /* ── Shirt image: always fills + centers the canvas ── */
+    .shirt-bg {
+      position: absolute; inset: 0; z-index: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .shirt-bg img {
+      width: 100%; height: 100%;
+      object-fit: contain;        /* contain keeps whole shirt visible */
+      object-position: center center;
+      display: block;
+    }
+
     input[type="range"] { accent-color: #f97316; width: 100%; height: 4px; cursor: pointer; }
     input[type="color"] { cursor: pointer; }
     .canvas-area { position: relative; user-select: none; }
-    .resize-handle {
-      position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px;
-      background: #f97316; border-radius: 2px; cursor: se-resize; z-index: 20;
-    }
+    .resize-handle { position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: #f97316; border-radius: 2px; cursor: se-resize; z-index: 20; }
     .header { background: #141414; border-bottom: 1px solid #222; padding: 11px 24px; display: flex; align-items: center; gap: 14px; height: 53px; flex-shrink: 0; }
     .logo-dirt  { font-family: 'Bebas Neue', cursive; font-size: 26px; color: #f97316; letter-spacing: 3px; }
     .logo-shirt { font-family: 'Bebas Neue', cursive; font-size: 26px; color: #e8e8e8; letter-spacing: 2px; }
@@ -110,7 +103,7 @@ const SHIRT_IMAGE_SRCS = {
   // ── Short Sleeve ──────────────────────────────────────────
   short_front:  "shortsleeve_front.png",   // Short Sleeve Front
   short_back:   "shortsleeve_back.png",    // Short Sleeve Back
-  short_sleeve: "shortsleeve_side2.png",    // Short Sleeve Sleeve
+  short_sleeve: "shortsleeve_side2.png",   // Short Sleeve Sleeve
   // ── Long Sleeve ───────────────────────────────────────────
   long_front:   "longsleeve_front.png",    // Long Sleeve Front
   long_back:    "longsleeve_back.png",     // Long Sleeve Back
@@ -141,10 +134,17 @@ const SHIRT_ZONES = {
     { id:"long_sleeve", label:"Long Sleeve – Sleeve", maxW:4,  maxH:14 },
   ],
 };
+
+// ── Larger canvas sizes so shirts fill the frame better ──────────────────────
 const ZONE_SIZE = {
-  short_front:[320,380], short_back:[320,380], short_sleeve:[320,210],
-  long_front:[320,430],  long_back:[320,430],  long_sleeve:[220,430],
+  short_front:  [400, 480],
+  short_back:   [400, 480],
+  short_sleeve: [400, 260],
+  long_front:   [400, 530],
+  long_back:    [400, 530],
+  long_sleeve:  [270, 530],
 };
+
 const ZONE_LABELS = {
   short_front:"Short Sleeve Front", short_back:"Short Sleeve Back", short_sleeve:"Short Sleeve Sleeve",
   long_front:"Long Sleeve Front",   long_back:"Long Sleeve Back",   long_sleeve:"Long Sleeve Sleeve",
@@ -175,13 +175,13 @@ function blankDesign(name="New Design") {
 }
 
 // ─── ShirtBackground ─────────────────────────────────────────────────────────
+// object-fit:contain keeps the whole shirt visible; object-position:center
+// ensures it's always perfectly centered regardless of image dimensions.
 function ShirtBackground({ shirtImage }) {
   if (!shirtImage) return null;
   return (
-    <div style={{position:"absolute",inset:0,zIndex:0}}>
-      <div className="shirt-img-wrap">
-        <img src={shirtImage} alt="shirt" style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}} draggable={false} />
-      </div>
+    <div className="shirt-bg">
+      <img src={shirtImage} alt="shirt" draggable={false} />
     </div>
   );
 }
@@ -213,8 +213,7 @@ function ImgSrcPanel({ shirtImages, onUpload }) {
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,padding:"24px 32px",gap:10}}>
       <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:15,color:"#555",letterSpacing:2,marginBottom:4}}>REPLACE # WITH YOUR IMAGE PATHS</div>
       {ALL_ZONES_ORDERED.map(z=>(
-        <input key={z.id} ref={fileRefs.current[z.id]} type="file" accept="image/*" style={{display:"none"}}
-          onChange={e=>handleFile(z.id,e)} />
+        <input key={z.id} ref={fileRefs.current[z.id]} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(z.id,e)} />
       ))}
       {!shortDone && (
         <div style={{width:"100%",maxWidth:540}}>
@@ -223,20 +222,14 @@ function ImgSrcPanel({ shirtImages, onUpload }) {
             {["short_front","short_back","short_sleeve"].filter(id=>!shirtImages[id]).map((id,i,arr)=>{
               const label = ZONE_LABELS[id];
               return (
-                <div key={id}
-                  style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:i<arr.length-1?"1px solid #1a1a1a":"none",cursor:"pointer",transition:"background 0.15s",gap:10}}
+                <div key={id} style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:i<arr.length-1?"1px solid #1a1a1a":"none",cursor:"pointer",transition:"background 0.15s",gap:10}}
                   onClick={()=>fileRefs.current[id].current.click()}
                   onMouseEnter={e=>e.currentTarget.style.background="#1a1a1a"}
                   onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <code style={{flex:1,fontFamily:"'DM Mono',monospace",fontSize:13,lineHeight:1,letterSpacing:"0.01em"}}>
-                    <span style={{color:"#555"}}>&lt;</span>
-                    <span style={{color:"#7c3aed"}}>img</span>
-                    <span style={{color:"#0d9488"}}> src</span>
-                    <span style={{color:"#6b7280"}}>=</span>
-                    <span style={{color:"#f97316"}}>"#"</span>
-                    <span style={{color:"#0d9488"}}> alt</span>
-                    <span style={{color:"#6b7280"}}>=</span>
-                    <span style={{color:"#f59e0b"}}>"{label}"</span>
+                    <span style={{color:"#555"}}>&lt;</span><span style={{color:"#7c3aed"}}>img</span>
+                    <span style={{color:"#0d9488"}}> src</span><span style={{color:"#6b7280"}}>=</span><span style={{color:"#f97316"}}>"#"</span>
+                    <span style={{color:"#0d9488"}}> alt</span><span style={{color:"#6b7280"}}>=</span><span style={{color:"#f59e0b"}}>"{label}"</span>
                     <span style={{color:"#555"}}> /&gt;</span>
                   </code>
                   <span style={{fontSize:10,color:"#444",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace"}}>click to upload ↑</span>
@@ -253,20 +246,14 @@ function ImgSrcPanel({ shirtImages, onUpload }) {
             {["long_front","long_back","long_sleeve"].filter(id=>!shirtImages[id]).map((id,i,arr)=>{
               const label = ZONE_LABELS[id];
               return (
-                <div key={id}
-                  style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:i<arr.length-1?"1px solid #1a1a1a":"none",cursor:"pointer",transition:"background 0.15s",gap:10}}
+                <div key={id} style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:i<arr.length-1?"1px solid #1a1a1a":"none",cursor:"pointer",transition:"background 0.15s",gap:10}}
                   onClick={()=>fileRefs.current[id].current.click()}
                   onMouseEnter={e=>e.currentTarget.style.background="#1a1a1a"}
                   onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <code style={{flex:1,fontFamily:"'DM Mono',monospace",fontSize:13,lineHeight:1,letterSpacing:"0.01em"}}>
-                    <span style={{color:"#555"}}>&lt;</span>
-                    <span style={{color:"#7c3aed"}}>img</span>
-                    <span style={{color:"#0d9488"}}> src</span>
-                    <span style={{color:"#6b7280"}}>=</span>
-                    <span style={{color:"#f97316"}}>"#"</span>
-                    <span style={{color:"#0d9488"}}> alt</span>
-                    <span style={{color:"#6b7280"}}>=</span>
-                    <span style={{color:"#f59e0b"}}>"{label}"</span>
+                    <span style={{color:"#555"}}>&lt;</span><span style={{color:"#7c3aed"}}>img</span>
+                    <span style={{color:"#0d9488"}}> src</span><span style={{color:"#6b7280"}}>=</span><span style={{color:"#f97316"}}>"#"</span>
+                    <span style={{color:"#0d9488"}}> alt</span><span style={{color:"#6b7280"}}>=</span><span style={{color:"#f59e0b"}}>"{label}"</span>
                     <span style={{color:"#555"}}> /&gt;</span>
                   </code>
                   <span style={{fontSize:10,color:"#444",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace"}}>click to upload ↑</span>
@@ -375,10 +362,9 @@ function Library({ designs, onOpen, onDuplicate, onDelete, onNew }) {
             const totalLayers = Object.values(d.zones||{}).reduce((s,z) => s+(z.layers?.length||0), 0);
             return (
               <div key={d.id} className="design-card">
-                <div style={{background:"#111",borderRadius:8,height:130,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,cursor:"pointer",overflow:"hidden"}}
-                  onClick={() => onOpen(d)}>
+                <div style={{background:"#111",borderRadius:8,height:130,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,cursor:"pointer",overflow:"hidden"}} onClick={() => onOpen(d)}>
                   {previewImg
-                    ? <img src={previewImg} alt="preview" style={{width:"100%",height:"100%",objectFit:"contain"}} />
+                    ? <img src={previewImg} alt="preview" style={{width:"100%",height:"100%",objectFit:"contain",objectPosition:"center"}} />
                     : <div style={{fontSize:42,opacity:0.18}}>👕</div>}
                 </div>
                 <div style={{fontWeight:500,fontSize:13,marginBottom:3,color:"#e8e8e8"}}>{d.name}</div>
@@ -413,11 +399,10 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
   const zone = d.zones[d.activeZone];
   const allZones = [...SHIRT_ZONES.short, ...SHIRT_ZONES.long];
   const zoneInfo = allZones.find(z => z.id === d.activeZone);
-  const [cW, cH] = ZONE_SIZE[d.activeZone] || [320,380];
+  const [cW, cH] = ZONE_SIZE[d.activeZone] || [400, 480];
   const selLayer = zone.layers.find(l => l.id === selectedLayer);
   const dtfInfo = selLayer ? calcDTF(selLayer.w, selLayer.h, zoneInfo?.maxW||12, zoneInfo?.maxH||14) : null;
   const allImagesSet = Object.values(d.shirtImages).every(Boolean);
-
   const upd = useCallback(patch => setD(p => ({...p,...patch})), []);
   const updZone = useCallback((zid, patch) => setD(p => ({...p, zones:{...p.zones,[zid]:{...p.zones[zid],...patch}}})), []);
   const updLayer = useCallback((lid, patch) => {
@@ -426,9 +411,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
       return {...p, zones:{...p.zones,[p.activeZone]:{...p.zones[p.activeZone],layers}}};
     });
   }, []);
-
   function setShirtImg(zid, src) { setD(p => ({...p, shirtImages:{...p.shirtImages,[zid]:src}})); }
-
   function addArtLayer(dataUrl) {
     const img = new Image();
     img.onload = () => {
@@ -501,9 +484,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
       setSelectedLayer(layer.id);
       isDragging.current=true;
       dragStart.current={cx,cy,ox:layer.x,oy:layer.y};
-    } else if(!layer) {
-      setSelectedLayer(null);
-    }
+    } else if(!layer) { setSelectedLayer(null); }
   }
   function onMM(e) {
     if(!isDragging.current||!selectedLayer) return;
@@ -514,6 +495,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
     updLayer(selectedLayer,{x:Math.max(0,dragStart.current.ox+dx),y:Math.max(0,dragStart.current.oy+dy)});
   }
   function onMU() { isDragging.current=false; }
+
   async function download(withShirt) {
     const sc=2.5, w=cW*sc, h=cH*sc;
     const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
@@ -522,7 +504,18 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
     if(withShirt){
       const src=d.shirtImages?.[d.activeZone];
       if(src){
-        await new Promise(res=>{ const img=new Image(); img.onload=()=>{ctx.drawImage(img,0,0,w,h);res();}; img.src=src; });
+        await new Promise(res=>{
+          const img=new Image();
+          img.onload=()=>{
+            // Mirror the contain+center display logic in the download
+            const scale = Math.min(w/img.width, h/img.height);
+            const dw=img.width*scale, dh=img.height*scale;
+            const dx=(w-dw)/2, dy=(h-dh)/2;
+            ctx.drawImage(img,dx,dy,dw,dh);
+            res();
+          };
+          img.src=src;
+        });
       } else { ctx.fillStyle=d.shirtColor; ctx.fillRect(0,0,w,h); }
     }
     for(const layer of zone.layers){
@@ -620,12 +613,17 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
           <>
             <div className="zone-badge">{zoneInfo?.label} · max print {zoneInfo?.maxW}" × {zoneInfo?.maxH}"</div>
             <div ref={canvasRef} className="canvas-area"
-              style={{position:"relative",width:cW,height:cH,borderRadius:10,overflow:"hidden",
+              style={{
+                position:"relative", width:cW, height:cH,
+                borderRadius:10, overflow:"hidden",
                 boxShadow:"0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56)",
-                cursor:zone.layers.length>0?"crosshair":"default"}}
+                cursor:zone.layers.length>0?"crosshair":"default",
+              }}
               onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
+
               <ShirtBackground shirtImage={d.shirtImages?.[d.activeZone]} />
               <div className="print-guide" />
+
               {zone.layers.map(layer=>{
                 const lx=(layer.x/100)*cW,ly=(layer.y/100)*cH,lw=(layer.w/100)*cW,lh=(layer.h/100)*cH;
                 const isSel=layer.id===selectedLayer;
