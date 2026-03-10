@@ -134,6 +134,22 @@ const ZONE_BASE_COLOR = {
   long_back:    "#ffffff",
   long_sleeve:  "#ffffff",
 };
+
+// ── SHIRT IMAGE POSITION OFFSETS ──────────────────────────────────────────────
+// Fine-tune where each shirt sits inside the canvas.
+// x: negative = move left,  positive = move right  (% of canvas width)
+// y: negative = move up,    positive = move down   (% of canvas height)
+// s: scale multiplier — 1.0 = default fit, 1.1 = 10% bigger, 0.9 = 10% smaller
+// TIP: Use the live sliders in the app under each zone tab, then copy
+//      the values you like back here so they're saved permanently.
+const ZONE_OFFSET = {
+  short_front:  { x: 0, y: 0, s: 1.0 },
+  short_back:   { x: 0, y: 0, s: 1.0 },
+  short_sleeve: { x: 0, y: 0, s: 1.0 },
+  long_front:   { x: 0, y: 0, s: 1.0 },
+  long_back:    { x: 0, y: 0, s: 1.0 },
+  long_sleeve:  { x: 0, y: 0, s: 1.0 },
+};
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ── One fixed stage size for ALL zones — guarantees identical frame on every switch ──
@@ -209,7 +225,7 @@ function hexToRgb(hex) {
 }
 function colorDist(r1,g1,b1,r2,g2,b2){ return Math.abs(r1-r2)+Math.abs(g1-g2)+Math.abs(b1-b2); }
 
-function ShirtBackground({ shirtImage, shirtColor, baseColor }) {
+function ShirtBackground({ shirtImage, shirtColor, baseColor, offset }) {
   const canvasRef = useRef(null);
   const [naturalImg, setNaturalImg] = useState(null);
 
@@ -233,7 +249,6 @@ function ShirtBackground({ shirtImage, shirtColor, baseColor }) {
     const px   = data.data;
     const W    = canvas.width, H = canvas.height;
 
-    // Sample corners to detect background color
     let br=0,bg=0,bb=0;
     [[0,0],[W-1,0],[0,H-1],[W-1,H-1]].forEach(([x,y])=>{
       const i=(y*W+x)*4; br+=px[i]; bg+=px[i+1]; bb+=px[i+2];
@@ -241,21 +256,15 @@ function ShirtBackground({ shirtImage, shirtColor, baseColor }) {
     br=Math.round(br/4); bg=Math.round(bg/4); bb=Math.round(bb/4);
     const BG_THRESH = 38;
 
-    // The shirt's original base color — normalize brightness AND hue
     const [baser, baseg, baseb] = hexToRgb(baseColor || '#ffffff');
     const baseLum = (0.299*baser + 0.587*baseg + 0.114*baseb) / 255;
     const normFactor = baseLum > 0 ? 1 / baseLum : 1;
-
-    // Target shirt color
     const [tr, tg, tb] = hexToRgb(shirtColor || '#ffffff');
 
     for (let i = 0; i < px.length; i += 4) {
       const r=px[i], g=px[i+1], b=px[i+2], a=px[i+3];
       if (a < 10) continue;
       if (colorDist(r,g,b,br,bg,bb) < BG_THRESH) continue;
-
-      // Convert to grayscale luminosity first (strips original hue),
-      // then normalize to white-equivalent, then apply target color
       const grayLum = (0.299*r + 0.587*g + 0.114*b) / 255;
       const lum = Math.min(grayLum * normFactor, 1.0);
       px[i]   = Math.round(tr * lum);
@@ -267,10 +276,22 @@ function ShirtBackground({ shirtImage, shirtColor, baseColor }) {
   }, [naturalImg, shirtColor, baseColor]);
 
   if (!shirtImage) return null;
+
+  // Apply offset: translate X/Y as % of stage, scale around center
+  const ox = offset?.x || 0;
+  const oy = offset?.y || 0;
+  const sc = offset?.s || 1.0;
+
   return (
     <div className="shirt-bg">
       <canvas ref={canvasRef}
-        style={{width:"100%",height:"100%",objectFit:"contain",objectPosition:"center",display:"block"}} />
+        style={{
+          width:"100%", height:"100%",
+          objectFit:"contain", objectPosition:"center", display:"block",
+          transform:`translate(${ox}%, ${oy}%) scale(${sc})`,
+          transformOrigin:"center center",
+          transition:"transform 0.1s ease",
+        }} />
     </div>
   );
 }
@@ -443,6 +464,10 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
   const [editingName, setEditingName] = useState(false);
   const [nameVal, setNameVal] = useState(d.name);
   const [prevZoneImg, setPrevZoneImg] = useState(null);
+  // Per-zone shirt image offsets — initialized from ZONE_OFFSET config, editable live
+  const [offsets, setOffsets] = useState(() => JSON.parse(JSON.stringify(ZONE_OFFSET)));
+  const [showNudge, setShowNudge] = useState(false);
+  const [copied, setCopied] = useState(false);
   const stageRef = useRef(null);
   const isDragging = useRef(false);
   const dragStart = useRef({});
@@ -466,7 +491,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
     });
   }, []);
 
-  // Track previous image for cross-fade
+  const updOffset = useCallback((zid, patch) => setOffsets(o => ({...o, [zid]:{...o[zid],...patch}})), []);
   const prevImgRef = useRef(currentShirtImg);
   useEffect(() => {
     if (currentShirtImg !== prevImgRef.current) {
@@ -648,6 +673,45 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
             ))}
           </div>
         </div>
+        {/* ── Shirt Position Nudge ── */}
+        <div className="panel-section" style={{paddingBottom:showNudge?10:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setShowNudge(v=>!v)}>
+            <span className="panel-label" style={{margin:0}}>Shirt Position</span>
+            <span style={{fontSize:10,color:"#555"}}>{showNudge?"▲":"▼"}</span>
+          </div>
+          {showNudge && (
+            <div style={{marginTop:8}}>
+              {[
+                {key:"x", label:"← → Nudge X", min:-30, max:30, step:0.5},
+                {key:"y", label:"↑ ↓ Nudge Y", min:-30, max:30, step:0.5},
+                {key:"s", label:"⊞ Scale",      min:0.6, max:1.6, step:0.01},
+              ].map(({key,label,min,max,step})=>{
+                const val = offsets[d.activeZone]?.[key] ?? (key==="s"?1:0);
+                return (
+                  <div key={key} className="slider-row">
+                    <div className="slider-top">
+                      <span className="slider-key">{label}</span>
+                      <span className="slider-val">{key==="s"?val.toFixed(2):Math.round(val)}</span>
+                    </div>
+                    <input type="range" min={min} max={max} step={step} value={val}
+                      onChange={e=>updOffset(d.activeZone,{[key]:parseFloat(e.target.value)})} />
+                  </div>
+                );
+              })}
+              <button className="btn btn-ghost" style={{width:"100%",fontSize:10,marginTop:4,padding:"5px 0"}}
+                onClick={()=>{
+                  const lines = Object.keys(ZONE_OFFSET).map(k=>`  ${k.padEnd(13)}: { x: ${(offsets[k]?.x||0).toFixed(1)}, y: ${(offsets[k]?.y||0).toFixed(1)}, s: ${(offsets[k]?.s||1).toFixed(2)} },`).join('\n');
+                  navigator.clipboard.writeText(`const ZONE_OFFSET = {\n${lines}\n};`).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
+                }}>
+                {copied?"✅ Copied!":"📋 Copy config for all zones"}
+              </button>
+              <button className="btn btn-ghost" style={{width:"100%",fontSize:10,marginTop:4,padding:"5px 0"}}
+                onClick={()=>updOffset(d.activeZone,{x:0,y:0,s:1.0})}>
+                ↺ Reset this zone
+              </button>
+            </div>
+          )}
+        </div>
         <div className="panel-section">
           <div className="panel-label">Shirt Color</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5}}>
@@ -699,7 +763,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
               onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
 
               {/* Shirt image with smooth cross-fade */}
-              <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} />
+              <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} />
 
               {/* Dashed print-area guide */}
               <div className="print-guide" />
