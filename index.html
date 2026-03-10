@@ -720,6 +720,20 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
   }, []);
 
   const updOffset = useCallback((zid, patch) => setOffsets(o => ({...o, [zid]:{...o[zid],...patch}})), []);
+
+  // Delete selected layer with keyboard
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (!selectedLayer) return;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        deleteLayer(selectedLayer);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedLayer]);
   const prevImgRef = useRef(currentShirtImg);
   useEffect(() => {
     if (currentShirtImg !== prevImgRef.current) {
