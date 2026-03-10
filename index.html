@@ -100,6 +100,16 @@
     .dtf-box-val { font-family: 'Bebas Neue', cursive; font-size: 22px; color: #fff; letter-spacing: 1px; }
     .dtf-box-sub { font-size: 10px; color: #555; margin-top: 2px; }
     .dot-indicator { display: inline-block; width: 6px; height: 6px; border-radius: 50%; vertical-align: middle; margin-left: 6px; }
+    /* ── Drawing Modal ── */
+    .draw-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.82); z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .draw-modal { background:#161616; border:1px solid #2a2a2a; border-radius:14px; display:flex; flex-direction:column; overflow:hidden; width:min(900px,95vw); height:min(680px,90vh); box-shadow:0 40px 120px rgba(0,0,0,0.8); }
+    .draw-toolbar { background:#111; border-bottom:1px solid #222; padding:8px 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0; }
+    .draw-tool-btn { padding:5px 10px; border-radius:6px; border:1px solid #333; background:transparent; color:#888; cursor:pointer; font-size:12px; font-family:'DM Mono',monospace; transition:all 0.15s; white-space:nowrap; }
+    .draw-tool-btn:hover { border-color:#555; color:#ccc; }
+    .draw-tool-btn.active { background:#f97316; color:#000; border-color:#f97316; }
+    .draw-canvas-wrap { flex:1; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#0d0d0d; position:relative; }
+    .draw-canvas { cursor:crosshair; display:block; touch-action:none; }
+    .draw-footer { background:#111; border-top:1px solid #222; padding:10px 14px; display:flex; align-items:center; gap:10px; flex-shrink:0; justify-content:flex-end; }
   </style>
 </head>
 <body>
@@ -361,7 +371,224 @@ function Slider({ label, value, min, max, onChange }) {
   );
 }
 
-// ─── App ─────────────────────────────────────────────────────────────────────
+// ─── DrawingModal ─────────────────────────────────────────────────────────────
+function DrawingModal({ onClose, onAdd }) {
+  const canvasRef   = useRef(null);
+  const overlayRef  = useRef(null); // svg overlay for shapes in progress
+  const [tool, setTool]         = useState("pen");
+  const [color, setColor]       = useState("#ffffff");
+  const [fillColor, setFillColor] = useState("#f97316");
+  const [useFill, setUseFill]   = useState(false);
+  const [size, setSize]         = useState(4);
+  const [fontSize, setFontSize] = useState(28);
+  const [fontFamily, setFontFamily] = useState("'DM Mono', monospace");
+  const [history, setHistory]   = useState([]);
+  const drawing = useRef(false);
+  const startPt  = useRef({x:0,y:0});
+  const snapData = useRef(null); // snapshot before shape preview
+
+  const CW = 700, CH = 520;
+
+  // Init blank canvas
+  useEffect(()=>{
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.fillStyle = "transparent";
+    ctx.clearRect(0,0,CW,CH);
+    pushHistory();
+  },[]);
+
+  function pushHistory() {
+    const ctx = canvasRef.current.getContext("2d");
+    setHistory(h => [...h.slice(-20), ctx.getImageData(0,0,CW,CH)]);
+  }
+  function undo() {
+    if (history.length < 2) return;
+    const prev = history[history.length-2];
+    canvasRef.current.getContext("2d").putImageData(prev,0,0);
+    setHistory(h => h.slice(0,-1));
+  }
+  function clearCanvas() {
+    canvasRef.current.getContext("2d").clearRect(0,0,CW,CH);
+    pushHistory();
+  }
+
+  function getPos(e) {
+    const rect = canvasRef.current.getBoundingClientRect();
+    const scaleX = CW / rect.width, scaleY = CH / rect.height;
+    if (e.touches) return { x:(e.touches[0].clientX-rect.left)*scaleX, y:(e.touches[0].clientY-rect.top)*scaleY };
+    return { x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY };
+  }
+
+  function applyStroke(ctx) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = size;
+    ctx.lineCap     = "round";
+    ctx.lineJoin    = "round";
+    if (useFill) { ctx.fillStyle = fillColor; }
+  }
+
+  function onPointerDown(e) {
+    if (tool === "text") { handleTextClick(e); return; }
+    drawing.current = true;
+    const p = getPos(e);
+    startPt.current = p;
+    const ctx = canvasRef.current.getContext("2d");
+    if (tool === "pen" || tool === "eraser") {
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    }
+    if (["rect","ellipse","line","arrow"].includes(tool)) {
+      snapData.current = ctx.getImageData(0,0,CW,CH);
+    }
+    e.preventDefault();
+  }
+
+  function onPointerMove(e) {
+    if (!drawing.current) return;
+    const p = getPos(e);
+    const ctx = canvasRef.current.getContext("2d");
+    if (tool === "pen") {
+      applyStroke(ctx); ctx.lineTo(p.x,p.y); ctx.stroke();
+    } else if (tool === "eraser") {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.lineWidth = size * 4; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.lineTo(p.x,p.y); ctx.stroke();
+      ctx.globalCompositeOperation = "source-over";
+    } else if (["rect","ellipse","line","arrow"].includes(tool)) {
+      // Restore snapshot then draw preview
+      ctx.putImageData(snapData.current,0,0);
+      const {x:sx,y:sy} = startPt.current;
+      applyStroke(ctx);
+      ctx.beginPath();
+      if (tool === "rect") {
+        if (useFill) ctx.fillRect(sx,sy,p.x-sx,p.y-sy);
+        ctx.strokeRect(sx,sy,p.x-sx,p.y-sy);
+      } else if (tool === "ellipse") {
+        ctx.ellipse((sx+p.x)/2,(sy+p.y)/2,Math.abs(p.x-sx)/2,Math.abs(p.y-sy)/2,0,0,Math.PI*2);
+        if (useFill) ctx.fill(); ctx.stroke();
+      } else if (tool === "line") {
+        ctx.moveTo(sx,sy); ctx.lineTo(p.x,p.y); ctx.stroke();
+      } else if (tool === "arrow") {
+        const angle = Math.atan2(p.y-sy,p.x-sx);
+        const headLen = Math.max(14, size*3);
+        ctx.moveTo(sx,sy); ctx.lineTo(p.x,p.y); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p.x,p.y);
+        ctx.lineTo(p.x-headLen*Math.cos(angle-0.4),p.y-headLen*Math.sin(angle-0.4));
+        ctx.lineTo(p.x-headLen*Math.cos(angle+0.4),p.y-headLen*Math.sin(angle+0.4));
+        ctx.closePath(); ctx.fillStyle=color; ctx.fill();
+      }
+    }
+    e.preventDefault();
+  }
+
+  function onPointerUp(e) {
+    if (!drawing.current) return;
+    drawing.current = false;
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.globalCompositeOperation = "source-over";
+    pushHistory();
+    e.preventDefault();
+  }
+
+  function handleTextClick(e) {
+    const p = getPos(e);
+    const text = window.prompt("Enter text:");
+    if (!text) return;
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    ctx.fillStyle = color;
+    ctx.fillText(text, p.x, p.y);
+    pushHistory();
+  }
+
+  function addToDesign() {
+    const data = canvasRef.current.toDataURL("image/png");
+    onAdd(data);
+    onClose();
+  }
+
+  const TOOLS = [
+    { id:"pen",     label:"✏️ Pen"     },
+    { id:"eraser",  label:"⬜ Eraser"  },
+    { id:"line",    label:"╱ Line"    },
+    { id:"arrow",   label:"→ Arrow"   },
+    { id:"rect",    label:"▭ Rect"    },
+    { id:"ellipse", label:"◯ Ellipse" },
+    { id:"text",    label:"T Text"    },
+  ];
+  const FONTS = [
+    { label:"Mono",    val:"'DM Mono', monospace"   },
+    { label:"Bebas",   val:"'Bebas Neue', cursive"   },
+    { label:"Serif",   val:"Georgia, serif"           },
+    { label:"Sans",    val:"Arial, sans-serif"        },
+  ];
+
+  return (
+    <div className="draw-modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="draw-modal">
+        {/* Toolbar */}
+        <div className="draw-toolbar">
+          {/* Tools */}
+          {TOOLS.map(t=>(
+            <button key={t.id} className={`draw-tool-btn${tool===t.id?" active":""}`} onClick={()=>setTool(t.id)}>{t.label}</button>
+          ))}
+          <div style={{width:1,height:24,background:"#333",margin:"0 2px"}} />
+          {/* Stroke color */}
+          <div style={{display:"flex",alignItems:"center",gap:5}}>
+            <span style={{fontSize:10,color:"#555"}}>Stroke</span>
+            <input type="color" value={color} onChange={e=>setColor(e.target.value)}
+              style={{width:28,height:24,border:"1px solid #333",borderRadius:4,background:"none",cursor:"pointer"}} />
+          </div>
+          {/* Fill */}
+          <div style={{display:"flex",alignItems:"center",gap:5}}>
+            <input type="checkbox" checked={useFill} onChange={e=>setUseFill(e.target.checked)}
+              style={{accentColor:"#f97316",cursor:"pointer"}} id="fill-chk" />
+            <label htmlFor="fill-chk" style={{fontSize:10,color:"#555",cursor:"pointer"}}>Fill</label>
+            <input type="color" value={fillColor} onChange={e=>setFillColor(e.target.value)}
+              style={{width:28,height:24,border:"1px solid #333",borderRadius:4,background:"none",cursor:"pointer",opacity:useFill?1:0.3}} />
+          </div>
+          <div style={{width:1,height:24,background:"#333",margin:"0 2px"}} />
+          {/* Size */}
+          <div style={{display:"flex",alignItems:"center",gap:6,minWidth:100}}>
+            <span style={{fontSize:10,color:"#555",whiteSpace:"nowrap"}}>{tool==="text"?"Font":"Size"} {tool==="text"?fontSize:size}px</span>
+            <input type="range" min={tool==="text"?10:1} max={tool==="text"?120:40} value={tool==="text"?fontSize:size}
+              onChange={e=>tool==="text"?setFontSize(+e.target.value):setSize(+e.target.value)}
+              style={{width:70,accentColor:"#f97316"}} />
+          </div>
+          {/* Font picker (text only) */}
+          {tool==="text" && (
+            <select value={fontFamily} onChange={e=>setFontFamily(e.target.value)}
+              style={{background:"#1a1a1a",border:"1px solid #333",color:"#aaa",borderRadius:6,padding:"4px 8px",fontSize:11,fontFamily:"'DM Mono',monospace",cursor:"pointer"}}>
+              {FONTS.map(f=><option key={f.val} value={f.val}>{f.label}</option>)}
+            </select>
+          )}
+          <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+            <button className="draw-tool-btn" onClick={undo} title="Undo">↩ Undo</button>
+            <button className="draw-tool-btn" onClick={clearCanvas}>🗑 Clear</button>
+          </div>
+        </div>
+
+        {/* Canvas */}
+        <div className="draw-canvas-wrap">
+          <canvas ref={canvasRef} width={CW} height={CH} className="draw-canvas"
+            style={{maxWidth:"100%",maxHeight:"100%",cursor:tool==="eraser"?"cell":tool==="text"?"text":"crosshair"}}
+            onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp} onMouseLeave={onPointerUp}
+            onTouchStart={onPointerDown} onTouchMove={onPointerMove} onTouchEnd={onPointerUp} />
+        </div>
+
+        {/* Footer */}
+        <div className="draw-footer">
+          <span style={{fontSize:11,color:"#444",marginRight:"auto"}}>Click on canvas to start drawing · Click outside to cancel</span>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={addToDesign}>✅ Add to Design</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function App() {
   const [designs, setDesigns] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -468,6 +695,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
   const [offsets, setOffsets] = useState(() => JSON.parse(JSON.stringify(ZONE_OFFSET)));
   const [showNudge, setShowNudge] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showDrawing, setShowDrawing] = useState(false);
   const stageRef = useRef(null);
   const isDragging = useRef(false);
   const dragStart = useRef({});
@@ -826,10 +1054,14 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
         <div className="panel-section">
           <div className="panel-label">Upload Art / Logo</div>
           <input ref={artFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleArtFile} />
-          <button className="btn btn-primary" style={{width:"100%",padding:"9px 0",fontSize:12}} onClick={()=>artFileRef.current.click()}>
-            🎨 Add Art to {zoneInfo?.label.split("–")[1]?.trim()}
+          <button className="btn btn-primary" style={{width:"100%",padding:"9px 0",fontSize:12,marginBottom:6}} onClick={()=>artFileRef.current.click()}>
+            📁 Upload Image
+          </button>
+          <button className="btn btn-ghost" style={{width:"100%",padding:"9px 0",fontSize:12}} onClick={()=>setShowDrawing(true)}>
+            ✏️ Open Drawing Board
           </button>
         </div>
+        {showDrawing && <DrawingModal onClose={()=>setShowDrawing(false)} onAdd={addArtLayer} />}
         {selLayer ? (
           <div className="scrollable">
             <div className="panel-label">Layer Properties</div>
