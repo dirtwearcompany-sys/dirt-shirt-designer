@@ -34,21 +34,33 @@
     .design-card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 16px; transition: border-color 0.2s; }
     .design-card:hover { border-color: #f97316; }
 
-    /* ── Shirt image: always fills + centers the canvas ── */
+    /* ── Unified canvas wrapper: all zones render at the same pixel box ── */
+    .shirt-stage {
+      position: relative;
+      /* Fixed display size — all shirt images scale-to-fit inside this box */
+      width: 420px;
+      height: 520px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56);
+    }
+
+    /* The shirt photo always fills the stage, centered, fully visible */
     .shirt-bg {
-      position: absolute; inset: 0; z-index: 0; overflow: hidden;
+      position: absolute; inset: 0; z-index: 0;
       display: flex; align-items: center; justify-content: center;
+      background: transparent;
     }
     .shirt-bg img {
       width: 100%; height: 100%;
-      object-fit: contain;        /* contain keeps whole shirt visible */
+      object-fit: contain;
       object-position: center center;
       display: block;
+      transition: opacity 0.18s ease;
     }
 
     input[type="range"] { accent-color: #f97316; width: 100%; height: 4px; cursor: pointer; }
     input[type="color"] { cursor: pointer; }
-    .canvas-area { position: relative; user-select: none; }
     .resize-handle { position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: #f97316; border-radius: 2px; cursor: se-resize; z-index: 20; }
     .header { background: #141414; border-bottom: 1px solid #222; padding: 11px 24px; display: flex; align-items: center; gap: 14px; height: 53px; flex-shrink: 0; }
     .logo-dirt  { font-family: 'Bebas Neue', cursive; font-size: 26px; color: #f97316; letter-spacing: 3px; }
@@ -74,6 +86,7 @@
     .lib-title { font-family: 'Bebas Neue', cursive; font-size: 28px; color: #f97316; letter-spacing: 1px; margin: 0; }
     .empty-state { text-align: center; color: #555; padding-top: 80px; }
     .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    /* Print-guide and art layers positioned inside the stage */
     .print-guide { position: absolute; left: 15%; top: 14%; width: 70%; height: 72%; border: 1px dashed rgba(255,255,255,0.07); border-radius: 4px; pointer-events: none; z-index: 2; }
     .art-hint { position: absolute; left: 15%; top: 14%; width: 70%; height: 72%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; z-index: 5; }
     .slider-row { margin-bottom: 10px; }
@@ -103,15 +116,25 @@ const SHIRT_IMAGE_SRCS = {
   // ── Short Sleeve ──────────────────────────────────────────
   short_front:  "front_shortsleeve.png",   // Short Sleeve Front
   short_back:   "back_shortsleeve.png",    // Short Sleeve Back
-  short_sleeve: "side_shortsleeve.png",   // Short Sleeve Sleeve
+  short_sleeve: "side_shortsleeve.png",    // Short Sleeve Sleeve
   // ── Long Sleeve ───────────────────────────────────────────
-  long_front:   "back_longsleeve (1).png",    // Long Sleeve Front
+  long_front:   "back_longsleeve (1).png", // Long Sleeve Front
   long_back:    "back_longsleeve.png",     // Long Sleeve Back
   long_sleeve:  "side_longsleeve.png",     // Long Sleeve Sleeve
 };
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// ── One fixed stage size for ALL zones — guarantees identical frame on every switch ──
+const STAGE_W = 420;
+const STAGE_H = 520;
+
+// Art-layer coordinate space still uses per-zone logical sizes for DTF math,
+// but we normalise them to the stage so positions stay consistent.
+const ZONE_LOGICAL = {
+  short_front:[380,460], short_back:[380,460], short_sleeve:[380,240],
+  long_front:[380,510],  long_back:[380,510],  long_sleeve:[250,510],
+};
+
 const SHIRT_COLORS = [
   { name:"White",       hex:"#FFFFFF" }, { name:"Black",      hex:"#1a1a1a" },
   { name:"Navy",        hex:"#1B2A4A" }, { name:"Royal Blue", hex:"#2563EB" },
@@ -134,17 +157,6 @@ const SHIRT_ZONES = {
     { id:"long_sleeve", label:"Long Sleeve – Sleeve", maxW:4,  maxH:14 },
   ],
 };
-
-// ── Larger canvas sizes so shirts fill the frame better ──────────────────────
-const ZONE_SIZE = {
-  short_front:  [400, 480],
-  short_back:   [400, 480],
-  short_sleeve: [400, 260],
-  long_front:   [400, 530],
-  long_back:    [400, 530],
-  long_sleeve:  [270, 530],
-};
-
 const ZONE_LABELS = {
   short_front:"Short Sleeve Front", short_back:"Short Sleeve Back", short_sleeve:"Short Sleeve Sleeve",
   long_front:"Long Sleeve Front",   long_back:"Long Sleeve Back",   long_sleeve:"Long Sleeve Sleeve",
@@ -175,25 +187,42 @@ function blankDesign(name="New Design") {
 }
 
 // ─── ShirtBackground ─────────────────────────────────────────────────────────
-// object-fit:contain keeps the whole shirt visible; object-position:center
-// ensures it's always perfectly centered regardless of image dimensions.
-function ShirtBackground({ shirtImage }) {
+// Cross-fades between zone images using two <img> layers so the transition
+// is smooth instead of a hard cut. Both images live in the same fixed stage box.
+function ShirtBackground({ shirtImage, prevImage }) {
+  const [visible, setVisible] = useState(true);
+  const prevRef = useRef(prevImage);
+
+  useEffect(() => {
+    if (shirtImage !== prevRef.current) {
+      setVisible(false);
+      const t = setTimeout(() => { setVisible(true); prevRef.current = shirtImage; }, 60);
+      return () => clearTimeout(t);
+    }
+  }, [shirtImage]);
+
   if (!shirtImage) return null;
   return (
     <div className="shirt-bg">
-      <img src={shirtImage} alt="shirt" draggable={false} />
+      {/* Previous image fades out underneath */}
+      {prevRef.current && prevRef.current !== shirtImage && (
+        <img key="prev" src={prevRef.current} alt="shirt-prev"
+          style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",objectPosition:"center",opacity: visible ? 0 : 1, transition:"opacity 0.18s ease", pointerEvents:"none"}}
+          draggable={false} />
+      )}
+      {/* Current image fades in on top */}
+      <img key={shirtImage} src={shirtImage} alt="shirt"
+        style={{width:"100%",height:"100%",objectFit:"contain",objectPosition:"center",display:"block",
+          opacity: visible ? 1 : 0, transition:"opacity 0.18s ease"}}
+        draggable={false} />
     </div>
   );
 }
 
 // ─── ImgSrcPanel ─────────────────────────────────────────────────────────────
 const ALL_ZONES_ORDERED = [
-  { id:"short_front",  label:"Short Sleeve Front"  },
-  { id:"short_back",   label:"Short Sleeve Back"   },
-  { id:"short_sleeve", label:"Short Sleeve Sleeve" },
-  { id:"long_front",   label:"Long Sleeve Front"   },
-  { id:"long_back",    label:"Long Sleeve Back"    },
-  { id:"long_sleeve",  label:"Long Sleeve Sleeve"  },
+  { id:"short_front",  }, { id:"short_back",  }, { id:"short_sleeve" },
+  { id:"long_front",   }, { id:"long_back",   }, { id:"long_sleeve"  },
 ];
 function ImgSrcPanel({ shirtImages, onUpload }) {
   const fileRefs = useRef({});
@@ -207,62 +236,36 @@ function ImgSrcPanel({ shirtImages, onUpload }) {
   }
   const shortDone = ["short_front","short_back","short_sleeve"].every(id => shirtImages[id]);
   const longDone  = ["long_front","long_back","long_sleeve"].every(id => shirtImages[id]);
-  const allDone   = shortDone && longDone;
-  if (allDone) return null;
+  if (shortDone && longDone) return null;
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,padding:"24px 32px",gap:10}}>
       <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:15,color:"#555",letterSpacing:2,marginBottom:4}}>REPLACE # WITH YOUR IMAGE PATHS</div>
       {ALL_ZONES_ORDERED.map(z=>(
         <input key={z.id} ref={fileRefs.current[z.id]} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(z.id,e)} />
       ))}
-      {!shortDone && (
-        <div style={{width:"100%",maxWidth:540}}>
-          <div style={{fontSize:10,color:"#444",textTransform:"uppercase",letterSpacing:2,marginBottom:6,fontFamily:"'DM Mono',monospace"}}>Short Sleeve</div>
+      {[{label:"Short Sleeve", ids:["short_front","short_back","short_sleeve"], done:shortDone},
+        {label:"Long Sleeve",  ids:["long_front","long_back","long_sleeve"],  done:longDone}
+      ].filter(g=>!g.done).map(group=>(
+        <div key={group.label} style={{width:"100%",maxWidth:540}}>
+          <div style={{fontSize:10,color:"#444",textTransform:"uppercase",letterSpacing:2,marginBottom:6,fontFamily:"'DM Mono',monospace"}}>{group.label}</div>
           <div style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,overflow:"hidden"}}>
-            {["short_front","short_back","short_sleeve"].filter(id=>!shirtImages[id]).map((id,i,arr)=>{
-              const label = ZONE_LABELS[id];
-              return (
-                <div key={id} style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:i<arr.length-1?"1px solid #1a1a1a":"none",cursor:"pointer",transition:"background 0.15s",gap:10}}
-                  onClick={()=>fileRefs.current[id].current.click()}
-                  onMouseEnter={e=>e.currentTarget.style.background="#1a1a1a"}
-                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                  <code style={{flex:1,fontFamily:"'DM Mono',monospace",fontSize:13,lineHeight:1,letterSpacing:"0.01em"}}>
-                    <span style={{color:"#555"}}>&lt;</span><span style={{color:"#7c3aed"}}>img</span>
-                    <span style={{color:"#0d9488"}}> src</span><span style={{color:"#6b7280"}}>=</span><span style={{color:"#f97316"}}>"#"</span>
-                    <span style={{color:"#0d9488"}}> alt</span><span style={{color:"#6b7280"}}>=</span><span style={{color:"#f59e0b"}}>"{label}"</span>
-                    <span style={{color:"#555"}}> /&gt;</span>
-                  </code>
-                  <span style={{fontSize:10,color:"#444",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace"}}>click to upload ↑</span>
-                </div>
-              );
-            })}
+            {group.ids.filter(id=>!shirtImages[id]).map((id,i,arr)=>(
+              <div key={id} style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:i<arr.length-1?"1px solid #1a1a1a":"none",cursor:"pointer",transition:"background 0.15s",gap:10}}
+                onClick={()=>fileRefs.current[id].current.click()}
+                onMouseEnter={e=>e.currentTarget.style.background="#1a1a1a"}
+                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <code style={{flex:1,fontFamily:"'DM Mono',monospace",fontSize:13,lineHeight:1}}>
+                  <span style={{color:"#555"}}>&lt;</span><span style={{color:"#7c3aed"}}>img</span>
+                  <span style={{color:"#0d9488"}}> src</span><span style={{color:"#6b7280"}}>=</span><span style={{color:"#f97316"}}>"#"</span>
+                  <span style={{color:"#0d9488"}}> alt</span><span style={{color:"#6b7280"}}>=</span><span style={{color:"#f59e0b"}}>"{ZONE_LABELS[id]}"</span>
+                  <span style={{color:"#555"}}> /&gt;</span>
+                </code>
+                <span style={{fontSize:10,color:"#444",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace"}}>click to upload ↑</span>
+              </div>
+            ))}
           </div>
         </div>
-      )}
-      {!longDone && (
-        <div style={{width:"100%",maxWidth:540}}>
-          <div style={{fontSize:10,color:"#444",textTransform:"uppercase",letterSpacing:2,marginBottom:6,fontFamily:"'DM Mono',monospace"}}>Long Sleeve</div>
-          <div style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,overflow:"hidden"}}>
-            {["long_front","long_back","long_sleeve"].filter(id=>!shirtImages[id]).map((id,i,arr)=>{
-              const label = ZONE_LABELS[id];
-              return (
-                <div key={id} style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:i<arr.length-1?"1px solid #1a1a1a":"none",cursor:"pointer",transition:"background 0.15s",gap:10}}
-                  onClick={()=>fileRefs.current[id].current.click()}
-                  onMouseEnter={e=>e.currentTarget.style.background="#1a1a1a"}
-                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                  <code style={{flex:1,fontFamily:"'DM Mono',monospace",fontSize:13,lineHeight:1,letterSpacing:"0.01em"}}>
-                    <span style={{color:"#555"}}>&lt;</span><span style={{color:"#7c3aed"}}>img</span>
-                    <span style={{color:"#0d9488"}}> src</span><span style={{color:"#6b7280"}}>=</span><span style={{color:"#f97316"}}>"#"</span>
-                    <span style={{color:"#0d9488"}}> alt</span><span style={{color:"#6b7280"}}>=</span><span style={{color:"#f59e0b"}}>"{label}"</span>
-                    <span style={{color:"#555"}}> /&gt;</span>
-                  </code>
-                  <span style={{fontSize:10,color:"#444",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace"}}>click to upload ↑</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -293,17 +296,12 @@ function App() {
     setView("editor");
     return d;
   }
-  function saveDesign(updated) {
-    setDesigns(prev => prev.map(d => d.id === updated.id ? updated : d));
-    setActiveId(updated.id);
-  }
+  function saveDesign(updated) { setDesigns(prev => prev.map(d => d.id === updated.id ? updated : d)); setActiveId(updated.id); }
   function duplicateDesign(d) {
     const copy = JSON.parse(JSON.stringify(d));
     copy.id = Date.now() + Math.random();
     copy.name = d.name + " (Copy)";
-    setDesigns(prev => [copy, ...prev]);
-    setActiveId(copy.id);
-    setView("editor");
+    setDesigns(prev => [copy, ...prev]); setActiveId(copy.id); setView("editor");
   }
   function deleteDesign(id) {
     setDesigns(prev => prev.filter(d => d.id !== id));
@@ -363,14 +361,10 @@ function Library({ designs, onOpen, onDuplicate, onDelete, onNew }) {
             return (
               <div key={d.id} className="design-card">
                 <div style={{background:"#111",borderRadius:8,height:130,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,cursor:"pointer",overflow:"hidden"}} onClick={() => onOpen(d)}>
-                  {previewImg
-                    ? <img src={previewImg} alt="preview" style={{width:"100%",height:"100%",objectFit:"contain",objectPosition:"center"}} />
-                    : <div style={{fontSize:42,opacity:0.18}}>👕</div>}
+                  {previewImg ? <img src={previewImg} alt="preview" style={{width:"100%",height:"100%",objectFit:"contain",objectPosition:"center"}} /> : <div style={{fontSize:42,opacity:0.18}}>👕</div>}
                 </div>
                 <div style={{fontWeight:500,fontSize:13,marginBottom:3,color:"#e8e8e8"}}>{d.name}</div>
-                <div style={{fontSize:11,color:"#555",marginBottom:10}}>
-                  {d.shirtType==="short"?"Short Sleeve":"Long Sleeve"} · {totalLayers} art layer{totalLayers!==1?"s":""}
-                </div>
+                <div style={{fontSize:11,color:"#555",marginBottom:10}}>{d.shirtType==="short"?"Short Sleeve":"Long Sleeve"} · {totalLayers} art layer{totalLayers!==1?"s":""}</div>
                 <div style={{display:"flex",gap:6}}>
                   <button className="btn btn-primary" style={{flex:1,padding:"5px 8px",fontSize:11}} onClick={() => onOpen(d)}>Edit</button>
                   <button className="btn btn-ghost" style={{padding:"5px 10px"}} onClick={() => onDuplicate(d)} title="Duplicate">⧉</button>
@@ -392,17 +386,21 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
   const [bgRemoving, setBgRemoving] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameVal, setNameVal] = useState(d.name);
-  const canvasRef = useRef(null);
+  const [prevZoneImg, setPrevZoneImg] = useState(null);
+  const stageRef = useRef(null);
   const isDragging = useRef(false);
   const dragStart = useRef({});
   const artFileRef = useRef(null);
+
   const zone = d.zones[d.activeZone];
   const allZones = [...SHIRT_ZONES.short, ...SHIRT_ZONES.long];
   const zoneInfo = allZones.find(z => z.id === d.activeZone);
-  const [cW, cH] = ZONE_SIZE[d.activeZone] || [400, 480];
+  const [lW, lH] = ZONE_LOGICAL[d.activeZone] || [380, 460]; // logical size for DTF math
   const selLayer = zone.layers.find(l => l.id === selectedLayer);
   const dtfInfo = selLayer ? calcDTF(selLayer.w, selLayer.h, zoneInfo?.maxW||12, zoneInfo?.maxH||14) : null;
   const allImagesSet = Object.values(d.shirtImages).every(Boolean);
+  const currentShirtImg = d.shirtImages?.[d.activeZone];
+
   const upd = useCallback(patch => setD(p => ({...p,...patch})), []);
   const updZone = useCallback((zid, patch) => setD(p => ({...p, zones:{...p.zones,[zid]:{...p.zones[zid],...patch}}})), []);
   const updLayer = useCallback((lid, patch) => {
@@ -411,6 +409,16 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
       return {...p, zones:{...p.zones,[p.activeZone]:{...p.zones[p.activeZone],layers}}};
     });
   }, []);
+
+  // Track previous image for cross-fade
+  const prevImgRef = useRef(currentShirtImg);
+  useEffect(() => {
+    if (currentShirtImg !== prevImgRef.current) {
+      setPrevZoneImg(prevImgRef.current);
+      prevImgRef.current = currentShirtImg;
+    }
+  }, [currentShirtImg]);
+
   function setShirtImg(zid, src) { setD(p => ({...p, shirtImages:{...p.shirtImages,[zid]:src}})); }
   function addArtLayer(dataUrl) {
     const img = new Image();
@@ -458,10 +466,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
     });
     setBgRemoving(false);
   }
-  function deleteLayer(id) {
-    updZone(d.activeZone, {layers:zone.layers.filter(l=>l.id!==id)});
-    if (selectedLayer===id) setSelectedLayer(null);
-  }
+  function deleteLayer(id) { updZone(d.activeZone, {layers:zone.layers.filter(l=>l.id!==id)}); if (selectedLayer===id) setSelectedLayer(null); }
   function reorderLayer(id, dir) {
     const layers=[...zone.layers], idx=layers.findIndex(l=>l.id===id), ni=idx+dir;
     if(ni<0||ni>=layers.length) return;
@@ -469,35 +474,35 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
     updZone(d.activeZone,{layers});
   }
   function layerAt(cx,cy) {
+    // Convert stage pixel coords → logical % then back to check hit
+    const scaleX = lW/STAGE_W, scaleY = lH/STAGE_H;
     for(let i=zone.layers.length-1;i>=0;i--){
       const l=zone.layers[i];
-      const lx=(l.x/100)*cW,ly=(l.y/100)*cH,lw=(l.w/100)*cW,lh=(l.h/100)*cH;
+      const lx=(l.x/100)*STAGE_W, ly=(l.y/100)*STAGE_H;
+      const lw=(l.w/100)*STAGE_W, lh=(l.h/100)*STAGE_H;
       if(cx>=lx&&cx<=lx+lw&&cy>=ly&&cy<=ly+lh) return l;
     }
     return null;
   }
   function onMD(e) {
-    const rect=canvasRef.current.getBoundingClientRect();
+    const rect=stageRef.current.getBoundingClientRect();
     const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
     const layer=layerAt(cx,cy);
-    if(layer&&!layer.locked){
-      setSelectedLayer(layer.id);
-      isDragging.current=true;
-      dragStart.current={cx,cy,ox:layer.x,oy:layer.y};
-    } else if(!layer) { setSelectedLayer(null); }
+    if(layer&&!layer.locked){ setSelectedLayer(layer.id); isDragging.current=true; dragStart.current={cx,cy,ox:layer.x,oy:layer.y}; }
+    else if(!layer) setSelectedLayer(null);
   }
   function onMM(e) {
     if(!isDragging.current||!selectedLayer) return;
-    const rect=canvasRef.current.getBoundingClientRect();
-    const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
-    const dx=((cx-dragStart.current.cx)/cW)*100;
-    const dy=((cy-dragStart.current.cy)/cH)*100;
+    const rect=stageRef.current.getBoundingClientRect();
+    const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
+    const dx=((cx-dragStart.current.cx)/STAGE_W)*100;
+    const dy=((cy-dragStart.current.cy)/STAGE_H)*100;
     updLayer(selectedLayer,{x:Math.max(0,dragStart.current.ox+dx),y:Math.max(0,dragStart.current.oy+dy)});
   }
   function onMU() { isDragging.current=false; }
 
   async function download(withShirt) {
-    const sc=2.5, w=cW*sc, h=cH*sc;
+    const sc=2.5, w=STAGE_W*sc, h=STAGE_H*sc;
     const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
     const ctx=cv.getContext("2d");
     ctx.clearRect(0,0,w,h);
@@ -507,11 +512,9 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
         await new Promise(res=>{
           const img=new Image();
           img.onload=()=>{
-            // Mirror the contain+center display logic in the download
-            const scale = Math.min(w/img.width, h/img.height);
+            const scale=Math.min(w/img.width, h/img.height);
             const dw=img.width*scale, dh=img.height*scale;
-            const dx=(w-dw)/2, dy=(h-dh)/2;
-            ctx.drawImage(img,dx,dy,dw,dh);
+            ctx.drawImage(img,(w-dw)/2,(h-dh)/2,dw,dh);
             res();
           };
           img.src=src;
@@ -523,7 +526,8 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
         const img=new Image();
         img.onload=()=>{
           ctx.globalAlpha=layer.opacity/100;
-          const lx=(layer.x/100)*w,ly=(layer.y/100)*h,lw=(layer.w/100)*w,lh=(layer.h/100)*h;
+          const lx=(layer.x/100)*w, ly=(layer.y/100)*h;
+          const lw=(layer.w/100)*w, lh=(layer.h/100)*h;
           ctx.save(); ctx.translate(lx+lw/2,ly+lh/2); ctx.rotate((layer.rotation||0)*Math.PI/180);
           ctx.drawImage(img,-lw/2,-lh/2,lw,lh); ctx.restore(); ctx.globalAlpha=1; res();
         };
@@ -583,11 +587,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
             <button style={{fontSize:10,color:"#f97316",background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Mono',monospace"}}
               onClick={()=>artFileRef.current.click()}>+ Add</button>
           </div>
-          {zone.layers.length===0&&(
-            <div style={{color:"#3a3a3a",fontSize:11,textAlign:"center",paddingTop:16,lineHeight:1.8}}>
-              No art layers yet.<br/>Upload a logo above.
-            </div>
-          )}
+          {zone.layers.length===0&&<div style={{color:"#3a3a3a",fontSize:11,textAlign:"center",paddingTop:16,lineHeight:1.8}}>No art layers yet.<br/>Upload a logo above.</div>}
           {[...zone.layers].reverse().map((layer,i)=>(
             <div key={layer.id} className={`layer-row${selectedLayer===layer.id?" selected":""}`}
               onClick={()=>setSelectedLayer(layer.id===selectedLayer?null:layer.id)}>
@@ -606,26 +606,26 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
 
       {/* CENTER */}
       <div className="center-area" style={{flexDirection:"column"}}>
-        {!allImagesSet && (
-          <ImgSrcPanel shirtImages={d.shirtImages} onUpload={(zid,src)=>setShirtImg(zid,src)} />
-        )}
+        {!allImagesSet && <ImgSrcPanel shirtImages={d.shirtImages} onUpload={(zid,src)=>setShirtImg(zid,src)} />}
         {allImagesSet && (
           <>
             <div className="zone-badge">{zoneInfo?.label} · max print {zoneInfo?.maxW}" × {zoneInfo?.maxH}"</div>
-            <div ref={canvasRef} className="canvas-area"
-              style={{
-                position:"relative", width:cW, height:cH,
-                borderRadius:10, overflow:"hidden",
-                boxShadow:"0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56)",
-                cursor:zone.layers.length>0?"crosshair":"default",
-              }}
+
+            {/* ── Unified fixed-size stage — identical frame on every zone switch ── */}
+            <div ref={stageRef} className="shirt-stage"
+              style={{cursor:zone.layers.length>0?"crosshair":"default"}}
               onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
 
-              <ShirtBackground shirtImage={d.shirtImages?.[d.activeZone]} />
+              {/* Shirt image with smooth cross-fade */}
+              <ShirtBackground shirtImage={currentShirtImg} prevImage={prevZoneImg} />
+
+              {/* Dashed print-area guide */}
               <div className="print-guide" />
 
+              {/* Art layers — coordinates stored as % of stage */}
               {zone.layers.map(layer=>{
-                const lx=(layer.x/100)*cW,ly=(layer.y/100)*cH,lw=(layer.w/100)*cW,lh=(layer.h/100)*cH;
+                const lx=(layer.x/100)*STAGE_W, ly=(layer.y/100)*STAGE_H;
+                const lw=(layer.w/100)*STAGE_W, lh=(layer.h/100)*STAGE_H;
                 const isSel=layer.id===selectedLayer;
                 return (
                   <div key={layer.id} style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:10,
@@ -637,7 +637,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
                         onMouseDown={e=>{
                           e.stopPropagation();
                           const sx=e.clientX,sy=e.clientY,sw=layer.w,sh=layer.h;
-                          const mv=ev=>updLayer(layer.id,{w:Math.max(5,sw+((ev.clientX-sx)/cW)*100),h:Math.max(5,sh+((ev.clientY-sy)/cH)*100)});
+                          const mv=ev=>updLayer(layer.id,{w:Math.max(5,sw+((ev.clientX-sx)/STAGE_W)*100),h:Math.max(5,sh+((ev.clientY-sy)/STAGE_H)*100)});
                           const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};
                           window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up);
                         }} />
@@ -652,6 +652,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
                 </div>
               )}
             </div>
+
             {dtfInfo&&selLayer&&(
               <div className="dtf-badge" style={{marginTop:14}}>
                 <span className="dtf-label">DTF Transfer Size</span>
@@ -684,8 +685,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
         <div className="panel-section">
           <div className="panel-label">Upload Art / Logo</div>
           <input ref={artFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleArtFile} />
-          <button className="btn btn-primary" style={{width:"100%",padding:"9px 0",fontSize:12}}
-            onClick={()=>artFileRef.current.click()}>
+          <button className="btn btn-primary" style={{width:"100%",padding:"9px 0",fontSize:12}} onClick={()=>artFileRef.current.click()}>
             🎨 Add Art to {zoneInfo?.label.split("–")[1]?.trim()}
           </button>
         </div>
@@ -721,9 +721,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
         ) : (
           <div style={{flex:1,padding:12}}>
             <div style={{fontSize:10,color:"#3a3a3a",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>No Layer Selected</div>
-            <div style={{fontSize:11,color:"#333",lineHeight:1.8}}>
-              Upload art using the button above, then click a layer to edit it.
-            </div>
+            <div style={{fontSize:11,color:"#333",lineHeight:1.8}}>Upload art using the button above, then click a layer to edit it.</div>
           </div>
         )}
         <div style={{padding:12,borderTop:"1px solid #1e1e1e",display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
