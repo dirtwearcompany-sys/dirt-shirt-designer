@@ -187,9 +187,10 @@ function blankDesign(name="New Design") {
 }
 
 // ─── ShirtBackground ─────────────────────────────────────────────────────────
-// Cross-fades between zone images using two <img> layers so the transition
-// is smooth instead of a hard cut. Both images live in the same fixed stage box.
-function ShirtBackground({ shirtImage, prevImage }) {
+// Cross-fades between zone images. A color tint overlay sits on top using
+// mix-blend-mode:multiply so the shirt fabric texture stays visible while
+// the selected color actually changes the shirt's appearance.
+function ShirtBackground({ shirtImage, prevImage, shirtColor }) {
   const [visible, setVisible] = useState(true);
   const prevRef = useRef(prevImage);
 
@@ -202,6 +203,11 @@ function ShirtBackground({ shirtImage, prevImage }) {
   }, [shirtImage]);
 
   if (!shirtImage) return null;
+
+  // For white (#FFFFFF) we skip the overlay — multiply by white = no change.
+  // For other colors we blend at ~70% opacity so texture stays visible.
+  const isWhite = !shirtColor || shirtColor.toLowerCase() === "#ffffff";
+
   return (
     <div className="shirt-bg">
       {/* Previous image fades out underneath */}
@@ -210,11 +216,21 @@ function ShirtBackground({ shirtImage, prevImage }) {
           style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"contain",objectPosition:"center",opacity: visible ? 0 : 1, transition:"opacity 0.18s ease", pointerEvents:"none"}}
           draggable={false} />
       )}
-      {/* Current image fades in on top */}
+      {/* Current image */}
       <img key={shirtImage} src={shirtImage} alt="shirt"
         style={{width:"100%",height:"100%",objectFit:"contain",objectPosition:"center",display:"block",
           opacity: visible ? 1 : 0, transition:"opacity 0.18s ease"}}
         draggable={false} />
+      {/* Color tint overlay — multiply blend preserves wrinkles/shadows */}
+      {!isWhite && (
+        <div style={{
+          position:"absolute", inset:0, pointerEvents:"none",
+          backgroundColor: shirtColor,
+          opacity: 0.72,
+          mixBlendMode: "multiply",
+          transition: "background-color 0.2s ease",
+        }} />
+      )}
     </div>
   );
 }
@@ -514,7 +530,18 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
           img.onload=()=>{
             const scale=Math.min(w/img.width, h/img.height);
             const dw=img.width*scale, dh=img.height*scale;
-            ctx.drawImage(img,(w-dw)/2,(h-dh)/2,dw,dh);
+            const dx=(w-dw)/2, dy=(h-dh)/2;
+            ctx.drawImage(img,dx,dy,dw,dh);
+            // Bake in the same color tint shown on screen
+            const isWhite = !d.shirtColor || d.shirtColor.toLowerCase()==="#ffffff";
+            if(!isWhite){
+              ctx.save();
+              ctx.globalCompositeOperation="multiply";
+              ctx.globalAlpha=0.72;
+              ctx.fillStyle=d.shirtColor;
+              ctx.fillRect(dx,dy,dw,dh);
+              ctx.restore();
+            }
             res();
           };
           img.src=src;
@@ -617,7 +644,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
               onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
 
               {/* Shirt image with smooth cross-fade */}
-              <ShirtBackground shirtImage={currentShirtImg} prevImage={prevZoneImg} />
+              <ShirtBackground shirtImage={currentShirtImg} prevImage={prevZoneImg} shirtColor={d.shirtColor} />
 
               {/* Dashed print-area guide */}
               <div className="print-guide" />
