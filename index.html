@@ -122,6 +122,18 @@ const SHIRT_IMAGE_SRCS = {
   long_back:    "back_longsleeve.png",     // Long Sleeve Back
   long_sleeve:  "side_longsleeve.png",     // Long Sleeve Sleeve
 };
+
+// ── BASE COLOR OF EACH SHIRT IMAGE ────────────────────────────────────────────
+// Set this to the actual shirt color in your photos so recoloring works
+// correctly. Common values: "#ffffff" white, "#c8c8c8" light gray, "#888" gray
+const ZONE_BASE_COLOR = {
+  short_front:  "#8B5E3C",  // ← short sleeve photos are brown
+  short_back:   "#8B5E3C",
+  short_sleeve: "#8B5E3C",
+  long_front:   "#ffffff",  // ← adjust if your long sleeve photos differ
+  long_back:    "#ffffff",
+  long_sleeve:  "#ffffff",
+};
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ── One fixed stage size for ALL zones — guarantees identical frame on every switch ──
@@ -197,11 +209,10 @@ function hexToRgb(hex) {
 }
 function colorDist(r1,g1,b1,r2,g2,b2){ return Math.abs(r1-r2)+Math.abs(g1-g2)+Math.abs(b1-b2); }
 
-function ShirtBackground({ shirtImage, shirtColor }) {
+function ShirtBackground({ shirtImage, shirtColor, baseColor }) {
   const canvasRef = useRef(null);
-  const [naturalImg, setNaturalImg] = useState(null); // original loaded Image object
+  const [naturalImg, setNaturalImg] = useState(null);
 
-  // Re-load image whenever src changes
   useEffect(() => {
     if (!shirtImage) return;
     const img = new Image();
@@ -210,7 +221,6 @@ function ShirtBackground({ shirtImage, shirtColor }) {
     img.src = shirtImage;
   }, [shirtImage]);
 
-  // Redraw whenever image or color changes
   useEffect(() => {
     if (!naturalImg || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -223,32 +233,38 @@ function ShirtBackground({ shirtImage, shirtColor }) {
     const px   = data.data;
     const W    = canvas.width, H = canvas.height;
 
-    // Sample corners to find background color
-    const sampleCorners = [[0,0],[W-1,0],[0,H-1],[W-1,H-1]];
+    // Sample corners to detect background color
     let br=0,bg=0,bb=0;
-    sampleCorners.forEach(([x,y])=>{
+    [[0,0],[W-1,0],[0,H-1],[W-1,H-1]].forEach(([x,y])=>{
       const i=(y*W+x)*4; br+=px[i]; bg+=px[i+1]; bb+=px[i+2];
     });
     br=Math.round(br/4); bg=Math.round(bg/4); bb=Math.round(bb/4);
-    const BG_THRESH = 38; // pixels within this distance of corner color = background
+    const BG_THRESH = 38;
+
+    // The shirt's original base color — normalize brightness AND hue
+    const [baser, baseg, baseb] = hexToRgb(baseColor || '#ffffff');
+    const baseLum = (0.299*baser + 0.587*baseg + 0.114*baseb) / 255;
+    const normFactor = baseLum > 0 ? 1 / baseLum : 1;
 
     // Target shirt color
     const [tr, tg, tb] = hexToRgb(shirtColor || '#ffffff');
 
     for (let i = 0; i < px.length; i += 4) {
       const r=px[i], g=px[i+1], b=px[i+2], a=px[i+3];
-      if (a < 10) continue; // fully transparent — skip
-      if (colorDist(r,g,b,br,bg,bb) < BG_THRESH) continue; // background — skip
+      if (a < 10) continue;
+      if (colorDist(r,g,b,br,bg,bb) < BG_THRESH) continue;
 
-      // Convert pixel to luminosity (0-1), then tint with target color
-      const lum = (0.299*r + 0.587*g + 0.114*b) / 255;
+      // Convert to grayscale luminosity first (strips original hue),
+      // then normalize to white-equivalent, then apply target color
+      const grayLum = (0.299*r + 0.587*g + 0.114*b) / 255;
+      const lum = Math.min(grayLum * normFactor, 1.0);
       px[i]   = Math.round(tr * lum);
       px[i+1] = Math.round(tg * lum);
       px[i+2] = Math.round(tb * lum);
     }
 
     ctx.putImageData(data, 0, 0);
-  }, [naturalImg, shirtColor]);
+  }, [naturalImg, shirtColor, baseColor]);
 
   if (!shirtImage) return null;
   return (
@@ -566,11 +582,15 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
               const i=(y*W+x)*4; br+=px[i]; bg+=px[i+1]; bb+=px[i+2];
             });
             br=Math.round(br/4); bg=Math.round(bg/4); bb=Math.round(bb/4);
+            const [baser,baseg,baseb]=hexToRgb(ZONE_BASE_COLOR[d.activeZone]||'#ffffff');
+            const baseLum=(0.299*baser+0.587*baseg+0.114*baseb)/255;
+            const normFactor=baseLum>0?1/baseLum:1;
             const [tr,tg,tb]=hexToRgb(d.shirtColor||'#ffffff');
             for(let i=0;i<px.length;i+=4){
               if(px[i+3]<10) continue;
               if(colorDist(px[i],px[i+1],px[i+2],br,bg,bb)<38) continue;
-              const lum=(0.299*px[i]+0.587*px[i+1]+0.114*px[i+2])/255;
+              const grayLum=(0.299*px[i]+0.587*px[i+1]+0.114*px[i+2])/255;
+              const lum=Math.min(grayLum*normFactor,1.0);
               px[i]=Math.round(tr*lum); px[i+1]=Math.round(tg*lum); px[i+2]=Math.round(tb*lum);
             }
             tctx.putImageData(data,0,0);
@@ -679,7 +699,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
               onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
 
               {/* Shirt image with smooth cross-fade */}
-              <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} />
+              <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} />
 
               {/* Dashed print-area guide */}
               <div className="print-guide" />
