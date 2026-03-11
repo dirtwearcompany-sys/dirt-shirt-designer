@@ -735,9 +735,9 @@ function AIGeneratorModal({ onClose, onAdd }) {
 }
 
 // ─── DrawingModal ─────────────────────────────────────────────────────────────
-function DrawingModal({ onClose, onAdd }) {
+function DrawingModal({ onClose, onAdd, initialImage }) {
   const canvasRef   = useRef(null);
-  const overlayRef  = useRef(null); // svg overlay for shapes in progress
+  const overlayRef  = useRef(null);
   const [tool, setTool]         = useState("pen");
   const [color, setColor]       = useState("#ffffff");
   const [fillColor, setFillColor] = useState("#f97316");
@@ -748,16 +748,28 @@ function DrawingModal({ onClose, onAdd }) {
   const [history, setHistory]   = useState([]);
   const drawing = useRef(false);
   const startPt  = useRef({x:0,y:0});
-  const snapData = useRef(null); // snapshot before shape preview
+  const snapData = useRef(null);
 
   const CW = 700, CH = 520;
 
-  // Init blank canvas
+  // Init: if editing an existing image, draw it onto the canvas first
   useEffect(()=>{
     const ctx = canvasRef.current.getContext("2d");
-    ctx.fillStyle = "transparent";
     ctx.clearRect(0,0,CW,CH);
-    pushHistory();
+    if (initialImage) {
+      const img = new Image();
+      img.onload = () => {
+        // Scale image to fit canvas while preserving aspect ratio
+        const scale = Math.min(CW / img.width, CH / img.height);
+        const dw = img.width * scale, dh = img.height * scale;
+        const dx = (CW - dw) / 2, dy = (CH - dh) / 2;
+        ctx.drawImage(img, dx, dy, dw, dh);
+        pushHistory();
+      };
+      img.src = initialImage;
+    } else {
+      pushHistory();
+    }
   },[]);
 
   function pushHistory() {
@@ -942,9 +954,13 @@ function DrawingModal({ onClose, onAdd }) {
 
         {/* Footer */}
         <div className="draw-footer">
-          <span style={{fontSize:11,color:"#444",marginRight:"auto"}}>Click on canvas to start drawing · Click outside to cancel</span>
+          <span style={{fontSize:11,color:"#444",marginRight:"auto"}}>
+            {initialImage ? "✏️ Editing existing layer — draw on top to modify" : "Click on canvas to start drawing · Click outside to cancel"}
+          </span>
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={addToDesign}>✅ Add to Design</button>
+          <button className="btn btn-primary" onClick={addToDesign}>
+            {initialImage ? "💾 Save Changes" : "✅ Add to Design"}
+          </button>
         </div>
       </div>
     </div>
@@ -1059,6 +1075,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
   const [showNudge, setShowNudge] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showDrawing, setShowDrawing] = useState(false);
+  const [editingLayerId, setEditingLayerId] = useState(null); // layer being edited in drawing board
   const [showAI, setShowAI] = useState(false);
   const [mannequin, setMannequin] = useState("off"); // "off" | "male" | "female"
   const stageRef = useRef(null);
@@ -1426,7 +1443,9 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
           {zone.layers.length===0&&<div style={{color:"#3a3a3a",fontSize:11,textAlign:"center",paddingTop:16,lineHeight:1.8}}>No art layers yet.<br/>Upload a logo above.</div>}
           {[...zone.layers].reverse().map((layer,i)=>(
             <div key={layer.id} className={`layer-row${selectedLayer===layer.id?" selected":""}`}
-              onClick={()=>setSelectedLayer(layer.id===selectedLayer?null:layer.id)}>
+              onClick={()=>setSelectedLayer(layer.id===selectedLayer?null:layer.id)}
+              onDoubleClick={()=>{ setSelectedLayer(layer.id); setEditingLayerId(layer.id); setShowDrawing(true); }}
+              title="Click to select · Double-click to edit in Drawing Board">
               <div style={{width:28,height:28,borderRadius:4,overflow:"hidden",flexShrink:0,background:"#222"}}>
                 <img src={layer.src} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="" />
               </div>
@@ -1527,11 +1546,29 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
             ✨ AI Image Generator
           </button>
         </div>
-        {showDrawing && <DrawingModal onClose={()=>setShowDrawing(false)} onAdd={addArtLayer} />}
+        {showDrawing && (
+          <DrawingModal
+            onClose={()=>{ setShowDrawing(false); setEditingLayerId(null); }}
+            initialImage={editingLayerId ? zone.layers.find(l=>l.id===editingLayerId)?.src : null}
+            onAdd={dataUrl => {
+              if (editingLayerId) {
+                // Replace existing layer's image with the edited version
+                updLayer(editingLayerId, { src: dataUrl });
+                setEditingLayerId(null);
+              } else {
+                addArtLayer(dataUrl);
+              }
+            }}
+          />
+        )}
         {showAI && <AIGeneratorModal onClose={()=>setShowAI(false)} onAdd={addArtLayer} />}
         {selLayer ? (
           <div className="scrollable">
             <div className="panel-label">Layer Properties</div>
+            <button className="btn btn-primary" style={{width:"100%",marginBottom:6,fontSize:11,padding:"7px 0"}}
+              onClick={()=>{ setEditingLayerId(selLayer.id); setShowDrawing(true); }}>
+              ✏️ Edit in Drawing Board
+            </button>
             <button className="btn btn-ghost" style={{width:"100%",marginBottom:10,fontSize:11,padding:"7px 0",borderColor:bgRemoving?"#f97316":"#333"}}
               onClick={removeBg} disabled={bgRemoving}>
               {bgRemoving?"⏳ Removing...":"✂️ Remove Background"}
