@@ -273,40 +273,57 @@ function ShirtBackground({ shirtImage, shirtColor, baseColor, offset }) {
     const px = data.data;
     const W = canvas.width, H = canvas.height;
 
-    // Detect background color from border pixels
-    const borderPts = [];
-    for (let x=0; x<W; x++) { borderPts.push([x,0]); borderPts.push([x,H-1]); }
-    for (let y=1; y<H-1; y++) { borderPts.push([0,y]); borderPts.push([W-1,y]); }
+    // ── Step 1: Flood-fill from border to identify background pixels exactly ──
+    // Sample border pixels to get bg color
     let sr=0,sg=0,sb=0,sc2=0;
-    borderPts.forEach(([x,y]) => {
-      const i=(y*W+x)*4;
-      if (px[i+3] > 10) { sr+=px[i]; sg+=px[i+1]; sb+=px[i+2]; sc2++; }
-    });
-    const bgR = sc2>0?Math.round(sr/sc2):0;
-    const bgG = sc2>0?Math.round(sg/sc2):0;
-    const bgB = sc2>0?Math.round(sb/sc2):0;
-    const bgLum = (0.299*bgR + 0.587*bgG + 0.114*bgB) / 255;
-    const isDarkBg = bgLum < 0.15;
-    const BG_THRESH = isDarkBg ? 60 : 45;
+    for (let x=0;x<W;x++) {
+      for (const y of [0,H-1]) { const i=(y*W+x)*4; if(px[i+3]>10){sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc2++;} }
+    }
+    for (let y=1;y<H-1;y++) {
+      for (const x of [0,W-1]) { const i=(y*W+x)*4; if(px[i+3]>10){sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc2++;} }
+    }
+    const bgR=sc2>0?Math.round(sr/sc2):0, bgG=sc2>0?Math.round(sg/sc2):0, bgB=sc2>0?Math.round(sb/sc2):0;
 
-    // Parse base color (actual shirt color in photo) and target color
+    // Flood fill — mark every pixel reachable from border that matches bg color
+    const BG_THRESH = 40;
+    const isBg = new Uint8Array(W * H);
+    const queue = new Int32Array(W * H);
+    let qHead=0, qTail=0;
+    function seedPx(idx) { if(!isBg[idx]){ isBg[idx]=1; queue[qTail++]=idx; } }
+    for (let x=0;x<W;x++) { seedPx(x); seedPx((H-1)*W+x); }
+    for (let y=1;y<H-1;y++) { seedPx(y*W); seedPx(y*W+W-1); }
+    while (qHead < qTail) {
+      const idx=queue[qHead++], x=idx%W, y=(idx/W)|0;
+      for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) {
+        if (!dx&&!dy) continue;
+        const nx=x+dx, ny=y+dy;
+        if (nx<0||nx>=W||ny<0||ny>=H) continue;
+        const ni=ny*W+nx;
+        if (isBg[ni]) continue;
+        const np=ni*4;
+        if (px[np+3]<10) { isBg[ni]=1; queue[qTail++]=ni; continue; }
+        const dr=px[np]-bgR, dg=px[np+1]-bgG, db=px[np+2]-bgB;
+        if (Math.sqrt(dr*dr+dg*dg+db*db) < BG_THRESH) { isBg[ni]=1; queue[qTail++]=ni; }
+      }
+    }
+
+    // ── Step 2: Recolor ALL non-background pixels ────────────────────────
+    // Normalize pixel luminosity against the base shirt color in the photo,
+    // then multiply by the target color — preserves all shading & wrinkles.
     const [bR,bG,bB] = hexToRgb(baseColor || "#ffffff");
     const baseLum = (0.299*bR + 0.587*bG + 0.114*bB) / 255 || 1;
     const [tR,tG,tB] = hexToRgb(shirtColor || "#ffffff");
 
-    for (let i=0; i<px.length; i+=4) {
-      const r=px[i], g=px[i+1], b=px[i+2], a=px[i+3];
-      if (a < 10) continue;
-      // Skip background pixels — only recolor shirt pixels
-      const dist = Math.abs(r-bgR)+Math.abs(g-bgG)+Math.abs(b-bgB);
-      const lum  = (0.299*r + 0.587*g + 0.114*b) / 255;
-      if (isDarkBg && lum < 0.10) continue; // leave dark bg alone
-      if (dist < BG_THRESH) continue;        // leave bg-colored pixels alone
-      // Normalize pixel luminosity by base color, then multiply by target
-      const norm = Math.min(lum / baseLum, 1.0);
-      px[i]   = Math.round(tR * norm);
-      px[i+1] = Math.round(tG * norm);
-      px[i+2] = Math.round(tB * norm);
+    for (let i=0; i<W*H; i++) {
+      if (isBg[i]) continue; // skip background
+      const pi=i*4;
+      if (px[pi+3] < 10) continue;
+      const r=px[pi], g=px[pi+1], b=px[pi+2];
+      const lum = (0.299*r + 0.587*g + 0.114*b) / 255;
+      const norm = Math.min(lum / baseLum, 1.2); // allow slight boost for dark shirts
+      px[pi]   = Math.min(255, Math.round(tR * norm));
+      px[pi+1] = Math.min(255, Math.round(tG * norm));
+      px[pi+2] = Math.min(255, Math.round(tB * norm));
     }
     ctx.putImageData(data, 0, 0);
   }, [naturalImg, shirtColor, baseColor]);
@@ -394,180 +411,6 @@ function Slider({ label, value, min, max, onChange }) {
   );
 }
 
-// ─── MannequinOverlay ─────────────────────────────────────────────────────────
-// Adds an invisible mannequin effect to flat-lay shirt photos:
-//  1. Skin-toned neck/collar fill so the collar looks occupied
-//  2. Body-shaped shading that makes the shirt look 3D and worn
-function MannequinOverlay({ gender, zone }) {
-  if (gender === "off") return null;
-
-  const isSleeve = zone.includes("sleeve");
-  const isLong   = zone.startsWith("long");
-  const isBack   = zone.includes("back");
-  const W = 420, H = 520;
-  const cx = W / 2;
-
-  // Skin tone — slightly warm neutral
-  const skinColor   = "#d4a882";
-  const skinDark    = "#b8926a";
-  const skinShadow  = "#9a7355";
-
-  // ── Sleeve ───────────────────────────────────────────────────────────────────
-  if (isSleeve) {
-    return (
-      <svg viewBox="0 0 420 520" xmlns="http://www.w3.org/2000/svg"
-        style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:3,mixBlendMode:"multiply"}}>
-        <defs>
-          <linearGradient id="sl-top" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%"  stopColor="#000" stopOpacity="0.18"/>
-            <stop offset="55%" stopColor="#000" stopOpacity="0.04"/>
-            <stop offset="100%" stopColor="#000" stopOpacity="0"/>
-          </linearGradient>
-          <linearGradient id="sl-inner" x1="100%" y1="0%" x2="0%" y2="0%">
-            <stop offset="0%"  stopColor="#000" stopOpacity="0.14"/>
-            <stop offset="45%" stopColor="#000" stopOpacity="0"/>
-          </linearGradient>
-        </defs>
-        <rect x="0" y="0" width="420" height="520" fill="url(#sl-top)" />
-        <rect x="0" y="0" width="420" height="520" fill="url(#sl-inner)" />
-      </svg>
-    );
-  }
-
-  // ── Torso body shaping values ────────────────────────────────────────────────
-  const sw = gender === "female" ? 0.80 : 0.88;  // shoulder width ratio
-  const ww = gender === "female" ? 0.52 : 0.66;  // waist width ratio
-  const hw = gender === "female" ? 0.72 : 0.72;  // hip width ratio
-
-  const shoulderY = H * 0.13;
-  const underarmY = H * 0.30;
-  const waistY    = H * (gender === "female" ? 0.57 : 0.53);
-  const hipY      = H * 0.74;
-  const hemY      = H * 1.00;
-
-  const sHalf = (W * sw) / 2;
-  const wHalf = (W * ww) / 2;
-  const hHalf = (W * hw) / 2;
-
-  // Torso silhouette path — smooth curves matching human proportions
-  const torsoPath = [
-    `M ${cx - sHalf} ${shoulderY}`,
-    `C ${cx - sHalf} ${underarmY}, ${cx - wHalf - 10} ${waistY * 0.6}, ${cx - wHalf} ${waistY}`,
-    `C ${cx - wHalf} ${hipY * 0.88}, ${cx - hHalf} ${hipY}, ${cx - hHalf} ${hemY}`,
-    `L ${cx + hHalf} ${hemY}`,
-    `C ${cx + hHalf} ${hipY}, ${cx + wHalf} ${hipY * 0.88}, ${cx + wHalf} ${waistY}`,
-    `C ${cx + wHalf + 10} ${waistY * 0.6}, ${cx + sHalf} ${underarmY}, ${cx + sHalf} ${shoulderY}`,
-    `Z`
-  ].join(" ");
-
-  // ── Collar / neck fill geometry ──────────────────────────────────────────────
-  // The neck fill sits at the very top center — inside the collar opening.
-  // We draw a skin-toned neck cylinder that peeks up from the collar.
-  const neckTopY    = H * 0.00;  // neck starts above shirt top
-  const neckBottomY = H * 0.115; // neck base — just inside collar
-  const neckRx      = W * (gender === "female" ? 0.065 : 0.075);
-  const neckRy      = H * 0.03;
-
-  // Collar fill — slightly larger ellipse behind the collar opening
-  const collarRx = W * (gender === "female" ? 0.115 : 0.125);
-  const collarRy = H * 0.048;
-  const collarCy = H * 0.10;
-
-  // Chest shaping
-  const bustCy  = gender === "female" ? H * 0.29 : H * 0.32;
-  const bustRx  = gender === "female" ? W * 0.26 : W * 0.22;
-  const bustRy  = gender === "female" ? H * 0.18 : H * 0.14;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg"
-      style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:3}}>
-      <defs>
-        {/* Body shading gradients */}
-        <linearGradient id="mn-left" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%"  stopColor="#000" stopOpacity="0.20"/>
-          <stop offset="28%" stopColor="#000" stopOpacity="0"/>
-        </linearGradient>
-        <linearGradient id="mn-right" x1="100%" y1="0%" x2="0%" y2="0%">
-          <stop offset="0%"  stopColor="#000" stopOpacity="0.20"/>
-          <stop offset="28%" stopColor="#000" stopOpacity="0"/>
-        </linearGradient>
-        <radialGradient id="mn-chest" cx="50%" cy="0%" r="100%">
-          <stop offset="0%"  stopColor="#000" stopOpacity="0.12"/>
-          <stop offset="100%" stopColor="#000" stopOpacity="0"/>
-        </radialGradient>
-        <radialGradient id="mn-belly" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"  stopColor="#000" stopOpacity="0.06"/>
-          <stop offset="100%" stopColor="#000" stopOpacity="0"/>
-        </radialGradient>
-        {/* Neck skin gradients */}
-        <radialGradient id="mn-neck-skin" cx="50%" cy="60%" r="55%">
-          <stop offset="0%"   stopColor={skinColor}/>
-          <stop offset="75%"  stopColor={skinColor}/>
-          <stop offset="100%" stopColor={skinDark}/>
-        </radialGradient>
-        <radialGradient id="mn-collar-fill" cx="50%" cy="40%" r="60%">
-          <stop offset="0%"   stopColor={skinColor} stopOpacity="1"/>
-          <stop offset="70%"  stopColor={skinColor} stopOpacity="1"/>
-          <stop offset="100%" stopColor={skinDark}  stopOpacity="0.8"/>
-        </radialGradient>
-        <radialGradient id="mn-neck-shadow" cx="50%" cy="100%" r="60%">
-          <stop offset="0%"   stopColor={skinShadow} stopOpacity="0.5"/>
-          <stop offset="100%" stopColor={skinShadow} stopOpacity="0"/>
-        </radialGradient>
-        <clipPath id="mn-torso-clip">
-          <path d={torsoPath}/>
-        </clipPath>
-      </defs>
-
-      {/* ── 1. COLLAR / NECK FILL ─────────────────────────────────────── */}
-      {/* Base skin fill in collar opening */}
-      <ellipse cx={cx} cy={collarCy} rx={collarRx} ry={collarRy}
-        fill="url(#mn-collar-fill)" />
-      {/* Neck cylinder rising from collar */}
-      <rect x={cx - neckRx} y={neckTopY} width={neckRx * 2} height={neckBottomY - neckTopY + neckRy}
-        fill={skinColor} rx={neckRx} />
-      <ellipse cx={cx} cy={neckBottomY} rx={neckRx} ry={neckRy}
-        fill={skinColor} />
-      {/* Neck top ellipse cap */}
-      <ellipse cx={cx} cy={neckTopY + neckRy} rx={neckRx} ry={neckRy}
-        fill={skinDark} />
-      {/* Shadow at bottom of neck where it meets collar */}
-      <ellipse cx={cx} cy={neckBottomY + neckRy * 0.5} rx={neckRx * 1.3} ry={neckRy * 1.4}
-        fill="url(#mn-neck-shadow)" />
-
-      {/* ── 2. BODY SHAPING (clipped to torso silhouette) ─────────────── */}
-      {/* Left edge shadow */}
-      <rect x="0" y="0" width={W} height={H}
-        fill="url(#mn-left)" clipPath="url(#mn-torso-clip)"
-        style={{mixBlendMode:"multiply"}} />
-      {/* Right edge shadow */}
-      <rect x="0" y="0" width={W} height={H}
-        fill="url(#mn-right)" clipPath="url(#mn-torso-clip)"
-        style={{mixBlendMode:"multiply"}} />
-      {/* Chest / bust volume center */}
-      <ellipse cx={cx} cy={bustCy} rx={bustRx} ry={bustRy}
-        fill="url(#mn-chest)" clipPath="url(#mn-torso-clip)"
-        style={{mixBlendMode:"multiply"}} />
-      {/* Mid-torso belly/waist */}
-      <ellipse cx={cx} cy={waistY} rx={W * 0.18} ry={H * 0.10}
-        fill="url(#mn-belly)" clipPath="url(#mn-torso-clip)"
-        style={{mixBlendMode:"multiply"}} />
-
-      {/* Female: subtle bust separation line */}
-      {gender === "female" && (
-        <line x1={cx} y1={bustCy - bustRy * 0.3} x2={cx} y2={bustCy + bustRy * 0.5}
-          stroke="#000" strokeOpacity="0.04" strokeWidth="6"
-          clipPath="url(#mn-torso-clip)" style={{mixBlendMode:"multiply"}} />
-      )}
-
-      {/* Back: overall slight darkening */}
-      {isBack && (
-        <rect x="0" y="0" width={W} height={H} fill="black" fillOpacity="0.07"
-          clipPath="url(#mn-torso-clip)" style={{mixBlendMode:"multiply"}} />
-      )}
-    </svg>
-  );
-}
 
 // ─── AIGeneratorModal ─────────────────────────────────────────────────────────
 // Uses Pollinations.ai — completely free, no API key needed.
@@ -1063,7 +906,6 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
   const [showDrawing, setShowDrawing] = useState(false);
   const [editingLayerId, setEditingLayerId] = useState(null); // layer being edited in drawing board
   const [showAI, setShowAI] = useState(false);
-  const [mannequin, setMannequin] = useState("off"); // "off" | "male" | "female"
   const stageRef = useRef(null);
   const isDragging = useRef(false);
   const dragStart = useRef({});
@@ -1290,72 +1132,6 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
         });
       } else { ctx.fillStyle="#555"; ctx.fillRect(0,0,w,h); }
     }
-    // Bake mannequin shading + neck fill into export
-    if(withShirt && mannequin !== "off") {
-      const isSleeve = d.activeZone.includes("sleeve");
-      const isBack   = d.activeZone.includes("back");
-      ctx.save();
-      if(isSleeve) {
-        ctx.globalCompositeOperation = "multiply";
-        const gTop = ctx.createLinearGradient(0,0,0,h);
-        gTop.addColorStop(0,"rgba(0,0,0,0.18)"); gTop.addColorStop(0.55,"rgba(0,0,0,0.04)"); gTop.addColorStop(1,"rgba(0,0,0,0)");
-        ctx.fillStyle=gTop; ctx.fillRect(0,0,w,h);
-        const gInner=ctx.createLinearGradient(w,0,0,0);
-        gInner.addColorStop(0,"rgba(0,0,0,0.14)"); gInner.addColorStop(0.45,"rgba(0,0,0,0)");
-        ctx.fillStyle=gInner; ctx.fillRect(0,0,w,h);
-      } else {
-        const cx2=w/2;
-        const isFem = mannequin==="female";
-        const sw2=isFem?0.80:0.88, ww2=isFem?0.52:0.66, hw2=0.72;
-        const sY=h*0.13, uY=h*0.30, waY=h*(isFem?0.57:0.53), hpY=h*0.74, hmY=h*1.00;
-        const sH=w*sw2/2, wH=w*ww2/2, hhH=w*hw2/2;
-
-        // ── Neck/collar fill (source-over, drawn first) ──
-        ctx.globalCompositeOperation = "source-over";
-        const skinC="#d4a882", skinD="#b8926a", skinS="#9a7355";
-        const neckRx=w*(isFem?0.065:0.075), neckRy=h*0.03;
-        const collarRx=w*(isFem?0.115:0.125), collarRy=h*0.048, collarCy=h*0.10;
-        // Collar fill ellipse
-        const gcf=ctx.createRadialGradient(cx2,collarCy-collarRy*0.3,0,cx2,collarCy,Math.max(collarRx,collarRy));
-        gcf.addColorStop(0,skinC); gcf.addColorStop(0.75,skinC); gcf.addColorStop(1,skinD);
-        ctx.fillStyle=gcf;
-        ctx.beginPath(); ctx.ellipse(cx2,collarCy,collarRx,collarRy,0,0,Math.PI*2); ctx.fill();
-        // Neck rectangle
-        ctx.fillStyle=skinC;
-        ctx.beginPath(); ctx.roundRect(cx2-neckRx,0,neckRx*2,h*0.115+neckRy,neckRx); ctx.fill();
-        // Neck top cap
-        ctx.fillStyle=skinD;
-        ctx.beginPath(); ctx.ellipse(cx2,neckRy,neckRx,neckRy,0,0,Math.PI*2); ctx.fill();
-        // Neck bottom shadow
-        const gns=ctx.createRadialGradient(cx2,h*0.115,0,cx2,h*0.115,neckRx*1.3);
-        gns.addColorStop(0,"rgba(154,115,85,0.5)"); gns.addColorStop(1,"rgba(154,115,85,0)");
-        ctx.fillStyle=gns;
-        ctx.beginPath(); ctx.ellipse(cx2,h*0.115+neckRy*0.5,neckRx*1.3,neckRy*1.4,0,0,Math.PI*2); ctx.fill();
-
-        // ── Body shading (multiply, clipped to torso) ──
-        ctx.globalCompositeOperation = "multiply";
-        ctx.beginPath();
-        ctx.moveTo(cx2-sH,sY);
-        ctx.bezierCurveTo(cx2-sH,uY,cx2-wH-10,waY*0.6,cx2-wH,waY);
-        ctx.bezierCurveTo(cx2-wH,hpY*0.88,cx2-hhH,hpY,cx2-hhH,hmY);
-        ctx.lineTo(cx2+hhH,hmY);
-        ctx.bezierCurveTo(cx2+hhH,hpY,cx2+wH,hpY*0.88,cx2+wH,waY);
-        ctx.bezierCurveTo(cx2+wH+10,waY*0.6,cx2+sH,uY,cx2+sH,sY);
-        ctx.closePath(); ctx.clip();
-        const gL=ctx.createLinearGradient(0,0,w,0);
-        gL.addColorStop(0,"rgba(0,0,0,0.20)"); gL.addColorStop(0.28,"rgba(0,0,0,0)");
-        ctx.fillStyle=gL; ctx.fillRect(0,0,w,h);
-        const gR=ctx.createLinearGradient(w,0,0,0);
-        gR.addColorStop(0,"rgba(0,0,0,0.20)"); gR.addColorStop(0.28,"rgba(0,0,0,0)");
-        ctx.fillStyle=gR; ctx.fillRect(0,0,w,h);
-        const bustY=isFem?h*0.29:h*0.32, bustRx=isFem?w*0.26:w*0.22, bustRy2=isFem?h*0.18:h*0.14;
-        const gC=ctx.createRadialGradient(cx2,bustY,0,cx2,bustY,Math.max(bustRx,bustRy2));
-        gC.addColorStop(0,"rgba(0,0,0,0.12)"); gC.addColorStop(1,"rgba(0,0,0,0)");
-        ctx.fillStyle=gC; ctx.fillRect(0,0,w,h);
-        if(isBack){ ctx.fillStyle="rgba(0,0,0,0.07)"; ctx.fillRect(0,0,w,h); }
-      }
-      ctx.restore();
-    }
     for(const layer of zone.layers){
       await new Promise(res=>{
         const img=new Image();
@@ -1401,20 +1177,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
             ))}
           </div>
         </div>
-        {/* ── Invisible Mannequin ── */}
-        <div className="panel-section">
-          <div className="panel-label">Invisible Mannequin</div>
-          <div style={{display:"flex",gap:6}}>
-            {[{val:"off",label:"Off"},{val:"male",label:"👔 Male"},{val:"female",label:"👗 Female"}].map(opt=>(
-              <button key={opt.val} className="btn-type"
-                style={{background:mannequin===opt.val?"#f97316":"#222",color:mannequin===opt.val?"#000":"#888",fontSize:10,padding:"5px 4px"}}
-                onClick={()=>setMannequin(opt.val)}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
-          {mannequin!=="off"&&<div style={{fontSize:10,color:"#444",marginTop:6,lineHeight:1.5}}>Body shading applied. Download includes the effect.</div>}
-        </div>
+
         {/* ── Shirt Position Nudge ── */}
         <div className="panel-section" style={{paddingBottom:showNudge?10:12}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setShowNudge(v=>!v)}>
@@ -1508,7 +1271,6 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
 
               {/* Shirt image with smooth cross-fade */}
               <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} />
-              <MannequinOverlay gender={mannequin} zone={d.activeZone} />
 
               {/* Dashed print-area guide */}
               <div className="print-guide" />
