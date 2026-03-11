@@ -249,21 +249,34 @@ function colorDist(r1,g1,b1,r2,g2,b2){ return Math.abs(r1-r2)+Math.abs(g1-g2)+Ma
 
 // ─── ShirtBackground ─────────────────────────────────────────────────────────
 // Renders shirt photo exactly as-is for maximum realism.
-function ShirtBackground({ shirtImage, offset }) {
+function ShirtBackground({ shirtImage, shirtColor, offset }) {
   if (!shirtImage) return null;
   const ox = offset?.x || 0;
   const oy = offset?.y || 0;
   const sc = offset?.s || 1.0;
+  const xf = `translate(${ox}%, ${oy}%) scale(${sc})`;
+  const isWhite = !shirtColor || shirtColor.toLowerCase() === "#ffffff";
   return (
-    <div className="shirt-bg">
+    <div className="shirt-bg" style={{overflow:"hidden"}}>
       <img src={shirtImage}
         style={{
+          position:"absolute", inset:0,
           width:"100%", height:"100%",
-          objectFit:"contain", objectPosition:"center", display:"block",
-          transform:`translate(${ox}%, ${oy}%) scale(${sc})`,
-          transformOrigin:"center center",
+          objectFit:"contain", objectPosition:"center",
+          transform:xf, transformOrigin:"center center",
           transition:"transform 0.1s ease",
+          display:"block",
         }} />
+      {!isWhite && (
+        <div style={{
+          position:"absolute", inset:0,
+          backgroundColor: shirtColor,
+          mixBlendMode: "multiply",
+          transform:xf, transformOrigin:"center center",
+          transition:"transform 0.1s ease, background-color 0.2s ease",
+          pointerEvents:"none",
+        }} />
+      )}
     </div>
   );
 }
@@ -1083,43 +1096,76 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
         const W = cv.width, H = cv.height;
         const THRESH = 40;
 
-        // Sample bg color from all 4 corners and average
-        const samplePts = [[0,0],[W-1,0],[0,H-1],[W-1,H-1]];
+        // Sample bg color from corners + edge midpoints for robustness
+        const samplePts = [
+          [0,0],[W-1,0],[0,H-1],[W-1,H-1],
+          [Math.floor(W/2),0],[Math.floor(W/2),H-1],
+          [0,Math.floor(H/2)],[W-1,Math.floor(H/2)],
+        ];
         let sr=0,sg=0,sb=0;
         samplePts.forEach(([x,y])=>{ const i=(y*W+x)*4; sr+=px[i];sg+=px[i+1];sb+=px[i+2]; });
-        const bgR=Math.round(sr/4), bgG=Math.round(sg/4), bgB=Math.round(sb/4);
+        const bgR=Math.round(sr/samplePts.length), bgG=Math.round(sg/samplePts.length), bgB=Math.round(sb/samplePts.length);
 
-        // Flood-fill from all 4 corners simultaneously
-        const visited = new Uint8Array(W * H);
+        // Step 1: Flood-fill from all edges to mark background pixels
+        // Uses 8-connected neighbors for fewer missed pixels in corners
+        const FILL_THRESH = THRESH * 3;
+        const isBg = new Uint8Array(W * H); // 1 = background
         const queue = [];
-        samplePts.forEach(([x,y]) => {
-          const idx = y*W+x;
-          if (!visited[idx]) { visited[idx]=1; queue.push(idx); }
-        });
+
+        // Seed from entire border (not just corners) for complete coverage
+        for (let x=0; x<W; x++) { queue.push(x); queue.push((H-1)*W+x); }
+        for (let y=1; y<H-1; y++) { queue.push(y*W); queue.push(y*W+W-1); }
+        queue.forEach(idx => { isBg[idx] = 1; });
 
         let head = 0;
         while (head < queue.length) {
           const idx = queue[head++];
           const x = idx % W, y = Math.floor(idx / W);
-          const pi = idx * 4;
-          // Make this pixel transparent
-          px[pi+3] = 0;
-          // Check 4 neighbors
-          const neighbors = [];
-          if (x > 0)   neighbors.push(idx - 1);
-          if (x < W-1) neighbors.push(idx + 1);
-          if (y > 0)   neighbors.push(idx - W);
-          if (y < H-1) neighbors.push(idx + W);
-          for (const ni of neighbors) {
-            if (visited[ni]) continue;
-            const np = ni * 4;
-            const dr = Math.abs(px[np]-bgR), dg = Math.abs(px[np+1]-bgG), db = Math.abs(px[np+2]-bgB);
-            if (dr+dg+db < THRESH*3 && px[np+3] > 10) {
-              visited[ni] = 1;
-              queue.push(ni);
+          // 8-connected neighbors
+          for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
+            if (dx===0 && dy===0) continue;
+            const nx=x+dx, ny=y+dy;
+            if (nx<0||nx>=W||ny<0||ny>=H) continue;
+            const ni = ny*W+nx;
+            if (isBg[ni]) continue;
+            const np = ni*4;
+            const dr=Math.abs(px[np]-bgR), dg=Math.abs(px[np+1]-bgG), db=Math.abs(px[np+2]-bgB);
+            if (dr+dg+db < FILL_THRESH) { isBg[ni]=1; queue.push(ni); }
+          }
+        }
+
+        // Step 2: Make confirmed background pixels fully transparent
+        for (let i=0; i<W*H; i++) {
+          if (isBg[i]) px[i*4+3] = 0;
+        }
+
+        // Step 3: Feather edges — for pixels adjacent to background, 
+        // blend alpha smoothly based on distance to nearest bg pixel
+        // This anti-aliases the cut edge so it looks clean when edited
+        const alpha2 = new Float32Array(W * H);
+        for (let i=0; i<W*H; i++) alpha2[i] = px[i*4+3];
+
+        for (let y=1; y<H-1; y++) {
+          for (let x=1; x<W-1; x++) {
+            const idx = y*W+x;
+            if (isBg[idx]) continue; // already transparent
+            // Count how many of the 8 neighbors are background
+            let bgNeighbors = 0, total = 0;
+            for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
+              if (dx===0 && dy===0) continue;
+              const ni=(y+dy)*W+(x+dx);
+              if (ni>=0 && ni<W*H) { total++; if(isBg[ni]) bgNeighbors++; }
+            }
+            if (bgNeighbors > 0) {
+              // Taper alpha: more bg neighbors = more transparent
+              const ratio = bgNeighbors / total;
+              alpha2[idx] = Math.round(px[idx*4+3] * (1 - ratio * 0.85));
             }
           }
         }
+
+        // Apply feathered alpha back
+        for (let i=0; i<W*H; i++) px[i*4+3] = alpha2[i];
 
         ctx.putImageData(imageData, 0, 0);
         updLayer(selLayer.id, { src: cv.toDataURL("image/png") });
@@ -1403,7 +1449,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
               onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
 
               {/* Shirt image with smooth cross-fade */}
-              <ShirtBackground shirtImage={currentShirtImg} offset={offsets[d.activeZone]} />
+              <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} offset={offsets[d.activeZone]} />
               <MannequinOverlay gender={mannequin} zone={d.activeZone} />
 
               {/* Dashed print-area guide */}
