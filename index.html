@@ -153,10 +153,10 @@ const SHIRT_IMAGE_SRCS = {
 // Set this to the actual shirt color in your photos so recoloring works
 // correctly. Common values: "#ffffff" white, "#c8c8c8" light gray, "#888" gray
 const ZONE_BASE_COLOR = {
-  short_front:  "#8B2020",  // ← short sleeve photos are dark red
-  short_back:   "#8B2020",
-  short_sleeve: "#8B2020",
-  long_front:   "#ffffff",  // ← long sleeve photos are white
+  short_front:  "#7B3A2A",  // ← short sleeve photos: red-brown
+  short_back:   "#7B3A2A",
+  short_sleeve: "#7B3A2A",
+  long_front:   "#ffffff",  // ← long sleeve photos: white
   long_back:    "#ffffff",
   long_sleeve:  "#ffffff",
 };
@@ -249,34 +249,82 @@ function colorDist(r1,g1,b1,r2,g2,b2){ return Math.abs(r1-r2)+Math.abs(g1-g2)+Ma
 
 // ─── ShirtBackground ─────────────────────────────────────────────────────────
 // Renders shirt photo exactly as-is for maximum realism.
-function ShirtBackground({ shirtImage, shirtColor, offset }) {
+function ShirtBackground({ shirtImage, shirtColor, baseColor, offset }) {
+  const canvasRef = useRef(null);
+  const [naturalImg, setNaturalImg] = useState(null);
+
+  useEffect(() => {
+    if (!shirtImage) return;
+    const img = new Image();
+    img.onload = () => setNaturalImg(img);
+    img.src = shirtImage;
+  }, [shirtImage]);
+
+  useEffect(() => {
+    if (!naturalImg || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    canvas.width  = naturalImg.width;
+    canvas.height = naturalImg.height;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(naturalImg, 0, 0);
+
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const px = data.data;
+    const W = canvas.width, H = canvas.height;
+
+    // Detect background color from border pixels
+    const borderPts = [];
+    for (let x=0; x<W; x++) { borderPts.push([x,0]); borderPts.push([x,H-1]); }
+    for (let y=1; y<H-1; y++) { borderPts.push([0,y]); borderPts.push([W-1,y]); }
+    let sr=0,sg=0,sb=0,sc2=0;
+    borderPts.forEach(([x,y]) => {
+      const i=(y*W+x)*4;
+      if (px[i+3] > 10) { sr+=px[i]; sg+=px[i+1]; sb+=px[i+2]; sc2++; }
+    });
+    const bgR = sc2>0?Math.round(sr/sc2):0;
+    const bgG = sc2>0?Math.round(sg/sc2):0;
+    const bgB = sc2>0?Math.round(sb/sc2):0;
+    const bgLum = (0.299*bgR + 0.587*bgG + 0.114*bgB) / 255;
+    const isDarkBg = bgLum < 0.15;
+    const BG_THRESH = isDarkBg ? 60 : 45;
+
+    // Parse base color (actual shirt color in photo) and target color
+    const [bR,bG,bB] = hexToRgb(baseColor || "#ffffff");
+    const baseLum = (0.299*bR + 0.587*bG + 0.114*bB) / 255 || 1;
+    const [tR,tG,tB] = hexToRgb(shirtColor || "#ffffff");
+
+    for (let i=0; i<px.length; i+=4) {
+      const r=px[i], g=px[i+1], b=px[i+2], a=px[i+3];
+      if (a < 10) continue;
+      // Skip background pixels — only recolor shirt pixels
+      const dist = Math.abs(r-bgR)+Math.abs(g-bgG)+Math.abs(b-bgB);
+      const lum  = (0.299*r + 0.587*g + 0.114*b) / 255;
+      if (isDarkBg && lum < 0.10) continue; // leave dark bg alone
+      if (dist < BG_THRESH) continue;        // leave bg-colored pixels alone
+      // Normalize pixel luminosity by base color, then multiply by target
+      const norm = Math.min(lum / baseLum, 1.0);
+      px[i]   = Math.round(tR * norm);
+      px[i+1] = Math.round(tG * norm);
+      px[i+2] = Math.round(tB * norm);
+    }
+    ctx.putImageData(data, 0, 0);
+  }, [naturalImg, shirtColor, baseColor]);
+
   if (!shirtImage) return null;
   const ox = offset?.x || 0;
   const oy = offset?.y || 0;
-  const sc = offset?.s || 1.0;
-  const xf = `translate(${ox}%, ${oy}%) scale(${sc})`;
-  const isWhite = !shirtColor || shirtColor.toLowerCase() === "#ffffff";
+  const sc2 = offset?.s || 1.0;
   return (
-    <div className="shirt-bg" style={{overflow:"hidden"}}>
-      <img src={shirtImage}
+    <div className="shirt-bg">
+      <canvas ref={canvasRef}
         style={{
-          position:"absolute", inset:0,
           width:"100%", height:"100%",
-          objectFit:"contain", objectPosition:"center",
-          transform:xf, transformOrigin:"center center",
+          objectFit:"contain", objectPosition:"center", display:"block",
+          transform:`translate(${ox}%, ${oy}%) scale(${sc2})`,
+          transformOrigin:"center center",
           transition:"transform 0.1s ease",
-          display:"block",
         }} />
-      {!isWhite && (
-        <div style={{
-          position:"absolute", inset:0,
-          backgroundColor: shirtColor,
-          mixBlendMode: "multiply",
-          transform:xf, transformOrigin:"center center",
-          transition:"transform 0.1s ease, background-color 0.2s ease",
-          pointerEvents:"none",
-        }} />
-      )}
     </div>
   );
 }
@@ -1094,78 +1142,88 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
         const imageData = ctx.getImageData(0, 0, cv.width, cv.height);
         const px = imageData.data;
         const W = cv.width, H = cv.height;
-        const THRESH = 40;
 
-        // Sample bg color from corners + edge midpoints for robustness
-        const samplePts = [
-          [0,0],[W-1,0],[0,H-1],[W-1,H-1],
-          [Math.floor(W/2),0],[Math.floor(W/2),H-1],
-          [0,Math.floor(H/2)],[W-1,Math.floor(H/2)],
-        ];
-        let sr=0,sg=0,sb=0;
-        samplePts.forEach(([x,y])=>{ const i=(y*W+x)*4; sr+=px[i];sg+=px[i+1];sb+=px[i+2]; });
-        const bgR=Math.round(sr/samplePts.length), bgG=Math.round(sg/samplePts.length), bgB=Math.round(sb/samplePts.length);
+        // ── Step 1: Sample bg color from entire image border ──────────────
+        let sr=0,sg=0,sb=0,sc=0;
+        for (let x=0;x<W;x++) {
+          [[x,0],[x,H-1]].forEach(([bx,by])=>{
+            const i=(by*W+bx)*4;
+            if(px[i+3]>10){sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc++;}
+          });
+        }
+        for (let y=1;y<H-1;y++) {
+          [[0,y],[W-1,y]].forEach(([bx,by])=>{
+            const i=(by*W+bx)*4;
+            if(px[i+3]>10){sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc++;}
+          });
+        }
+        const bgR=sc>0?Math.round(sr/sc):0;
+        const bgG=sc>0?Math.round(sg/sc):0;
+        const bgB=sc>0?Math.round(sb/sc):0;
 
-        // Step 1: Flood-fill from all edges to mark background pixels
-        // Uses 8-connected neighbors for fewer missed pixels in corners
-        const FILL_THRESH = THRESH * 3;
-        const isBg = new Uint8Array(W * H); // 1 = background
-        const queue = [];
+        // ── Step 2: Flood-fill from entire border, 8-connected ────────────
+        const THRESH = 38;
+        const isBg = new Uint8Array(W * H);
+        const queue = new Int32Array(W * H * 2);
+        let qHead=0, qTail=0;
 
-        // Seed from entire border (not just corners) for complete coverage
-        for (let x=0; x<W; x++) { queue.push(x); queue.push((H-1)*W+x); }
-        for (let y=1; y<H-1; y++) { queue.push(y*W); queue.push(y*W+W-1); }
-        queue.forEach(idx => { isBg[idx] = 1; });
+        function seed(idx) { if(!isBg[idx]){ isBg[idx]=1; queue[qTail++]=idx; } }
+        for (let x=0;x<W;x++) { seed(x); seed((H-1)*W+x); }
+        for (let y=1;y<H-1;y++) { seed(y*W); seed(y*W+W-1); }
 
-        let head = 0;
-        while (head < queue.length) {
-          const idx = queue[head++];
-          const x = idx % W, y = Math.floor(idx / W);
-          // 8-connected neighbors
-          for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
-            if (dx===0 && dy===0) continue;
+        while (qHead < qTail) {
+          const idx = queue[qHead++];
+          const x = idx % W, y = (idx/W)|0;
+          for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) {
+            if (!dx&&!dy) continue;
             const nx=x+dx, ny=y+dy;
             if (nx<0||nx>=W||ny<0||ny>=H) continue;
-            const ni = ny*W+nx;
+            const ni=ny*W+nx;
             if (isBg[ni]) continue;
-            const np = ni*4;
-            const dr=Math.abs(px[np]-bgR), dg=Math.abs(px[np+1]-bgG), db=Math.abs(px[np+2]-bgB);
-            if (dr+dg+db < FILL_THRESH) { isBg[ni]=1; queue.push(ni); }
+            const np=ni*4;
+            if (px[np+3]<10) { isBg[ni]=1; queue[qTail++]=ni; continue; }
+            const dr=px[np]-bgR, dg=px[np+1]-bgG, db=px[np+2]-bgB;
+            if (Math.sqrt(dr*dr+dg*dg+db*db) < THRESH) { isBg[ni]=1; queue[qTail++]=ni; }
           }
         }
 
-        // Step 2: Make confirmed background pixels fully transparent
-        for (let i=0; i<W*H; i++) {
-          if (isBg[i]) px[i*4+3] = 0;
+        // ── Step 3: Remove bg pixels ──────────────────────────────────────
+        for (let i=0;i<W*H;i++) { if(isBg[i]) px[i*4+3]=0; }
+
+        // ── Step 4: Multi-pass alpha feathering for clean soft edges ──────
+        // Pass 1: erode slightly — pulls the cut edge 1px inward to remove fringe
+        const eroded = new Uint8Array(W*H);
+        for (let y=1;y<H-1;y++) for (let x=1;x<W-1;x++) {
+          const idx=y*W+x;
+          if (isBg[idx]) continue;
+          // If any 4-connected neighbor is bg, mark as fringe
+          const hasBgNeighbor = isBg[(y-1)*W+x]||isBg[(y+1)*W+x]||isBg[y*W+x-1]||isBg[y*W+x+1];
+          if (hasBgNeighbor) eroded[idx]=1;
         }
+        for (let i=0;i<W*H;i++) if(eroded[i]) px[i*4+3]=0;
 
-        // Step 3: Feather edges — for pixels adjacent to background, 
-        // blend alpha smoothly based on distance to nearest bg pixel
-        // This anti-aliases the cut edge so it looks clean when edited
-        const alpha2 = new Float32Array(W * H);
-        for (let i=0; i<W*H; i++) alpha2[i] = px[i*4+3];
-
-        for (let y=1; y<H-1; y++) {
-          for (let x=1; x<W-1; x++) {
-            const idx = y*W+x;
-            if (isBg[idx]) continue; // already transparent
-            // Count how many of the 8 neighbors are background
-            let bgNeighbors = 0, total = 0;
-            for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
-              if (dx===0 && dy===0) continue;
-              const ni=(y+dy)*W+(x+dx);
-              if (ni>=0 && ni<W*H) { total++; if(isBg[ni]) bgNeighbors++; }
-            }
-            if (bgNeighbors > 0) {
-              // Taper alpha: more bg neighbors = more transparent
-              const ratio = bgNeighbors / total;
-              alpha2[idx] = Math.round(px[idx*4+3] * (1 - ratio * 0.85));
-            }
+        // Pass 2: smooth alpha along remaining edges with a 3x3 blur
+        const alphaOrig = new Float32Array(W*H);
+        for (let i=0;i<W*H;i++) alphaOrig[i]=px[i*4+3];
+        for (let y=1;y<H-1;y++) for (let x=1;x<W-1;x++) {
+          const idx=y*W+x;
+          if (isBg[idx]||alphaOrig[idx]===0) continue;
+          // Only blur pixels near the new edge (eroded pixels)
+          let hasTransNeighbor=false;
+          for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) {
+            if(!dx&&!dy) continue;
+            const ni=(y+dy)*W+(x+dx);
+            if(alphaOrig[ni]===0) { hasTransNeighbor=true; break; }
           }
+          if (!hasTransNeighbor) continue;
+          // 3x3 box average of alpha
+          let sum=0, cnt=0;
+          for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) {
+            const ni=(y+dy)*W+(x+dx);
+            if(ni>=0&&ni<W*H) { sum+=alphaOrig[ni]; cnt++; }
+          }
+          px[idx*4+3]=Math.round(sum/cnt);
         }
-
-        // Apply feathered alpha back
-        for (let i=0; i<W*H; i++) px[i*4+3] = alpha2[i];
 
         ctx.putImageData(imageData, 0, 0);
         updLayer(selLayer.id, { src: cv.toDataURL("image/png") });
@@ -1449,7 +1507,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
               onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
 
               {/* Shirt image with smooth cross-fade */}
-              <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} offset={offsets[d.activeZone]} />
+              <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} />
               <MannequinOverlay gender={mannequin} zone={d.activeZone} />
 
               {/* Dashed print-area guide */}
