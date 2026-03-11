@@ -37,11 +37,11 @@
     /* ── Unified canvas wrapper: all zones render at the same pixel box ── */
     .shirt-stage {
       position: relative;
-      /* Fixed display size — all shirt images scale-to-fit inside this box */
       width: 420px;
       height: 520px;
       border-radius: 10px;
       overflow: hidden;
+      background: transparent;
       box-shadow: 0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56);
     }
 
@@ -110,6 +110,22 @@
     .draw-canvas-wrap { flex:1; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#0d0d0d; position:relative; }
     .draw-canvas { cursor:crosshair; display:block; touch-action:none; }
     .draw-footer { background:#111; border-top:1px solid #222; padding:10px 14px; display:flex; align-items:center; gap:10px; flex-shrink:0; justify-content:flex-end; }
+    /* ── AI Image Generator Modal ── */
+    .ai-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000; display:flex; align-items:center; justify-content:center; }
+    .ai-modal { background:#161616; border:1px solid #2a2a2a; border-radius:14px; width:min(680px,94vw); display:flex; flex-direction:column; overflow:hidden; box-shadow:0 40px 120px rgba(0,0,0,0.8); }
+    .ai-modal-header { background:#111; border-bottom:1px solid #222; padding:14px 18px; display:flex; align-items:center; gap:10px; }
+    .ai-modal-body { padding:20px 18px; display:flex; flex-direction:column; gap:14px; }
+    .ai-prompt-row { display:flex; gap:8px; }
+    .ai-prompt-input { flex:1; background:#111; border:1px solid #333; border-radius:8px; padding:10px 14px; color:#e8e8e8; font-family:'DM Mono',monospace; font-size:13px; outline:none; resize:none; }
+    .ai-prompt-input:focus { border-color:#f97316; }
+    .ai-preview-area { background:#0d0d0d; border:1px solid #1e1e1e; border-radius:10px; min-height:320px; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+    .ai-preview-img { max-width:100%; max-height:360px; display:block; border-radius:8px; }
+    .ai-spinner { width:40px; height:40px; border:3px solid #222; border-top-color:#f97316; border-radius:50%; animation:spin 0.8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .ai-style-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .ai-chip { padding:4px 10px; border-radius:20px; border:1px solid #333; background:transparent; color:#888; font-size:11px; cursor:pointer; font-family:'DM Mono',monospace; transition:all 0.15s; }
+    .ai-chip:hover { border-color:#f97316; color:#f97316; }
+    .ai-chip.active { background:#f97316; color:#000; border-color:#f97316; }
   </style>
 </head>
 <body>
@@ -137,10 +153,10 @@ const SHIRT_IMAGE_SRCS = {
 // Set this to the actual shirt color in your photos so recoloring works
 // correctly. Common values: "#ffffff" white, "#c8c8c8" light gray, "#888" gray
 const ZONE_BASE_COLOR = {
-  short_front:  "#8B5E3C",  // ← short sleeve photos are brown
-  short_back:   "#8B5E3C",
-  short_sleeve: "#8B5E3C",
-  long_front:   "#ffffff",  // ← adjust if your long sleeve photos differ
+  short_front:  "#8B2020",  // ← short sleeve photos are dark red
+  short_back:   "#8B2020",
+  short_sleeve: "#8B2020",
+  long_front:   "#ffffff",  // ← long sleeve photos are white
   long_back:    "#ffffff",
   long_sleeve:  "#ffffff",
 };
@@ -253,29 +269,50 @@ function ShirtBackground({ shirtImage, shirtColor, baseColor, offset }) {
     const ctx = canvas.getContext('2d');
     canvas.width  = naturalImg.width;
     canvas.height = naturalImg.height;
+    // Clear to transparent first so bg pixels become invisible
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(naturalImg, 0, 0);
 
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const px   = data.data;
     const W    = canvas.width, H = canvas.height;
 
+    // Sample corners + edge midpoints for a more reliable bg color detection
+    const samplePts = [
+      [0,0],[W-1,0],[0,H-1],[W-1,H-1],
+      [Math.floor(W/2),0],[Math.floor(W/2),H-1],
+      [0,Math.floor(H/2)],[W-1,Math.floor(H/2)],
+    ];
     let br=0,bg=0,bb=0;
-    [[0,0],[W-1,0],[0,H-1],[W-1,H-1]].forEach(([x,y])=>{
-      const i=(y*W+x)*4; br+=px[i]; bg+=px[i+1]; bb+=px[i+2];
-    });
-    br=Math.round(br/4); bg=Math.round(bg/4); bb=Math.round(bb/4);
-    const BG_THRESH = 38;
+    samplePts.forEach(([x,y])=>{ const i=(y*W+x)*4; br+=px[i]; bg+=px[i+1]; bb+=px[i+2]; });
+    br=Math.round(br/samplePts.length);
+    bg=Math.round(bg/samplePts.length);
+    bb=Math.round(bb/samplePts.length);
+
+    // Detect if background is dark (black) — use higher threshold + make transparent
+    const bgLum = (0.299*br + 0.587*bg + 0.114*bb) / 255;
+    const isDarkBg = bgLum < 0.15;
+    // Dark bg: anything with luminosity < 0.08 is background; light bg: use color distance
+    const BG_THRESH = isDarkBg ? 55 : 38;
 
     const [baser, baseg, baseb] = hexToRgb(baseColor || '#ffffff');
-    const baseLum = (0.299*baser + 0.587*baseg + 0.114*baseb) / 255;
-    const normFactor = baseLum > 0 ? 1 / baseLum : 1;
+    const baseLum2 = (0.299*baser + 0.587*baseg + 0.114*baseb) / 255;
+    const normFactor = baseLum2 > 0 ? 1 / baseLum2 : 1;
     const [tr, tg, tb] = hexToRgb(shirtColor || '#ffffff');
 
     for (let i = 0; i < px.length; i += 4) {
       const r=px[i], g=px[i+1], b=px[i+2], a=px[i+3];
       if (a < 10) continue;
-      if (colorDist(r,g,b,br,bg,bb) < BG_THRESH) continue;
-      const grayLum = (0.299*r + 0.587*g + 0.114*b) / 255;
+
+      const pixLum = (0.299*r + 0.587*g + 0.114*b) / 255;
+
+      // For dark backgrounds: knock out near-black pixels to transparent
+      if (isDarkBg && pixLum < 0.08) { px[i+3] = 0; continue; }
+      // For any bg: also knock out pixels close to sampled bg color
+      if (colorDist(r,g,b,br,bg,bb) < BG_THRESH) { px[i+3] = 0; continue; }
+
+      // Recolor shirt pixel
+      const grayLum = pixLum;
       const lum = Math.min(grayLum * normFactor, 1.0);
       px[i]   = Math.round(tr * lum);
       px[i+1] = Math.round(tg * lum);
@@ -367,6 +404,332 @@ function Slider({ label, value, min, max, onChange }) {
       </div>
       <input type="range" min={min} max={max} step={label.includes("°")?1:0.5}
         value={value} onChange={e => onChange(parseFloat(e.target.value))} />
+    </div>
+  );
+}
+
+// ─── MannequinOverlay ─────────────────────────────────────────────────────────
+// Adds an invisible mannequin effect to flat-lay shirt photos:
+//  1. Skin-toned neck/collar fill so the collar looks occupied
+//  2. Body-shaped shading that makes the shirt look 3D and worn
+function MannequinOverlay({ gender, zone }) {
+  if (gender === "off") return null;
+
+  const isSleeve = zone.includes("sleeve");
+  const isLong   = zone.startsWith("long");
+  const isBack   = zone.includes("back");
+  const W = 420, H = 520;
+  const cx = W / 2;
+
+  // Skin tone — slightly warm neutral
+  const skinColor   = "#d4a882";
+  const skinDark    = "#b8926a";
+  const skinShadow  = "#9a7355";
+
+  // ── Sleeve ───────────────────────────────────────────────────────────────────
+  if (isSleeve) {
+    return (
+      <svg viewBox="0 0 420 520" xmlns="http://www.w3.org/2000/svg"
+        style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:3,mixBlendMode:"multiply"}}>
+        <defs>
+          <linearGradient id="sl-top" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"  stopColor="#000" stopOpacity="0.18"/>
+            <stop offset="55%" stopColor="#000" stopOpacity="0.04"/>
+            <stop offset="100%" stopColor="#000" stopOpacity="0"/>
+          </linearGradient>
+          <linearGradient id="sl-inner" x1="100%" y1="0%" x2="0%" y2="0%">
+            <stop offset="0%"  stopColor="#000" stopOpacity="0.14"/>
+            <stop offset="45%" stopColor="#000" stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="420" height="520" fill="url(#sl-top)" />
+        <rect x="0" y="0" width="420" height="520" fill="url(#sl-inner)" />
+      </svg>
+    );
+  }
+
+  // ── Torso body shaping values ────────────────────────────────────────────────
+  const sw = gender === "female" ? 0.80 : 0.88;  // shoulder width ratio
+  const ww = gender === "female" ? 0.52 : 0.66;  // waist width ratio
+  const hw = gender === "female" ? 0.72 : 0.72;  // hip width ratio
+
+  const shoulderY = H * 0.13;
+  const underarmY = H * 0.30;
+  const waistY    = H * (gender === "female" ? 0.57 : 0.53);
+  const hipY      = H * 0.74;
+  const hemY      = H * 1.00;
+
+  const sHalf = (W * sw) / 2;
+  const wHalf = (W * ww) / 2;
+  const hHalf = (W * hw) / 2;
+
+  // Torso silhouette path — smooth curves matching human proportions
+  const torsoPath = [
+    `M ${cx - sHalf} ${shoulderY}`,
+    `C ${cx - sHalf} ${underarmY}, ${cx - wHalf - 10} ${waistY * 0.6}, ${cx - wHalf} ${waistY}`,
+    `C ${cx - wHalf} ${hipY * 0.88}, ${cx - hHalf} ${hipY}, ${cx - hHalf} ${hemY}`,
+    `L ${cx + hHalf} ${hemY}`,
+    `C ${cx + hHalf} ${hipY}, ${cx + wHalf} ${hipY * 0.88}, ${cx + wHalf} ${waistY}`,
+    `C ${cx + wHalf + 10} ${waistY * 0.6}, ${cx + sHalf} ${underarmY}, ${cx + sHalf} ${shoulderY}`,
+    `Z`
+  ].join(" ");
+
+  // ── Collar / neck fill geometry ──────────────────────────────────────────────
+  // The neck fill sits at the very top center — inside the collar opening.
+  // We draw a skin-toned neck cylinder that peeks up from the collar.
+  const neckTopY    = H * 0.00;  // neck starts above shirt top
+  const neckBottomY = H * 0.115; // neck base — just inside collar
+  const neckRx      = W * (gender === "female" ? 0.065 : 0.075);
+  const neckRy      = H * 0.03;
+
+  // Collar fill — slightly larger ellipse behind the collar opening
+  const collarRx = W * (gender === "female" ? 0.115 : 0.125);
+  const collarRy = H * 0.048;
+  const collarCy = H * 0.10;
+
+  // Chest shaping
+  const bustCy  = gender === "female" ? H * 0.29 : H * 0.32;
+  const bustRx  = gender === "female" ? W * 0.26 : W * 0.22;
+  const bustRy  = gender === "female" ? H * 0.18 : H * 0.14;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg"
+      style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:3}}>
+      <defs>
+        {/* Body shading gradients */}
+        <linearGradient id="mn-left" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%"  stopColor="#000" stopOpacity="0.20"/>
+          <stop offset="28%" stopColor="#000" stopOpacity="0"/>
+        </linearGradient>
+        <linearGradient id="mn-right" x1="100%" y1="0%" x2="0%" y2="0%">
+          <stop offset="0%"  stopColor="#000" stopOpacity="0.20"/>
+          <stop offset="28%" stopColor="#000" stopOpacity="0"/>
+        </linearGradient>
+        <radialGradient id="mn-chest" cx="50%" cy="0%" r="100%">
+          <stop offset="0%"  stopColor="#000" stopOpacity="0.12"/>
+          <stop offset="100%" stopColor="#000" stopOpacity="0"/>
+        </radialGradient>
+        <radialGradient id="mn-belly" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"  stopColor="#000" stopOpacity="0.06"/>
+          <stop offset="100%" stopColor="#000" stopOpacity="0"/>
+        </radialGradient>
+        {/* Neck skin gradients */}
+        <radialGradient id="mn-neck-skin" cx="50%" cy="60%" r="55%">
+          <stop offset="0%"   stopColor={skinColor}/>
+          <stop offset="75%"  stopColor={skinColor}/>
+          <stop offset="100%" stopColor={skinDark}/>
+        </radialGradient>
+        <radialGradient id="mn-collar-fill" cx="50%" cy="40%" r="60%">
+          <stop offset="0%"   stopColor={skinColor} stopOpacity="1"/>
+          <stop offset="70%"  stopColor={skinColor} stopOpacity="1"/>
+          <stop offset="100%" stopColor={skinDark}  stopOpacity="0.8"/>
+        </radialGradient>
+        <radialGradient id="mn-neck-shadow" cx="50%" cy="100%" r="60%">
+          <stop offset="0%"   stopColor={skinShadow} stopOpacity="0.5"/>
+          <stop offset="100%" stopColor={skinShadow} stopOpacity="0"/>
+        </radialGradient>
+        <clipPath id="mn-torso-clip">
+          <path d={torsoPath}/>
+        </clipPath>
+      </defs>
+
+      {/* ── 1. COLLAR / NECK FILL ─────────────────────────────────────── */}
+      {/* Base skin fill in collar opening */}
+      <ellipse cx={cx} cy={collarCy} rx={collarRx} ry={collarRy}
+        fill="url(#mn-collar-fill)" />
+      {/* Neck cylinder rising from collar */}
+      <rect x={cx - neckRx} y={neckTopY} width={neckRx * 2} height={neckBottomY - neckTopY + neckRy}
+        fill={skinColor} rx={neckRx} />
+      <ellipse cx={cx} cy={neckBottomY} rx={neckRx} ry={neckRy}
+        fill={skinColor} />
+      {/* Neck top ellipse cap */}
+      <ellipse cx={cx} cy={neckTopY + neckRy} rx={neckRx} ry={neckRy}
+        fill={skinDark} />
+      {/* Shadow at bottom of neck where it meets collar */}
+      <ellipse cx={cx} cy={neckBottomY + neckRy * 0.5} rx={neckRx * 1.3} ry={neckRy * 1.4}
+        fill="url(#mn-neck-shadow)" />
+
+      {/* ── 2. BODY SHAPING (clipped to torso silhouette) ─────────────── */}
+      {/* Left edge shadow */}
+      <rect x="0" y="0" width={W} height={H}
+        fill="url(#mn-left)" clipPath="url(#mn-torso-clip)"
+        style={{mixBlendMode:"multiply"}} />
+      {/* Right edge shadow */}
+      <rect x="0" y="0" width={W} height={H}
+        fill="url(#mn-right)" clipPath="url(#mn-torso-clip)"
+        style={{mixBlendMode:"multiply"}} />
+      {/* Chest / bust volume center */}
+      <ellipse cx={cx} cy={bustCy} rx={bustRx} ry={bustRy}
+        fill="url(#mn-chest)" clipPath="url(#mn-torso-clip)"
+        style={{mixBlendMode:"multiply"}} />
+      {/* Mid-torso belly/waist */}
+      <ellipse cx={cx} cy={waistY} rx={W * 0.18} ry={H * 0.10}
+        fill="url(#mn-belly)" clipPath="url(#mn-torso-clip)"
+        style={{mixBlendMode:"multiply"}} />
+
+      {/* Female: subtle bust separation line */}
+      {gender === "female" && (
+        <line x1={cx} y1={bustCy - bustRy * 0.3} x2={cx} y2={bustCy + bustRy * 0.5}
+          stroke="#000" strokeOpacity="0.04" strokeWidth="6"
+          clipPath="url(#mn-torso-clip)" style={{mixBlendMode:"multiply"}} />
+      )}
+
+      {/* Back: overall slight darkening */}
+      {isBack && (
+        <rect x="0" y="0" width={W} height={H} fill="black" fillOpacity="0.07"
+          clipPath="url(#mn-torso-clip)" style={{mixBlendMode:"multiply"}} />
+      )}
+    </svg>
+  );
+}
+
+// ─── AIGeneratorModal ─────────────────────────────────────────────────────────
+// Uses Pollinations.ai — completely free, no API key needed.
+// Generates images via a simple URL fetch.
+const AI_STYLES = [
+  { label:"No style",       val:""                          },
+  { label:"Sticker",        val:"sticker art, white outline, transparent background" },
+  { label:"Vintage",        val:"vintage screen print, distressed, retro"            },
+  { label:"Minimalist",     val:"minimalist flat design, simple, clean lines"        },
+  { label:"Graffiti",       val:"graffiti street art, bold, urban"                   },
+  { label:"Watercolor",     val:"watercolor illustration, soft edges"                },
+  { label:"Pixel Art",      val:"pixel art, 8-bit, retro game style"                 },
+  { label:"Sketch",         val:"pencil sketch, hand drawn, ink"                     },
+  { label:"Neon",           val:"neon glow, dark background, vibrant colors"         },
+  { label:"Cartoon",        val:"cartoon illustration, bold outlines, flat color"    },
+];
+const AI_SIZES = [
+  { label:"Square 1:1",   w:512,  h:512  },
+  { label:"Wide 16:9",    w:768,  h:432  },
+  { label:"Tall 9:16",    w:432,  h:768  },
+  { label:"Portrait 3:4", w:512,  h:682  },
+];
+
+function AIGeneratorModal({ onClose, onAdd }) {
+  const [prompt, setPrompt]     = useState("");
+  const [style, setStyle]       = useState("");
+  const [size, setSize]         = useState(AI_SIZES[0]);
+  const [imgUrl, setImgUrl]     = useState(null);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState(null);
+  const [seed, setSeed]         = useState(()=>Math.floor(Math.random()*99999));
+
+  async function generate() {
+    if (!prompt.trim()) return;
+    setLoading(true); setError(null); setImgUrl(null);
+    try {
+      const fullPrompt = [prompt.trim(), style].filter(Boolean).join(", ");
+      const encoded = encodeURIComponent(fullPrompt);
+      // Pollinations.ai free image generation — no key required
+      const url = `https://image.pollinations.ai/prompt/${encoded}?width=${size.w}&height=${size.h}&seed=${seed}&nologo=true&enhance=true`;
+      // Pre-load to confirm it resolves
+      await new Promise((res, rej) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload  = () => res(img);
+        img.onerror = () => rej(new Error("Generation failed"));
+        img.src = url;
+      });
+      setImgUrl(url);
+    } catch(e) {
+      setError("Generation failed — try rephrasing your prompt.");
+    }
+    setLoading(false);
+  }
+
+  function reroll() { setSeed(Math.floor(Math.random()*99999)); }
+
+  async function addToDesign() {
+    if (!imgUrl) return;
+    // Fetch as blob → dataURL so it works as a layer (avoids CORS on canvas export)
+    try {
+      const resp = await fetch(imgUrl);
+      const blob = await resp.blob();
+      const reader = new FileReader();
+      reader.onload = e => { onAdd(e.target.result); onClose(); };
+      reader.readAsDataURL(blob);
+    } catch {
+      // Fallback: use URL directly
+      onAdd(imgUrl); onClose();
+    }
+  }
+
+  // Generate on Enter in prompt box
+  function onKeyDown(e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); generate(); } }
+
+  return (
+    <div className="ai-modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="ai-modal">
+        {/* Header */}
+        <div className="ai-modal-header">
+          <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:20,color:"#f97316",letterSpacing:2}}>AI IMAGE GENERATOR</span>
+          <span style={{fontSize:11,color:"#444",marginLeft:4}}>powered by Pollinations.ai · free · no key needed</span>
+          <button onClick={onClose} style={{marginLeft:"auto",background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:18,lineHeight:1}}>✕</button>
+        </div>
+
+        <div className="ai-modal-body">
+          {/* Prompt */}
+          <div>
+            <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Describe your image</div>
+            <div className="ai-prompt-row">
+              <textarea className="ai-prompt-input" rows={2} placeholder='e.g. "a fierce eagle wearing sunglasses, logo style"'
+                value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={onKeyDown} />
+              <button className="btn btn-primary" style={{padding:"0 18px",fontSize:13,flexShrink:0}} onClick={generate} disabled={loading||!prompt.trim()}>
+                {loading?"⏳":"✨"} {loading?"Generating…":"Generate"}
+              </button>
+            </div>
+          </div>
+
+          {/* Style chips */}
+          <div>
+            <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Style</div>
+            <div className="ai-style-chips">
+              {AI_STYLES.map(s=>(
+                <button key={s.label} className={`ai-chip${style===s.val?" active":""}`} onClick={()=>setStyle(s.val)}>{s.label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Size + seed row */}
+          <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+            <div>
+              <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Size</div>
+              <div style={{display:"flex",gap:6}}>
+                {AI_SIZES.map(s=>(
+                  <button key={s.label} className={`ai-chip${size===s?" active":""}`} onClick={()=>setSize(s)}>{s.label}</button>
+                ))}
+              </div>
+            </div>
+            <button className="btn btn-ghost" style={{marginLeft:"auto",fontSize:11,padding:"5px 12px"}} onClick={()=>{reroll();}} title="New random seed = different variation">
+              🎲 New Variation
+            </button>
+          </div>
+
+          {/* Preview */}
+          <div className="ai-preview-area">
+            {loading && <div className="ai-spinner" />}
+            {!loading && !imgUrl && !error && (
+              <div style={{textAlign:"center",color:"#333"}}>
+                <div style={{fontSize:32,marginBottom:8}}>✨</div>
+                <div style={{fontSize:12}}>Your image will appear here</div>
+              </div>
+            )}
+            {error && <div style={{color:"#ef4444",fontSize:12,padding:16,textAlign:"center"}}>{error}</div>}
+            {imgUrl && !loading && <img src={imgUrl} className="ai-preview-img" alt="AI generated" crossOrigin="anonymous" />}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{padding:"12px 18px",borderTop:"1px solid #1e1e1e",display:"flex",gap:8,justifyContent:"flex-end",background:"#111"}}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          {imgUrl && (
+            <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>{reroll();generate();}}>🔄 Regenerate</button>
+          )}
+          <button className="btn btn-primary" onClick={addToDesign} disabled={!imgUrl||loading}>
+            ✅ Add to Design
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -696,6 +1059,8 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
   const [showNudge, setShowNudge] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showDrawing, setShowDrawing] = useState(false);
+  const [showAI, setShowAI] = useState(false);
+  const [mannequin, setMannequin] = useState("off"); // "off" | "male" | "female"
   const stageRef = useRef(null);
   const isDragging = useRef(false);
   const dragStart = useRef({});
@@ -843,21 +1208,24 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
             tctx.drawImage(img,0,0);
             const data=tctx.getImageData(0,0,tmp.width,tmp.height);
             const px=data.data, W=tmp.width, H=tmp.height;
-            // Sample corners for background color
+            // Sample corners + edges for bg color
+            const spts=[[0,0],[W-1,0],[0,H-1],[W-1,H-1],[Math.floor(W/2),0],[Math.floor(W/2),H-1],[0,Math.floor(H/2)],[W-1,Math.floor(H/2)]];
             let br=0,bg=0,bb=0;
-            [[0,0],[W-1,0],[0,H-1],[W-1,H-1]].forEach(([x,y])=>{
-              const i=(y*W+x)*4; br+=px[i]; bg+=px[i+1]; bb+=px[i+2];
-            });
-            br=Math.round(br/4); bg=Math.round(bg/4); bb=Math.round(bb/4);
+            spts.forEach(([x,y])=>{ const i=(y*W+x)*4; br+=px[i]; bg+=px[i+1]; bb+=px[i+2]; });
+            br=Math.round(br/spts.length); bg=Math.round(bg/spts.length); bb=Math.round(bb/spts.length);
+            const bgLum2=(0.299*br+0.587*bg+0.114*bb)/255;
+            const isDarkBg2=bgLum2<0.15;
+            const BG_THRESH2=isDarkBg2?55:38;
             const [baser,baseg,baseb]=hexToRgb(ZONE_BASE_COLOR[d.activeZone]||'#ffffff');
             const baseLum=(0.299*baser+0.587*baseg+0.114*baseb)/255;
             const normFactor=baseLum>0?1/baseLum:1;
             const [tr,tg,tb]=hexToRgb(d.shirtColor||'#ffffff');
             for(let i=0;i<px.length;i+=4){
               if(px[i+3]<10) continue;
-              if(colorDist(px[i],px[i+1],px[i+2],br,bg,bb)<38) continue;
-              const grayLum=(0.299*px[i]+0.587*px[i+1]+0.114*px[i+2])/255;
-              const lum=Math.min(grayLum*normFactor,1.0);
+              const pLum=(0.299*px[i]+0.587*px[i+1]+0.114*px[i+2])/255;
+              if(isDarkBg2&&pLum<0.08){ px[i+3]=0; continue; }
+              if(colorDist(px[i],px[i+1],px[i+2],br,bg,bb)<BG_THRESH2){ px[i+3]=0; continue; }
+              const lum=Math.min(pLum*normFactor,1.0);
               px[i]=Math.round(tr*lum); px[i+1]=Math.round(tg*lum); px[i+2]=Math.round(tb*lum);
             }
             tctx.putImageData(data,0,0);
@@ -869,6 +1237,72 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
           img.src=src;
         });
       } else { ctx.fillStyle=d.shirtColor; ctx.fillRect(0,0,w,h); }
+    }
+    // Bake mannequin shading + neck fill into export
+    if(withShirt && mannequin !== "off") {
+      const isSleeve = d.activeZone.includes("sleeve");
+      const isBack   = d.activeZone.includes("back");
+      ctx.save();
+      if(isSleeve) {
+        ctx.globalCompositeOperation = "multiply";
+        const gTop = ctx.createLinearGradient(0,0,0,h);
+        gTop.addColorStop(0,"rgba(0,0,0,0.18)"); gTop.addColorStop(0.55,"rgba(0,0,0,0.04)"); gTop.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.fillStyle=gTop; ctx.fillRect(0,0,w,h);
+        const gInner=ctx.createLinearGradient(w,0,0,0);
+        gInner.addColorStop(0,"rgba(0,0,0,0.14)"); gInner.addColorStop(0.45,"rgba(0,0,0,0)");
+        ctx.fillStyle=gInner; ctx.fillRect(0,0,w,h);
+      } else {
+        const cx2=w/2;
+        const isFem = mannequin==="female";
+        const sw2=isFem?0.80:0.88, ww2=isFem?0.52:0.66, hw2=0.72;
+        const sY=h*0.13, uY=h*0.30, waY=h*(isFem?0.57:0.53), hpY=h*0.74, hmY=h*1.00;
+        const sH=w*sw2/2, wH=w*ww2/2, hhH=w*hw2/2;
+
+        // ── Neck/collar fill (source-over, drawn first) ──
+        ctx.globalCompositeOperation = "source-over";
+        const skinC="#d4a882", skinD="#b8926a", skinS="#9a7355";
+        const neckRx=w*(isFem?0.065:0.075), neckRy=h*0.03;
+        const collarRx=w*(isFem?0.115:0.125), collarRy=h*0.048, collarCy=h*0.10;
+        // Collar fill ellipse
+        const gcf=ctx.createRadialGradient(cx2,collarCy-collarRy*0.3,0,cx2,collarCy,Math.max(collarRx,collarRy));
+        gcf.addColorStop(0,skinC); gcf.addColorStop(0.75,skinC); gcf.addColorStop(1,skinD);
+        ctx.fillStyle=gcf;
+        ctx.beginPath(); ctx.ellipse(cx2,collarCy,collarRx,collarRy,0,0,Math.PI*2); ctx.fill();
+        // Neck rectangle
+        ctx.fillStyle=skinC;
+        ctx.beginPath(); ctx.roundRect(cx2-neckRx,0,neckRx*2,h*0.115+neckRy,neckRx); ctx.fill();
+        // Neck top cap
+        ctx.fillStyle=skinD;
+        ctx.beginPath(); ctx.ellipse(cx2,neckRy,neckRx,neckRy,0,0,Math.PI*2); ctx.fill();
+        // Neck bottom shadow
+        const gns=ctx.createRadialGradient(cx2,h*0.115,0,cx2,h*0.115,neckRx*1.3);
+        gns.addColorStop(0,"rgba(154,115,85,0.5)"); gns.addColorStop(1,"rgba(154,115,85,0)");
+        ctx.fillStyle=gns;
+        ctx.beginPath(); ctx.ellipse(cx2,h*0.115+neckRy*0.5,neckRx*1.3,neckRy*1.4,0,0,Math.PI*2); ctx.fill();
+
+        // ── Body shading (multiply, clipped to torso) ──
+        ctx.globalCompositeOperation = "multiply";
+        ctx.beginPath();
+        ctx.moveTo(cx2-sH,sY);
+        ctx.bezierCurveTo(cx2-sH,uY,cx2-wH-10,waY*0.6,cx2-wH,waY);
+        ctx.bezierCurveTo(cx2-wH,hpY*0.88,cx2-hhH,hpY,cx2-hhH,hmY);
+        ctx.lineTo(cx2+hhH,hmY);
+        ctx.bezierCurveTo(cx2+hhH,hpY,cx2+wH,hpY*0.88,cx2+wH,waY);
+        ctx.bezierCurveTo(cx2+wH+10,waY*0.6,cx2+sH,uY,cx2+sH,sY);
+        ctx.closePath(); ctx.clip();
+        const gL=ctx.createLinearGradient(0,0,w,0);
+        gL.addColorStop(0,"rgba(0,0,0,0.20)"); gL.addColorStop(0.28,"rgba(0,0,0,0)");
+        ctx.fillStyle=gL; ctx.fillRect(0,0,w,h);
+        const gR=ctx.createLinearGradient(w,0,0,0);
+        gR.addColorStop(0,"rgba(0,0,0,0.20)"); gR.addColorStop(0.28,"rgba(0,0,0,0)");
+        ctx.fillStyle=gR; ctx.fillRect(0,0,w,h);
+        const bustY=isFem?h*0.29:h*0.32, bustRx=isFem?w*0.26:w*0.22, bustRy2=isFem?h*0.18:h*0.14;
+        const gC=ctx.createRadialGradient(cx2,bustY,0,cx2,bustY,Math.max(bustRx,bustRy2));
+        gC.addColorStop(0,"rgba(0,0,0,0.12)"); gC.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.fillStyle=gC; ctx.fillRect(0,0,w,h);
+        if(isBack){ ctx.fillStyle="rgba(0,0,0,0.07)"; ctx.fillRect(0,0,w,h); }
+      }
+      ctx.restore();
     }
     for(const layer of zone.layers){
       await new Promise(res=>{
@@ -914,6 +1348,20 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
               </button>
             ))}
           </div>
+        </div>
+        {/* ── Invisible Mannequin ── */}
+        <div className="panel-section">
+          <div className="panel-label">Invisible Mannequin</div>
+          <div style={{display:"flex",gap:6}}>
+            {[{val:"off",label:"Off"},{val:"male",label:"👔 Male"},{val:"female",label:"👗 Female"}].map(opt=>(
+              <button key={opt.val} className="btn-type"
+                style={{background:mannequin===opt.val?"#f97316":"#222",color:mannequin===opt.val?"#000":"#888",fontSize:10,padding:"5px 4px"}}
+                onClick={()=>setMannequin(opt.val)}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {mannequin!=="off"&&<div style={{fontSize:10,color:"#444",marginTop:6,lineHeight:1.5}}>Body shading applied. Download includes the effect.</div>}
         </div>
         {/* ── Shirt Position Nudge ── */}
         <div className="panel-section" style={{paddingBottom:showNudge?10:12}}>
@@ -1006,6 +1454,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
 
               {/* Shirt image with smooth cross-fade */}
               <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} />
+              <MannequinOverlay gender={mannequin} zone={d.activeZone} />
 
               {/* Dashed print-area guide */}
               <div className="print-guide" />
@@ -1071,11 +1520,15 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
           <button className="btn btn-primary" style={{width:"100%",padding:"9px 0",fontSize:12,marginBottom:6}} onClick={()=>artFileRef.current.click()}>
             📁 Upload Image
           </button>
-          <button className="btn btn-ghost" style={{width:"100%",padding:"9px 0",fontSize:12}} onClick={()=>setShowDrawing(true)}>
+          <button className="btn btn-ghost" style={{width:"100%",padding:"9px 0",fontSize:12,marginBottom:6}} onClick={()=>setShowDrawing(true)}>
             ✏️ Open Drawing Board
+          </button>
+          <button className="btn btn-ghost" style={{width:"100%",padding:"9px 0",fontSize:12,borderColor:"rgba(249,115,22,0.4)",color:"#f97316"}} onClick={()=>setShowAI(true)}>
+            ✨ AI Image Generator
           </button>
         </div>
         {showDrawing && <DrawingModal onClose={()=>setShowDrawing(false)} onAdd={addArtLayer} />}
+        {showAI && <AIGeneratorModal onClose={()=>setShowAI(false)} onAdd={addArtLayer} />}
         {selLayer ? (
           <div className="scrollable">
             <div className="panel-label">Layer Properties</div>
