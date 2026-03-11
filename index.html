@@ -240,98 +240,23 @@ function blankDesign(name="New Design") {
   };
 }
 
-// ─── ShirtBackground ─────────────────────────────────────────────────────────
-// Draws the shirt onto a canvas and recolors ONLY the shirt pixels.
-// Algorithm: sample the 4 corners to detect the background color, then for
-// every pixel that is NOT background, blend it with the chosen shirt color
-// using luminosity so wrinkles/shadows stay intact.
+// ─── Color helpers (used by removeBg + download) ─────────────────────────────
 function hexToRgb(hex) {
   const h = hex.replace('#','');
   return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
 }
 function colorDist(r1,g1,b1,r2,g2,b2){ return Math.abs(r1-r2)+Math.abs(g1-g2)+Math.abs(b1-b2); }
 
-function ShirtBackground({ shirtImage, shirtColor, baseColor, offset }) {
-  const canvasRef = useRef(null);
-  const [naturalImg, setNaturalImg] = useState(null);
-
-  useEffect(() => {
-    if (!shirtImage) return;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => setNaturalImg(img);
-    img.src = shirtImage;
-  }, [shirtImage]);
-
-  useEffect(() => {
-    if (!naturalImg || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    canvas.width  = naturalImg.width;
-    canvas.height = naturalImg.height;
-    // Clear to transparent first so bg pixels become invisible
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(naturalImg, 0, 0);
-
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const px   = data.data;
-    const W    = canvas.width, H = canvas.height;
-
-    // Sample corners + edge midpoints for a more reliable bg color detection
-    const samplePts = [
-      [0,0],[W-1,0],[0,H-1],[W-1,H-1],
-      [Math.floor(W/2),0],[Math.floor(W/2),H-1],
-      [0,Math.floor(H/2)],[W-1,Math.floor(H/2)],
-    ];
-    let br=0,bg=0,bb=0;
-    samplePts.forEach(([x,y])=>{ const i=(y*W+x)*4; br+=px[i]; bg+=px[i+1]; bb+=px[i+2]; });
-    br=Math.round(br/samplePts.length);
-    bg=Math.round(bg/samplePts.length);
-    bb=Math.round(bb/samplePts.length);
-
-    // Detect if background is dark (black) — use higher threshold + make transparent
-    const bgLum = (0.299*br + 0.587*bg + 0.114*bb) / 255;
-    const isDarkBg = bgLum < 0.15;
-    // Dark bg: anything with luminosity < 0.08 is background; light bg: use color distance
-    const BG_THRESH = isDarkBg ? 55 : 38;
-
-    const [baser, baseg, baseb] = hexToRgb(baseColor || '#ffffff');
-    const baseLum2 = (0.299*baser + 0.587*baseg + 0.114*baseb) / 255;
-    const normFactor = baseLum2 > 0 ? 1 / baseLum2 : 1;
-    const [tr, tg, tb] = hexToRgb(shirtColor || '#ffffff');
-
-    for (let i = 0; i < px.length; i += 4) {
-      const r=px[i], g=px[i+1], b=px[i+2], a=px[i+3];
-      if (a < 10) continue;
-
-      const pixLum = (0.299*r + 0.587*g + 0.114*b) / 255;
-
-      // For dark backgrounds: knock out near-black pixels to transparent
-      if (isDarkBg && pixLum < 0.08) { px[i+3] = 0; continue; }
-      // For any bg: also knock out pixels close to sampled bg color
-      if (colorDist(r,g,b,br,bg,bb) < BG_THRESH) { px[i+3] = 0; continue; }
-
-      // Recolor shirt pixel
-      const grayLum = pixLum;
-      const lum = Math.min(grayLum * normFactor, 1.0);
-      px[i]   = Math.round(tr * lum);
-      px[i+1] = Math.round(tg * lum);
-      px[i+2] = Math.round(tb * lum);
-    }
-
-    ctx.putImageData(data, 0, 0);
-  }, [naturalImg, shirtColor, baseColor]);
-
+// ─── ShirtBackground ─────────────────────────────────────────────────────────
+// Renders shirt photo exactly as-is for maximum realism.
+function ShirtBackground({ shirtImage, offset }) {
   if (!shirtImage) return null;
-
-  // Apply offset: translate X/Y as % of stage, scale around center
   const ox = offset?.x || 0;
   const oy = offset?.y || 0;
   const sc = offset?.s || 1.0;
-
   return (
     <div className="shirt-bg">
-      <canvas ref={canvasRef}
+      <img src={shirtImage}
         style={{
           width:"100%", height:"100%",
           objectFit:"contain", objectPosition:"center", display:"block",
@@ -1150,21 +1075,54 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
       const img = new Image();
       img.onload = () => {
         const cv = document.createElement("canvas");
-        cv.width=img.width; cv.height=img.height;
-        const ctx=cv.getContext("2d");
-        ctx.drawImage(img,0,0);
-        const data=ctx.getImageData(0,0,cv.width,cv.height);
-        const px=data.data;
-        const corners=[[0,0],[cv.width-1,0],[0,cv.height-1],[cv.width-1,cv.height-1]];
-        let r=0,g=0,b=0;
-        corners.forEach(([x,y])=>{ const i=(y*cv.width+x)*4; r+=px[i];g+=px[i+1];b+=px[i+2]; });
-        r=Math.round(r/4); g=Math.round(g/4); b=Math.round(b/4);
-        const t=40;
-        for(let i=0;i<px.length;i+=4){
-          if(Math.abs(px[i]-r)<t&&Math.abs(px[i+1]-g)<t&&Math.abs(px[i+2]-b)<t) px[i+3]=0;
+        cv.width = img.width; cv.height = img.height;
+        const ctx = cv.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, cv.width, cv.height);
+        const px = imageData.data;
+        const W = cv.width, H = cv.height;
+        const THRESH = 40;
+
+        // Sample bg color from all 4 corners and average
+        const samplePts = [[0,0],[W-1,0],[0,H-1],[W-1,H-1]];
+        let sr=0,sg=0,sb=0;
+        samplePts.forEach(([x,y])=>{ const i=(y*W+x)*4; sr+=px[i];sg+=px[i+1];sb+=px[i+2]; });
+        const bgR=Math.round(sr/4), bgG=Math.round(sg/4), bgB=Math.round(sb/4);
+
+        // Flood-fill from all 4 corners simultaneously
+        const visited = new Uint8Array(W * H);
+        const queue = [];
+        samplePts.forEach(([x,y]) => {
+          const idx = y*W+x;
+          if (!visited[idx]) { visited[idx]=1; queue.push(idx); }
+        });
+
+        let head = 0;
+        while (head < queue.length) {
+          const idx = queue[head++];
+          const x = idx % W, y = Math.floor(idx / W);
+          const pi = idx * 4;
+          // Make this pixel transparent
+          px[pi+3] = 0;
+          // Check 4 neighbors
+          const neighbors = [];
+          if (x > 0)   neighbors.push(idx - 1);
+          if (x < W-1) neighbors.push(idx + 1);
+          if (y > 0)   neighbors.push(idx - W);
+          if (y < H-1) neighbors.push(idx + W);
+          for (const ni of neighbors) {
+            if (visited[ni]) continue;
+            const np = ni * 4;
+            const dr = Math.abs(px[np]-bgR), dg = Math.abs(px[np+1]-bgG), db = Math.abs(px[np+2]-bgB);
+            if (dr+dg+db < THRESH*3 && px[np+3] > 10) {
+              visited[ni] = 1;
+              queue.push(ni);
+            }
+          }
         }
-        ctx.putImageData(data,0,0);
-        updLayer(selLayer.id, {src:cv.toDataURL("image/png")});
+
+        ctx.putImageData(imageData, 0, 0);
+        updLayer(selLayer.id, { src: cv.toDataURL("image/png") });
         resolve();
       };
       img.src = selLayer.src;
@@ -1218,42 +1176,15 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
           const img=new Image();
           img.crossOrigin="anonymous";
           img.onload=()=>{
-            // Draw shirt into a temp canvas at native size, recolor, then scale onto output
-            const tmp=document.createElement("canvas");
-            tmp.width=img.width; tmp.height=img.height;
-            const tctx=tmp.getContext("2d");
-            tctx.drawImage(img,0,0);
-            const data=tctx.getImageData(0,0,tmp.width,tmp.height);
-            const px=data.data, W=tmp.width, H=tmp.height;
-            // Sample corners + edges for bg color
-            const spts=[[0,0],[W-1,0],[0,H-1],[W-1,H-1],[Math.floor(W/2),0],[Math.floor(W/2),H-1],[0,Math.floor(H/2)],[W-1,Math.floor(H/2)]];
-            let br=0,bg=0,bb=0;
-            spts.forEach(([x,y])=>{ const i=(y*W+x)*4; br+=px[i]; bg+=px[i+1]; bb+=px[i+2]; });
-            br=Math.round(br/spts.length); bg=Math.round(bg/spts.length); bb=Math.round(bb/spts.length);
-            const bgLum2=(0.299*br+0.587*bg+0.114*bb)/255;
-            const isDarkBg2=bgLum2<0.15;
-            const BG_THRESH2=isDarkBg2?55:38;
-            const [baser,baseg,baseb]=hexToRgb(ZONE_BASE_COLOR[d.activeZone]||'#ffffff');
-            const baseLum=(0.299*baser+0.587*baseg+0.114*baseb)/255;
-            const normFactor=baseLum>0?1/baseLum:1;
-            const [tr,tg,tb]=hexToRgb(d.shirtColor||'#ffffff');
-            for(let i=0;i<px.length;i+=4){
-              if(px[i+3]<10) continue;
-              const pLum=(0.299*px[i]+0.587*px[i+1]+0.114*px[i+2])/255;
-              if(isDarkBg2&&pLum<0.08){ px[i+3]=0; continue; }
-              if(colorDist(px[i],px[i+1],px[i+2],br,bg,bb)<BG_THRESH2){ px[i+3]=0; continue; }
-              const lum=Math.min(pLum*normFactor,1.0);
-              px[i]=Math.round(tr*lum); px[i+1]=Math.round(tg*lum); px[i+2]=Math.round(tb*lum);
-            }
-            tctx.putImageData(data,0,0);
+            // Draw shirt as-is for full photo realism
             const scale=Math.min(w/img.width,h/img.height);
             const dw=img.width*scale, dh=img.height*scale;
-            ctx.drawImage(tmp,(w-dw)/2,(h-dh)/2,dw,dh);
+            ctx.drawImage(img,(w-dw)/2,(h-dh)/2,dw,dh);
             res();
           };
           img.src=src;
         });
-      } else { ctx.fillStyle=d.shirtColor; ctx.fillRect(0,0,w,h); }
+      } else { ctx.fillStyle="#555"; ctx.fillRect(0,0,w,h); }
     }
     // Bake mannequin shading + neck fill into export
     if(withShirt && mannequin !== "off") {
@@ -1472,7 +1403,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
               onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
 
               {/* Shirt image with smooth cross-fade */}
-              <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} />
+              <ShirtBackground shirtImage={currentShirtImg} offset={offsets[d.activeZone]} />
               <MannequinOverlay gender={mannequin} zone={d.activeZone} />
 
               {/* Dashed print-area guide */}
