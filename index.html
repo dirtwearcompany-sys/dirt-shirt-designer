@@ -1033,87 +1033,120 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
         const imageData = ctx.getImageData(0, 0, cv.width, cv.height);
         const px = imageData.data;
         const W = cv.width, H = cv.height;
+        const N = W * H;
 
-        // ── Step 1: Sample bg color from entire image border ──────────────
+        // ── Phase 1: Sample background color from the full border ─────────
         let sr=0,sg=0,sb=0,sc=0;
-        for (let x=0;x<W;x++) {
-          [[x,0],[x,H-1]].forEach(([bx,by])=>{
-            const i=(by*W+bx)*4;
-            if(px[i+3]>10){sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc++;}
-          });
+        for (let x=0;x<W;x++) for (const y of [0,H-1]) {
+          const i=(y*W+x)*4; sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc++;
         }
-        for (let y=1;y<H-1;y++) {
-          [[0,y],[W-1,y]].forEach(([bx,by])=>{
-            const i=(by*W+bx)*4;
-            if(px[i+3]>10){sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc++;}
-          });
+        for (let y=1;y<H-1;y++) for (const x of [0,W-1]) {
+          const i=(y*W+x)*4; sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc++;
         }
-        const bgR=sc>0?Math.round(sr/sc):0;
-        const bgG=sc>0?Math.round(sg/sc):0;
-        const bgB=sc>0?Math.round(sb/sc):0;
+        const bgR=sr/sc, bgG=sg/sc, bgB=sb/sc;
+        const bgLum=(0.299*bgR+0.587*bgG+0.114*bgB)/255;
+        const isDark=bgLum<0.12;
 
-        // ── Step 2: Flood-fill from entire border, 8-connected ────────────
-        const THRESH = 38;
-        const isBg = new Uint8Array(W * H);
-        const queue = new Int32Array(W * H * 2);
-        let qHead=0, qTail=0;
-
-        function seed(idx) { if(!isBg[idx]){ isBg[idx]=1; queue[qTail++]=idx; } }
-        for (let x=0;x<W;x++) { seed(x); seed((H-1)*W+x); }
-        for (let y=1;y<H-1;y++) { seed(y*W); seed(y*W+W-1); }
-
-        while (qHead < qTail) {
-          const idx = queue[qHead++];
-          const x = idx % W, y = (idx/W)|0;
-          for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) {
-            if (!dx&&!dy) continue;
-            const nx=x+dx, ny=y+dy;
-            if (nx<0||nx>=W||ny<0||ny>=H) continue;
-            const ni=ny*W+nx;
-            if (isBg[ni]) continue;
-            const np=ni*4;
-            if (px[np+3]<10) { isBg[ni]=1; queue[qTail++]=ni; continue; }
-            const dr=px[np]-bgR, dg=px[np+1]-bgG, db=px[np+2]-bgB;
-            if (Math.sqrt(dr*dr+dg*dg+db*db) < THRESH) { isBg[ni]=1; queue[qTail++]=ni; }
-          }
-        }
-
-        // ── Step 3: Remove bg pixels ──────────────────────────────────────
-        for (let i=0;i<W*H;i++) { if(isBg[i]) px[i*4+3]=0; }
-
-        // ── Step 4: Multi-pass alpha feathering for clean soft edges ──────
-        // Pass 1: erode slightly — pulls the cut edge 1px inward to remove fringe
-        const eroded = new Uint8Array(W*H);
-        for (let y=1;y<H-1;y++) for (let x=1;x<W-1;x++) {
-          const idx=y*W+x;
-          if (isBg[idx]) continue;
-          // If any 4-connected neighbor is bg, mark as fringe
-          const hasBgNeighbor = isBg[(y-1)*W+x]||isBg[(y+1)*W+x]||isBg[y*W+x-1]||isBg[y*W+x+1];
-          if (hasBgNeighbor) eroded[idx]=1;
-        }
-        for (let i=0;i<W*H;i++) if(eroded[i]) px[i*4+3]=0;
-
-        // Pass 2: smooth alpha along remaining edges with a 3x3 blur
-        const alphaOrig = new Float32Array(W*H);
-        for (let i=0;i<W*H;i++) alphaOrig[i]=px[i*4+3];
-        for (let y=1;y<H-1;y++) for (let x=1;x<W-1;x++) {
-          const idx=y*W+x;
-          if (isBg[idx]||alphaOrig[idx]===0) continue;
-          // Only blur pixels near the new edge (eroded pixels)
-          let hasTransNeighbor=false;
-          for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) {
+        // ── Phase 2: Definite-BG flood fill (tight threshold) ────────────
+        // Marks pixels that are unambiguously background
+        const TIGHT = isDark ? 0.05 : 30; // lum for dark, color dist for light
+        const defBg  = new Uint8Array(N);
+        const q1 = new Int32Array(N*2); let q1h=0,q1t=0;
+        function seed1(i){if(!defBg[i]){defBg[i]=1;q1[q1t++]=i;}}
+        for(let x=0;x<W;x++){seed1(x);seed1((H-1)*W+x);}
+        for(let y=1;y<H-1;y++){seed1(y*W);seed1(y*W+W-1);}
+        while(q1h<q1t){
+          const idx=q1[q1h++],x=idx%W,y=(idx/W)|0;
+          for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
             if(!dx&&!dy) continue;
-            const ni=(y+dy)*W+(x+dx);
-            if(alphaOrig[ni]===0) { hasTransNeighbor=true; break; }
+            const nx=x+dx,ny=y+dy;
+            if(nx<0||nx>=W||ny<0||ny>=H) continue;
+            const ni=ny*W+nx; if(defBg[ni]) continue;
+            const p=ni*4,r=px[p],g=px[p+1],b=px[p+2];
+            let isBgPx=false;
+            if(isDark){ isBgPx=(0.299*r+0.587*g+0.114*b)/255 < TIGHT; }
+            else { const dr=r-bgR,dg=g-bgG,db=b-bgB; isBgPx=Math.sqrt(dr*dr+dg*dg+db*db)<TIGHT; }
+            if(isBgPx){defBg[ni]=1;q1[q1t++]=ni;}
           }
-          if (!hasTransNeighbor) continue;
-          // 3x3 box average of alpha
-          let sum=0, cnt=0;
-          for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) {
-            const ni=(y+dy)*W+(x+dx);
-            if(ni>=0&&ni<W*H) { sum+=alphaOrig[ni]; cnt++; }
+        }
+
+        // ── Phase 3: Loose-BG flood fill (wider threshold = "maybe bg") ──
+        const LOOSE = isDark ? 0.15 : 60;
+        const looseBg = new Uint8Array(N);
+        const q2 = new Int32Array(N*2); let q2h=0,q2t=0;
+        function seed2(i){if(!looseBg[i]){looseBg[i]=1;q2[q2t++]=i;}}
+        for(let x=0;x<W;x++){seed2(x);seed2((H-1)*W+x);}
+        for(let y=1;y<H-1;y++){seed2(y*W);seed2(y*W+W-1);}
+        while(q2h<q2t){
+          const idx=q2[q2h++],x=idx%W,y=(idx/W)|0;
+          for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+            if(!dx&&!dy) continue;
+            const nx=x+dx,ny=y+dy;
+            if(nx<0||nx>=W||ny<0||ny>=H) continue;
+            const ni=ny*W+nx; if(looseBg[ni]) continue;
+            const p=ni*4,r=px[p],g=px[p+1],b=px[p+2];
+            let isBgPx=false;
+            if(isDark){ isBgPx=(0.299*r+0.587*g+0.114*b)/255 < LOOSE; }
+            else { const dr=r-bgR,dg=g-bgG,db=b-bgB; isBgPx=Math.sqrt(dr*dr+dg*dg+db*db)<LOOSE; }
+            if(isBgPx){looseBg[ni]=1;q2[q2t++]=ni;}
           }
-          px[idx*4+3]=Math.round(sum/cnt);
+        }
+
+        // ── Phase 4: Alpha matte computation ─────────────────────────────
+        // defBg=1  → alpha 0 (definitely background)
+        // looseBg=0 → alpha 255 (definitely foreground)
+        // between  → transition zone: alpha based on color similarity to bg
+        const alpha = new Float32Array(N);
+        for(let i=0;i<N;i++){
+          if(defBg[i]){ alpha[i]=0; continue; }
+          if(!looseBg[i]){ alpha[i]=255; continue; }
+          // Transition zone: compute how "bg-like" this pixel is
+          const p=i*4,r=px[p],g=px[p+1],b=px[p+2];
+          let sim=0;
+          if(isDark){
+            const lum=(0.299*r+0.587*g+0.114*b)/255;
+            sim = Math.max(0, 1-(lum/LOOSE)); // 0=foreground, 1=background
+          } else {
+            const dr=r-bgR,dg=g-bgG,db=b-bgB;
+            sim = Math.min(1, Math.sqrt(dr*dr+dg*dg+db*db)/LOOSE);
+            sim = 1-sim;
+          }
+          alpha[i] = Math.round((1-sim)*255);
+        }
+
+        // ── Phase 5: Gaussian blur on alpha (radius 1) for smooth edges ──
+        const sigma=1.0;
+        const kernel=[0.0625,0.25,0.375,0.25,0.0625]; // approx Gaussian σ=1
+        const tmp1 = new Float32Array(N);
+        // Horizontal pass
+        for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+          let sum=0,wsum=0;
+          for(let k=-2;k<=2;k++){
+            const nx=x+k; if(nx<0||nx>=W) continue;
+            const w=kernel[k+2];
+            sum+=alpha[y*W+nx]*w; wsum+=w;
+          }
+          tmp1[y*W+x]=sum/wsum;
+        }
+        // Vertical pass
+        const blurred = new Float32Array(N);
+        for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+          let sum=0,wsum=0;
+          for(let k=-2;k<=2;k++){
+            const ny=y+k; if(ny<0||ny>=H) continue;
+            const w=kernel[k+2];
+            sum+=tmp1[ny*W+x]*w; wsum+=w;
+          }
+          blurred[y*W+x]=sum/wsum;
+        }
+
+        // ── Phase 6: Apply final alpha — hard cut for clear bg, soft for edges ──
+        for(let i=0;i<N;i++){
+          // Use blurred alpha but snap near-0 and near-255 to hard values
+          let a = blurred[i];
+          if(a < 8)   a=0;
+          if(a > 247) a=255;
+          px[i*4+3] = Math.round(a);
         }
 
         ctx.putImageData(imageData, 0, 0);
