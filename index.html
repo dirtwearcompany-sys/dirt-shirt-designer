@@ -59,6 +59,12 @@
       transition: opacity 0.18s ease;
     }
 
+    /* ── BG Eraser Modal ── */
+    .bge-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:200; display:flex; flex-direction:column; }
+    .bge-toolbar { background:#141414; border-bottom:1px solid #222; padding:10px 16px; display:flex; align-items:center; gap:12px; flex-shrink:0; flex-wrap:wrap; }
+    .bge-canvas-wrap { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; cursor:none; }
+    .bge-footer { background:#141414; border-top:1px solid #222; padding:10px 16px; display:flex; align-items:center; gap:10px; justify-content:flex-end; }
+    .bge-cursor { position:fixed; pointer-events:none; border-radius:50%; border:2px solid rgba(255,255,255,0.8); transform:translate(-50%,-50%); z-index:9999; }
     input[type="range"] { accent-color: #f97316; width: 100%; height: 4px; cursor: pointer; }
     input[type="color"] { cursor: pointer; }
     .resize-handle { position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: #f97316; border-radius: 2px; cursor: se-resize; z-index: 20; }
@@ -846,6 +852,165 @@ function DrawingModal({ onClose, onAdd, initialImage }) {
 }
 
 
+// ─── BgEraserModal ────────────────────────────────────────────────────────────
+// Canva-style manual background eraser — paint to erase or restore pixels
+function BgEraserModal({ src, onClose, onSave }) {
+  const canvasRef   = useRef(null);
+  const displayRef  = useRef(null); // shown canvas (checkerboard bg)
+  const [mode, setMode]         = useState("erase");   // "erase" | "restore"
+  const [brushSize, setBrushSize] = useState(24);
+  const [zoom, setZoom]         = useState(1);
+  const [cursorPos, setCursorPos] = useState({x:-999,y:-999});
+  const painting    = useRef(false);
+  const naturalImg  = useRef(null);
+  const CW = useRef(0), CH = useRef(0);
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      naturalImg.current = img;
+      const canvas = canvasRef.current;
+      canvas.width  = img.width;
+      canvas.height = img.height;
+      CW.current = img.width; CH.current = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, img.width, img.height);
+      ctx.drawImage(img, 0, 0);
+      renderDisplay();
+    };
+    img.src = src;
+  }, []);
+
+  function renderDisplay() {
+    const src = canvasRef.current;
+    const dst = displayRef.current;
+    if (!src || !dst) return;
+    dst.width  = src.width;
+    dst.height = src.height;
+    const dctx = dst.getContext("2d");
+    // Checkerboard background
+    const size = Math.max(8, Math.floor(src.width / 60));
+    for (let y=0; y<src.height; y+=size) for (let x=0; x<src.width; x+=size) {
+      dctx.fillStyle = ((Math.floor(x/size)+Math.floor(y/size))%2===0) ? "#ccc" : "#999";
+      dctx.fillRect(x, y, size, size);
+    }
+    dctx.drawImage(src, 0, 0);
+  }
+
+  function getCanvasPos(e) {
+    const rect = displayRef.current.getBoundingClientRect();
+    const scaleX = CW.current / rect.width;
+    const scaleY = CH.current / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x:(clientX-rect.left)*scaleX, y:(clientY-rect.top)*scaleY };
+  }
+
+  function paint(e) {
+    if (!painting.current) return;
+    const {x, y} = getCanvasPos(e);
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.globalCompositeOperation = mode==="erase" ? "destination-out" : "source-over";
+    if (mode === "restore" && naturalImg.current) {
+      // Restore: draw from original image clipped to brush circle
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, brushSize/2, 0, Math.PI*2);
+      ctx.clip();
+      ctx.drawImage(naturalImg.current, 0, 0);
+      ctx.restore();
+    } else {
+      // Erase: paint transparent circle
+      ctx.beginPath();
+      ctx.arc(x, y, brushSize/2, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(0,0,0,1)";
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = "source-over";
+    renderDisplay();
+  }
+
+  function onMouseMove(e) {
+    setCursorPos({x: e.clientX, y: e.clientY});
+    paint(e);
+  }
+  function onMouseDown(e) { painting.current=true; paint(e); e.preventDefault(); }
+  function onMouseUp()    { painting.current=false; }
+
+  function handleSave() {
+    onSave(canvasRef.current.toDataURL("image/png"));
+    onClose();
+  }
+
+  // Display brush size in canvas pixels scaled to display size
+  const displayBrushPx = displayRef.current
+    ? brushSize * (displayRef.current.getBoundingClientRect().width / (CW.current||1))
+    : brushSize;
+
+  return (
+    <div className="bge-overlay">
+      {/* Cursor */}
+      <div className="bge-cursor" style={{
+        left: cursorPos.x, top: cursorPos.y,
+        width: displayBrushPx, height: displayBrushPx,
+        borderColor: mode==="erase" ? "rgba(255,80,80,0.9)" : "rgba(80,255,80,0.9)",
+      }} />
+
+      {/* Toolbar */}
+      <div className="bge-toolbar">
+        <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:15,color:"#f97316",letterSpacing:2}}>BG ERASER</span>
+        <div style={{width:1,height:20,background:"#333"}} />
+        {/* Mode toggle */}
+        <div style={{display:"flex",gap:4}}>
+          {[{val:"erase",label:"🧹 Erase"},{val:"restore",label:"✏️ Restore"}].map(m=>(
+            <button key={m.val} className="btn" style={{
+              fontSize:11, padding:"5px 10px",
+              background: mode===m.val ? "#f97316" : "#222",
+              color: mode===m.val ? "#000" : "#888",
+              border: "1px solid " + (mode===m.val?"#f97316":"#333"),
+            }} onClick={()=>setMode(m.val)}>{m.label}</button>
+          ))}
+        </div>
+        <div style={{width:1,height:20,background:"#333"}} />
+        {/* Brush size */}
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:160}}>
+          <span style={{fontSize:11,color:"#666",whiteSpace:"nowrap"}}>Brush {brushSize}px</span>
+          <input type="range" min={4} max={120} value={brushSize}
+            onChange={e=>setBrushSize(+e.target.value)}
+            style={{width:100,accentColor:"#f97316"}} />
+        </div>
+        <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+          <span style={{fontSize:10,color:"#444",alignSelf:"center"}}>
+            {mode==="erase"?"Paint red to erase":"Paint green to restore"}
+          </span>
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div className="bge-canvas-wrap"
+        onMouseMove={onMouseMove} onMouseDown={onMouseDown}
+        onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
+        <canvas ref={displayRef}
+          style={{
+            maxWidth:"95%", maxHeight:"100%",
+            imageRendering:"pixelated",
+            boxShadow:"0 0 40px rgba(0,0,0,0.8)",
+          }} />
+        <canvas ref={canvasRef} style={{display:"none"}} />
+      </div>
+
+      {/* Footer */}
+      <div className="bge-footer">
+        <span style={{fontSize:11,color:"#444",marginRight:"auto"}}>
+          Paint over areas to erase · Switch to Restore to paint back
+        </span>
+        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" onClick={handleSave}>✅ Save Changes</button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [designs, setDesigns] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -953,6 +1118,7 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
   const [showNudge, setShowNudge] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showDrawing, setShowDrawing] = useState(false);
+  const [showBgEraser, setShowBgEraser] = useState(false);
   const [editingLayerId, setEditingLayerId] = useState(null); // layer being edited in drawing board
   const [showAI, setShowAI] = useState(false);
   const stageRef = useRef(null);
@@ -1484,6 +1650,13 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
             ✨ AI Image Generator
           </button>
         </div>
+        {showBgEraser && selLayer && (
+          <BgEraserModal
+            src={selLayer.src}
+            onClose={()=>setShowBgEraser(false)}
+            onSave={dataUrl=>updLayer(selLayer.id,{src:dataUrl})}
+          />
+        )}
         {showDrawing && (
           <DrawingModal
             onClose={()=>{ setShowDrawing(false); setEditingLayerId(null); }}
@@ -1507,10 +1680,16 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
               onClick={()=>{ setEditingLayerId(selLayer.id); setShowDrawing(true); }}>
               ✏️ Edit in Drawing Board
             </button>
-            <button className="btn btn-ghost" style={{width:"100%",marginBottom:10,fontSize:11,padding:"7px 0",borderColor:bgRemoving?"#f97316":"#333"}}
-              onClick={removeBg} disabled={bgRemoving}>
-              {bgRemoving?"⏳ Removing...":"✂️ Remove Background"}
-            </button>
+            <div style={{display:"flex",gap:5,marginBottom:10}}>
+              <button className="btn btn-ghost" style={{flex:1,fontSize:10,padding:"7px 0",borderColor:bgRemoving?"#f97316":"#333"}}
+                onClick={removeBg} disabled={bgRemoving}>
+                {bgRemoving?"⏳ Auto...":"⚡ Auto Remove"}
+              </button>
+              <button className="btn btn-ghost" style={{flex:1,fontSize:10,padding:"7px 0",borderColor:"rgba(249,115,22,0.4)",color:"#f97316"}}
+                onClick={()=>setShowBgEraser(true)} disabled={bgRemoving}>
+                🖌️ Manual Erase
+              </button>
+            </div>
             <Slider label="Width %"    value={selLayer.w}           min={5}    max={100} onChange={v=>updLayer(selLayer.id,{w:v})} />
             <Slider label="Height %"   value={selLayer.h}           min={5}    max={100} onChange={v=>updLayer(selLayer.id,{h:v})} />
             <Slider label="X Position" value={selLayer.x}           min={0}    max={90}  onChange={v=>updLayer(selLayer.id,{x:v})} />
