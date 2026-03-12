@@ -1023,138 +1023,201 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
   async function removeBg() {
     if (!selLayer) return;
     setBgRemoving(true);
-    await new Promise(resolve => {
-      const img = new Image();
-      img.onload = () => {
-        const cv = document.createElement("canvas");
-        cv.width = img.width; cv.height = img.height;
-        const ctx = cv.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, cv.width, cv.height);
-        const px = imageData.data;
-        const W = cv.width, H = cv.height;
-        const N = W * H;
 
-        // ── Phase 1: Sample background color from the full border ─────────
-        let sr=0,sg=0,sb=0,sc=0;
-        for (let x=0;x<W;x++) for (const y of [0,H-1]) {
-          const i=(y*W+x)*4; sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc++;
-        }
-        for (let y=1;y<H-1;y++) for (const x of [0,W-1]) {
-          const i=(y*W+x)*4; sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc++;
-        }
-        const bgR=sr/sc, bgG=sg/sc, bgB=sb/sc;
-        const bgLum=(0.299*bgR+0.587*bgG+0.114*bgB)/255;
-        const isDark=bgLum<0.12;
+    // ── Core removal engine — works for any bg type ───────────────────────
+    function applyRemoval(srcImg, params) {
+      const cv = document.createElement("canvas");
+      cv.width = srcImg.width; cv.height = srcImg.height;
+      const ctx = cv.getContext("2d");
+      ctx.drawImage(srcImg, 0, 0);
+      const id = ctx.getImageData(0, 0, cv.width, cv.height);
+      const px = id.data, W = cv.width, H = cv.height, N = W * H;
 
-        // ── Phase 2: Definite-BG flood fill (tight threshold) ────────────
-        // Marks pixels that are unambiguously background
-        const TIGHT = isDark ? 0.05 : 30; // lum for dark, color dist for light
-        const defBg  = new Uint8Array(N);
-        const q1 = new Int32Array(N*2); let q1h=0,q1t=0;
-        function seed1(i){if(!defBg[i]){defBg[i]=1;q1[q1t++]=i;}}
-        for(let x=0;x<W;x++){seed1(x);seed1((H-1)*W+x);}
-        for(let y=1;y<H-1;y++){seed1(y*W);seed1(y*W+W-1);}
-        while(q1h<q1t){
-          const idx=q1[q1h++],x=idx%W,y=(idx/W)|0;
-          for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
-            if(!dx&&!dy) continue;
-            const nx=x+dx,ny=y+dy;
-            if(nx<0||nx>=W||ny<0||ny>=H) continue;
-            const ni=ny*W+nx; if(defBg[ni]) continue;
-            const p=ni*4,r=px[p],g=px[p+1],b=px[p+2];
-            let isBgPx=false;
-            if(isDark){ isBgPx=(0.299*r+0.587*g+0.114*b)/255 < TIGHT; }
-            else { const dr=r-bgR,dg=g-bgG,db=b-bgB; isBgPx=Math.sqrt(dr*dr+dg*dg+db*db)<TIGHT; }
-            if(isBgPx){defBg[ni]=1;q1[q1t++]=ni;}
+      const { bgR, bgG, bgB, method, threshold, holeSeeds, apiW, apiH } = params;
+
+      // Score: how "background-like" is a pixel (0=fg, 1=bg)
+      function pixScore(r,g,b) {
+        if (method === "dark") {
+          return (0.299*r + 0.587*g + 0.114*b) / 255;
+        } else if (method === "light") {
+          // Invert: bright = bg
+          return 1 - (0.299*r + 0.587*g + 0.114*b) / 255;
+        } else {
+          // color distance from bg
+          const dr=r-bgR, dg=g-bgG, db=b-bgB;
+          return 1 - Math.min(1, Math.sqrt(dr*dr+dg*dg+db*db) / (threshold * 2.5));
+        }
+      }
+
+      const scores = new Float32Array(N);
+      for (let i=0; i<N; i++) {
+        scores[i] = pixScore(px[i*4], px[i*4+1], px[i*4+2]);
+      }
+
+      const TIGHT  = 0.80;  // unambiguous bg
+      const MEDIUM = 0.60;  // probable bg
+      const LOOSE  = 0.40;  // possible bg / fringe
+
+      const isBg = new Uint8Array(N);
+
+      function floodFill(thresh, extraSeeds) {
+        const q = new Int32Array(N * 2); let qh=0, qt=0;
+        function tryAdd(i) {
+          if (i>=0 && i<N && !isBg[i] && scores[i] >= thresh) {
+            isBg[i] = 1; q[qt++] = i;
           }
         }
-
-        // ── Phase 3: Loose-BG flood fill (wider threshold = "maybe bg") ──
-        const LOOSE = isDark ? 0.15 : 60;
-        const looseBg = new Uint8Array(N);
-        const q2 = new Int32Array(N*2); let q2h=0,q2t=0;
-        function seed2(i){if(!looseBg[i]){looseBg[i]=1;q2[q2t++]=i;}}
-        for(let x=0;x<W;x++){seed2(x);seed2((H-1)*W+x);}
-        for(let y=1;y<H-1;y++){seed2(y*W);seed2(y*W+W-1);}
-        while(q2h<q2t){
-          const idx=q2[q2h++],x=idx%W,y=(idx/W)|0;
-          for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
-            if(!dx&&!dy) continue;
-            const nx=x+dx,ny=y+dy;
-            if(nx<0||nx>=W||ny<0||ny>=H) continue;
-            const ni=ny*W+nx; if(looseBg[ni]) continue;
-            const p=ni*4,r=px[p],g=px[p+1],b=px[p+2];
-            let isBgPx=false;
-            if(isDark){ isBgPx=(0.299*r+0.587*g+0.114*b)/255 < LOOSE; }
-            else { const dr=r-bgR,dg=g-bgG,db=b-bgB; isBgPx=Math.sqrt(dr*dr+dg*dg+db*db)<LOOSE; }
-            if(isBgPx){looseBg[ni]=1;q2[q2t++]=ni;}
+        // Seed entire border
+        for (let x=0; x<W; x++) { tryAdd(x); tryAdd((H-1)*W+x); }
+        for (let y=1; y<H-1; y++) { tryAdd(y*W); tryAdd(y*W+W-1); }
+        // Seed interior bg areas provided by AI (scaled to full img size)
+        if (extraSeeds && apiW && apiH) {
+          extraSeeds.forEach(([sx, sy]) => {
+            const fx = Math.round(sx * W / apiW);
+            const fy = Math.round(sy * H / apiH);
+            if (fx>=0&&fx<W&&fy>=0&&fy<H) tryAdd(fy*W+fx);
+          });
+        }
+        while (qh < qt) {
+          const idx=q[qh++], x=idx%W, y=(idx/W)|0;
+          for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) {
+            if (!dx && !dy) continue;
+            const nx=x+dx, ny=y+dy;
+            if (nx<0||nx>=W||ny<0||ny>=H) continue;
+            const ni=ny*W+nx;
+            if (!isBg[ni] && scores[ni]>=thresh) { isBg[ni]=1; q[qt++]=ni; }
           }
         }
+      }
 
-        // ── Phase 4: Alpha matte computation ─────────────────────────────
-        // defBg=1  → alpha 0 (definitely background)
-        // looseBg=0 → alpha 255 (definitely foreground)
-        // between  → transition zone: alpha based on color similarity to bg
-        const alpha = new Float32Array(N);
-        for(let i=0;i<N;i++){
-          if(defBg[i]){ alpha[i]=0; continue; }
-          if(!looseBg[i]){ alpha[i]=255; continue; }
-          // Transition zone: compute how "bg-like" this pixel is
-          const p=i*4,r=px[p],g=px[p+1],b=px[p+2];
-          let sim=0;
-          if(isDark){
-            const lum=(0.299*r+0.587*g+0.114*b)/255;
-            sim = Math.max(0, 1-(lum/LOOSE)); // 0=foreground, 1=background
-          } else {
-            const dr=r-bgR,dg=g-bgG,db=b-bgB;
-            sim = Math.min(1, Math.sqrt(dr*dr+dg*dg+db*db)/LOOSE);
-            sim = 1-sim;
-          }
-          alpha[i] = Math.round((1-sim)*255);
-        }
+      floodFill(TIGHT,  params.holeSeeds);
+      floodFill(MEDIUM, params.holeSeeds);
+      floodFill(LOOSE,  params.holeSeeds);
 
-        // ── Phase 5: Gaussian blur on alpha (radius 1) for smooth edges ──
-        const sigma=1.0;
-        const kernel=[0.0625,0.25,0.375,0.25,0.0625]; // approx Gaussian σ=1
-        const tmp1 = new Float32Array(N);
-        // Horizontal pass
-        for(let y=0;y<H;y++) for(let x=0;x<W;x++){
-          let sum=0,wsum=0;
-          for(let k=-2;k<=2;k++){
-            const nx=x+k; if(nx<0||nx>=W) continue;
-            const w=kernel[k+2];
-            sum+=alpha[y*W+nx]*w; wsum+=w;
-          }
-          tmp1[y*W+x]=sum/wsum;
+      // Dilate 2px — removes anti-alias fringe
+      for (let pass=0; pass<2; pass++) {
+        const prev = new Uint8Array(isBg);
+        for (let y=1; y<H-1; y++) for (let x=1; x<W-1; x++) {
+          if (prev[y*W+x]) continue;
+          if (prev[(y-1)*W+x]||prev[(y+1)*W+x]||prev[y*W+x-1]||prev[y*W+x+1])
+            isBg[y*W+x] = 1;
         }
-        // Vertical pass
-        const blurred = new Float32Array(N);
-        for(let y=0;y<H;y++) for(let x=0;x<W;x++){
-          let sum=0,wsum=0;
-          for(let k=-2;k<=2;k++){
-            const ny=y+k; if(ny<0||ny>=H) continue;
-            const w=kernel[k+2];
-            sum+=tmp1[ny*W+x]*w; wsum+=w;
-          }
-          blurred[y*W+x]=sum/wsum;
-        }
+      }
 
-        // ── Phase 6: Apply final alpha — hard cut for clear bg, soft for edges ──
-        for(let i=0;i<N;i++){
-          // Use blurred alpha but snap near-0 and near-255 to hard values
-          let a = blurred[i];
-          if(a < 8)   a=0;
-          if(a > 247) a=255;
-          px[i*4+3] = Math.round(a);
-        }
+      // Build alpha map
+      const alpha = new Float32Array(N);
+      for (let i=0; i<N; i++) {
+        alpha[i] = isBg[i] ? 0 : 255;
+      }
 
-        ctx.putImageData(imageData, 0, 0);
-        updLayer(selLayer.id, { src: cv.toDataURL("image/png") });
-        resolve();
-      };
-      img.src = selLayer.src;
-    });
+      // Gaussian blur on alpha for smooth edges (σ≈1.2)
+      const kern = [0.0545, 0.2442, 0.4026, 0.2442, 0.0545];
+      const tmp = new Float32Array(N);
+      for (let y=0; y<H; y++) for (let x=0; x<W; x++) {
+        let s=0, w=0;
+        for (let k=-2; k<=2; k++) {
+          const nx=x+k; if(nx<0||nx>=W) continue;
+          s += alpha[y*W+nx]*kern[k+2]; w += kern[k+2];
+        }
+        tmp[y*W+x] = s/w;
+      }
+      for (let y=0; y<H; y++) for (let x=0; x<W; x++) {
+        let s=0, w=0;
+        for (let k=-2; k<=2; k++) {
+          const ny=y+k; if(ny<0||ny>=H) continue;
+          s += tmp[ny*W+x]*kern[k+2]; w += kern[k+2];
+        }
+        const a = s/w;
+        px[(y*W+x)*4+3] = Math.round(a < 12 ? 0 : a > 243 ? 255 : a);
+      }
+
+      ctx.putImageData(id, 0, 0);
+      return cv.toDataURL("image/png");
+    }
+
+    try {
+      const srcImg = await new Promise((res, rej) => {
+        const i = new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=selLayer.src;
+      });
+
+      // Downscale for API call (max 600px)
+      const MAX = 600;
+      const sc = Math.min(1, MAX / Math.max(srcImg.width, srcImg.height));
+      const AW = Math.round(srcImg.width*sc), AH = Math.round(srcImg.height*sc);
+      const apiCv = document.createElement("canvas");
+      apiCv.width=AW; apiCv.height=AH;
+      apiCv.getContext("2d").drawImage(srcImg,0,0,AW,AH);
+      const b64 = apiCv.toDataURL("image/jpeg",0.90).split(",")[1];
+
+      // ── Ask Claude to analyze the image background ────────────────────
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 512,
+          messages: [{
+            role: "user",
+            content: [
+              { type:"image", source:{ type:"base64", media_type:"image/jpeg", data:b64 } },
+              { type:"text", text:`Analyze this image for background removal. Reply ONLY with a JSON object, no markdown, no explanation:
+{
+  "bgR": number,
+  "bgG": number,
+  "bgB": number,
+  "method": "dark" | "light" | "color",
+  "threshold": number,
+  "holeSeeds": [[x,y],...]
+}
+
+Rules:
+- bgR/bgG/bgB: exact background color as 0-255 RGB values
+- method: "dark" if background is black/very dark, "light" if white/very light, "color" for any other solid color
+- threshold: 0-255, how tight the removal should be (lower=tighter, use 25-40 for clean solid bg, 50-70 for noisy/gradient bg)
+- holeSeeds: pixel coordinates [x,y] of any INTERIOR background areas not touching the border (e.g. inside a collar, inside a logo letter, between arm and body). Empty array [] if none. Max 15 points. These are in the ${AW}x${AH} image coordinate space.` }
+            ]
+          }]
+        })
+      });
+
+      const apiJson = await resp.json();
+      const raw = apiJson.content?.find(c=>c.type==="text")?.text?.trim() || "{}";
+      let p;
+      try { p = JSON.parse(raw); } catch(e) { p = {}; }
+
+      // Merge with fallback defaults
+      const bgR = p.bgR ?? 0, bgG = p.bgG ?? 0, bgB = p.bgB ?? 0;
+      const method = p.method ?? (((0.299*bgR+0.587*bgG+0.114*bgB)/255 < 0.15) ? "dark" : "color");
+      const threshold = p.threshold ?? 40;
+      const holeSeeds = Array.isArray(p.holeSeeds) ? p.holeSeeds : [];
+
+      const result = applyRemoval(srcImg, { bgR, bgG, bgB, method, threshold, holeSeeds, apiW: AW, apiH: AH });
+      updLayer(selLayer.id, { src: result });
+
+    } catch(err) {
+      console.error("BG remove error:", err);
+      // Fallback: run without AI params, auto-detect from corners
+      try {
+        const srcImg = await new Promise((res,rej)=>{
+          const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=selLayer.src;
+        });
+        const cv2=document.createElement("canvas"); cv2.width=srcImg.width; cv2.height=srcImg.height;
+        const ct2=cv2.getContext("2d"); ct2.drawImage(srcImg,0,0);
+        const id2=ct2.getImageData(0,0,cv2.width,cv2.height);
+        const p2=id2.data;
+        let cr=0,cg=0,cb=0;
+        [[0,0],[cv2.width-1,0],[0,cv2.height-1],[cv2.width-1,cv2.height-1]].forEach(([x,y])=>{
+          const i=(y*cv2.width+x)*4; cr+=p2[i]; cg+=p2[i+1]; cb+=p2[i+2];
+        });
+        cr/=4; cg/=4; cb/=4;
+        const lum=(0.299*cr+0.587*cg+0.114*cb)/255;
+        const method2 = lum<0.15?"dark":lum>0.85?"light":"color";
+        const result2 = applyRemoval(srcImg, { bgR:cr, bgG:cg, bgB:cb, method:method2, threshold:40, holeSeeds:[], apiW:srcImg.width, apiH:srcImg.height });
+        updLayer(selLayer.id, { src: result2 });
+      } catch(e2) {
+        alert("Background removal failed. Please try again.");
+      }
+    }
     setBgRemoving(false);
   }
   function deleteLayer(id) { updZone(d.activeZone, {layers:zone.layers.filter(l=>l.id!==id)}); if (selectedLayer===id) setSelectedLayer(null); }
