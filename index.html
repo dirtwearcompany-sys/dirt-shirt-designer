@@ -505,25 +505,21 @@ function AIGeneratorModal({ onClose, onAdd }) {
       const fullPrompt = [prompt.trim(), style, "dtf transfer design, clean edges"].filter(Boolean).join(", ");
       const encoded = encodeURIComponent(fullPrompt);
       const url = `https://image.pollinations.ai/prompt/${encoded}?width=${size.w}&height=${size.h}&seed=${seed}&nologo=true&model=flux`;
+
+      // Use fetch() — avoids crossOrigin canvas taint issues
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
       const dataUrl = await new Promise((res, rej) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-          // Draw to canvas to get dataUrl (avoids CORS issues on export)
-          const cv = document.createElement("canvas");
-          cv.width = img.naturalWidth || size.w;
-          cv.height = img.naturalHeight || size.h;
-          cv.getContext("2d").drawImage(img, 0, 0);
-          res(cv.toDataURL("image/png"));
-        };
-        img.onerror = () => rej(new Error("Image failed to load"));
-        // Small delay so browser doesn't race
-        setTimeout(() => { img.src = url; }, 50);
+        const reader = new FileReader();
+        reader.onload = e => res(e.target.result);
+        reader.onerror = rej;
+        reader.readAsDataURL(blob);
       });
       setImgUrl(dataUrl);
     } catch(e) {
       console.error("AI gen:", e);
-      setError("Generation failed — check your internet connection and try again.");
+      setError(`Generation failed: ${e.message}. Make sure you're online and not blocking external requests.`);
     }
     setLoading(false);
   }
