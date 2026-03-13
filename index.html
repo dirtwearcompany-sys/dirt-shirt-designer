@@ -501,26 +501,59 @@ function AIGeneratorModal({ onClose, onAdd }) {
   async function generate() {
     if (!prompt.trim()) return;
     setLoading(true); setError(null); setImgUrl(null);
-    try {
-      const fullPrompt = [prompt.trim(), style, "dtf transfer design, clean edges"].filter(Boolean).join(", ");
-      const encoded = encodeURIComponent(fullPrompt);
-      const url = `https://image.pollinations.ai/prompt/${encoded}?width=${size.w}&height=${size.h}&seed=${seed}&nologo=true&model=flux`;
 
-      // Use fetch() — avoids crossOrigin canvas taint issues
+    const fullPrompt = [prompt.trim(), style].filter(Boolean).join(", ");
+
+    // Try multiple providers in order
+    const tryFetch = async (url) => {
       const resp = await fetch(url);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const blob = await resp.blob();
-      const dataUrl = await new Promise((res, rej) => {
+      return new Promise((res, rej) => {
         const reader = new FileReader();
         reader.onload = e => res(e.target.result);
         reader.onerror = rej;
         reader.readAsDataURL(blob);
       });
-      setImgUrl(dataUrl);
-    } catch(e) {
-      console.error("AI gen:", e);
-      setError(`Generation failed: ${e.message}. Make sure you're online and not blocking external requests.`);
+    };
+
+    const providers = [
+      // Pollinations — flux
+      () => tryFetch(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${size.w}&height=${size.h}&seed=${seed}&nologo=true&model=flux`),
+      // Pollinations — turbo
+      () => tryFetch(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${size.w}&height=${size.h}&seed=${seed}&nologo=true&model=turbo`),
+      // Hugging Face — FLUX.1-schnell (free, no key needed for public models)
+      () => (async () => {
+        const resp = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inputs: fullPrompt, parameters: { width: size.w, height: size.h } })
+        });
+        if (!resp.ok) throw new Error(`HF HTTP ${resp.status}`);
+        const blob = await resp.blob();
+        return new Promise((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = e => res(e.target.result);
+          reader.onerror = rej;
+          reader.readAsDataURL(blob);
+        });
+      })(),
+    ];
+
+    let lastError = null;
+    for (let i = 0; i < providers.length; i++) {
+      try {
+        const dataUrl = await providers[i]();
+        setImgUrl(dataUrl);
+        setLoading(false);
+        return;
+      } catch(e) {
+        console.warn(`Provider ${i+1} failed:`, e.message);
+        lastError = e;
+      }
     }
+
+    setError(`All providers failed (${lastError?.message}). Pollinations may be down — try again in a moment.`);
     setLoading(false);
   }
 
@@ -540,7 +573,7 @@ function AIGeneratorModal({ onClose, onAdd }) {
         {/* Header */}
         <div className="ai-modal-header">
           <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:20,color:"#f97316",letterSpacing:2}}>AI IMAGE GENERATOR</span>
-          <span style={{fontSize:11,color:"#444",marginLeft:4}}>powered by Pollinations.ai · free · no key needed</span>
+          <span style={{fontSize:11,color:"#444",marginLeft:4}}>powered by Pollinations · FLUX · free · no key needed</span>
           <button onClick={onClose} style={{marginLeft:"auto",background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:18,lineHeight:1}}>✕</button>
         </div>
 
