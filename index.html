@@ -1207,26 +1207,26 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
       cpts.forEach(([x,y])=>{ const i=(y*W+x)*4; bgR+=px[i]; bgG+=px[i+1]; bgB+=px[i+2]; });
       bgR/=cpts.length; bgG/=cpts.length; bgB/=cpts.length;
 
-      // ── 2. Distance from bg color for every pixel ─────────────────────────
+      // ── 2. Euclidean distance from bg for every pixel ────────────────────
       const dist=new Float32Array(N);
       for(let i=0;i<N;i++){
         const dr=px[i*4]-bgR, dg=px[i*4+1]-bgG, db=px[i*4+2]-bgB;
         dist[i]=Math.sqrt(dr*dr+dg*dg+db*db);
       }
 
-      // ── 3. Multi-pass seeded flood fill ───────────────────────────────────
-      // KEY INSIGHT: each pass is seeded from ALL pixels marked bg so far.
-      // This lets later passes "crawl through" fringe pixels to reach
-      // enclosed background areas (e.g. the white patch between the legs).
-      // Safe because it still can't cross high-dist (subject) pixels.
+      // ── 3. Multi-pass flood fill — each pass re-seeds from all prior bg ──
+      // This lets later (looser) passes crawl through fringe pixels to reach
+      // enclosed background pockets. Still safe: can't cross high-dist subject pixels.
       const isBg=new Uint8Array(N);
 
       function floodPass(thresh) {
-        const q=new Uint32Array(N); let qh=0,qt=0;
+        const q=new Uint32Array(N*2); let qh=0,qt=0;
         function tryAdd(i){
           if(i>=0&&i<N&&!isBg[i]&&dist[i]<=thresh){ isBg[i]=1; q[qt++]=i; }
         }
-        // Seed from border
+        // Re-seed from ALL existing bg pixels first (handles enclosed areas)
+        for(let i=0;i<N;i++) if(isBg[i]) q[qt++]=i;
+        // Seed entire border
         for(let x=0;x<W;x++){
           if(!isBg[x])          { isBg[x]=1;         q[qt++]=x;          }
           if(!isBg[(H-1)*W+x]) { isBg[(H-1)*W+x]=1; q[qt++]=(H-1)*W+x; }
@@ -1235,11 +1235,6 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
           if(!isBg[y*W])        { isBg[y*W]=1;        q[qt++]=y*W;        }
           if(!isBg[y*W+W-1])    { isBg[y*W+W-1]=1;    q[qt++]=y*W+W-1;   }
         }
-        // Re-seed from ALL currently marked bg pixels (reaches enclosed areas)
-        for(let i=0;i<N;i++) if(isBg[i]&&!q.slice(0,qt).includes(i)) q[qt++]=i;
-        // Simpler: just re-scan and enqueue all bg pixels
-        qt=0; qh=0;
-        for(let i=0;i<N;i++) if(isBg[i]) q[qt++]=i;
         while(qh<qt){
           const idx=q[qh++],x=idx%W,y=(idx/W)|0;
           if(x>0)    tryAdd(idx-1);
@@ -1254,31 +1249,35 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
       }
 
       floodPass(30);   // tight: clear unambiguous bg
-      floodPass(55);   // medium: crawls through JPEG fringe, reaches enclosed areas
-      floodPass(85);   // loose: catches remaining soft fringe / shadows
+      floodPass(60);   // medium: JPEG fringe + anti-alias edges
+      floodPass(100);  // loose: soft shadows + compression artifacts
 
-      // ── 4. Apply alpha ────────────────────────────────────────────────────
+      // ── 4. Apply alpha with soft fringe ──────────────────────────────────
       for(let i=0;i<N;i++){
         if(!isBg[i]) continue;
         const d=dist[i];
-        if(d<=40){
-          px[i*4+3]=0;                               // definite bg → fully transparent
-        } else {
-          const t=Math.min(1,(d-40)/45);
-          px[i*4+3]=Math.round(Math.pow(t,1.5)*255); // soft fade at fringe
+        if(d<=40) px[i*4+3]=0;
+        else {
+          const t=Math.min(1,(d-40)/60);
+          px[i*4+3]=Math.round(Math.pow(t,1.5)*255);
         }
       }
 
-      // ── 5. Defringe: kill white halo on edge fg pixels ────────────────────
-      // Near-white fg pixels directly adjacent to removed bg get faded out
+      // ── 5. Edge cleanup: fade dark/light fringe on fg edge pixels ────────
+      // For each non-bg pixel adjacent to a removed pixel:
+      // if it's close to the bg color, fade it proportionally
+      const alphaSnap=new Uint8Array(N);
+      for(let i=0;i<N;i++) alphaSnap[i]=px[i*4+3];
+
       for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
         const i=y*W+x;
-        if(isBg[i]) continue;          // already removed
-        if(dist[i]>50) continue;       // not near-white, not a halo pixel
-        if(px[i*4+3]<200) continue;   // already semi-transparent
-        // Check if adjacent to removed bg
+        if(isBg[i]) continue;
+        if(alphaSnap[i]<10) continue;
         const nearBg=isBg[i-1]||isBg[i+1]||isBg[i-W]||isBg[i+W];
-        if(nearBg) px[i*4+3]=Math.round((dist[i]/50)*200);
+        if(!nearBg) continue;
+        // Fade fringe: the closer to bg color, the more transparent
+        const fringeFactor=Math.max(0, 1-dist[i]/120);
+        if(fringeFactor>0) px[i*4+3]=Math.round(alphaSnap[i]*(1-fringeFactor*0.85));
       }
 
       ctx.putImageData(id,0,0);
