@@ -1201,73 +1201,91 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
       const ctx=cv.getContext("2d"); ctx.drawImage(srcImg,0,0);
       const id=ctx.getImageData(0,0,W,H); const px=id.data;
 
-      // ── 1. Sample corners to get exact bg color ───────────────────────
-      // Use corners only — most reliable, avoids subject pixels
-      const corners=[[0,0],[W-1,0],[0,H-1],[W-1,H-1],
-                     [1,1],[W-2,1],[1,H-2],[W-2,H-2]];
+      // ── 1. Sample bg color from corners + a wider border sample ──────────
+      // Use many border points to get a robust bg color estimate
+      const samples=[];
+      const step = Math.max(1, Math.floor(Math.min(W,H)/20));
+      for(let x=0;x<W;x+=step){ samples.push([x,0]); samples.push([x,H-1]); }
+      for(let y=0;y<H;y+=step){ samples.push([0,y]); samples.push([W-1,y]); }
       let bgR=0,bgG=0,bgB=0;
-      corners.forEach(([x,y])=>{
+      samples.forEach(([x,y])=>{
         const i=(y*W+x)*4; bgR+=px[i]; bgG+=px[i+1]; bgB+=px[i+2];
       });
-      bgR/=corners.length; bgG/=corners.length; bgB/=corners.length;
+      bgR/=samples.length; bgG/=samples.length; bgB/=samples.length;
 
-      // ── 2. Color distance from bg for every pixel ─────────────────────
-      // Using Euclidean distance in RGB space — straightforward and correct
+      // ── 2. Euclidean color distance from bg for every pixel ───────────────
       const dist=new Float32Array(N);
       for(let i=0;i<N;i++){
         const dr=px[i*4]-bgR, dg=px[i*4+1]-bgG, db=px[i*4+2]-bgB;
-        dist[i]=Math.sqrt(dr*dr+dg*dg+db*db); // 0=same as bg, 441=opposite
+        dist[i]=Math.sqrt(dr*dr+dg*dg+db*db);
       }
 
-      // ── 3. Single flood fill from entire border ───────────────────────
-      // Only expand to pixels SIMILAR to bg (low distance)
-      // STRICT threshold — never expands into the subject
-      const THRESH = 30; // pixels within 30/441 color distance of bg get removed
+      // ── 3. Flood fill — two passes ────────────────────────────────────────
+      // CRITICAL: flood fill from border only — can NEVER jump inside subject
+      // even with a loose threshold, because connectivity keeps it at borders.
+      // Pass 1 tight (30): removes unambiguous bg
+      // Pass 2 loose (60): grows into JPEG fringe/anti-alias at edges
+      // Both seeded only from border — safe, won't eat into subject
       const isBg=new Uint8Array(N);
-      const q=new Uint32Array(N*2); let qh=0,qt=0;
 
-      function tryAdd(i){
-        if(i>=0&&i<N&&!isBg[i]&&dist[i]<=THRESH){ isBg[i]=1; q[qt++]=i; }
-      }
-      // Seed from ALL border pixels regardless of color
-      // (border pixels are always background by definition)
-      for(let x=0;x<W;x++){ isBg[x]=1; q[qt++]=x; isBg[(H-1)*W+x]=1; q[qt++]=(H-1)*W+x; }
-      for(let y=1;y<H-1;y++){ isBg[y*W]=1; q[qt++]=y*W; isBg[y*W+W-1]=1; q[qt++]=y*W+W-1; }
-
-      while(qh<qt){
-        const idx=q[qh++], x=idx%W, y=(idx/W)|0;
-        if(x>0)   tryAdd(idx-1);
-        if(x<W-1) tryAdd(idx+1);
-        if(y>0)   tryAdd(idx-W);
-        if(y<H-1) tryAdd(idx+W);
-        if(x>0   &&y>0)   tryAdd(idx-W-1);
-        if(x<W-1 &&y>0)   tryAdd(idx-W+1);
-        if(x>0   &&y<H-1) tryAdd(idx+W-1);
-        if(x<W-1 &&y<H-1) tryAdd(idx+W+1);
-      }
-
-      // ── 4. Erode 1px inward — removes anti-alias fringe ──────────────
-      const snap=new Uint8Array(isBg);
-      for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
-        if(snap[y*W+x]) continue;
-        if(snap[(y-1)*W+x]||snap[(y+1)*W+x]||snap[y*W+x-1]||snap[y*W+x+1])
-          isBg[y*W+x]=1;
-      }
-
-      // ── 5. Apply alpha — bg=0, edge pixels feathered, fg=255 ─────────
-      for(let i=0;i<N;i++){
-        if(isBg[i]){ px[i*4+3]=0; continue; }
-        // Feather only pixels directly adjacent to removed area
-        const x=i%W,y=(i/W)|0;
-        const onEdge=(x>0&&isBg[i-1])||(x<W-1&&isBg[i+1])||
-                     (y>0&&isBg[i-W])||(y<H-1&&isBg[i+W]);
-        if(onEdge){
-          // Alpha proportional to distance from bg color
-          // More different from bg = more opaque
-          const t=Math.min(1, dist[i]/(THRESH*2));
-          px[i*4+3]=Math.round(t*255);
+      function flood(thresh) {
+        const q=new Uint32Array(N); let qh=0,qt=0;
+        function tryAdd(i){
+          if(i>=0&&i<N&&!isBg[i]&&dist[i]<=thresh){ isBg[i]=1; q[qt++]=i; }
         }
-        // else: leave alpha as-is (fully opaque)
+        // Seed entire border unconditionally — border is always bg
+        for(let x=0;x<W;x++){
+          if(!isBg[x])            { isBg[x]=1;          q[qt++]=x;          }
+          if(!isBg[(H-1)*W+x])   { isBg[(H-1)*W+x]=1;  q[qt++]=(H-1)*W+x; }
+        }
+        for(let y=1;y<H-1;y++){
+          if(!isBg[y*W])          { isBg[y*W]=1;         q[qt++]=y*W;        }
+          if(!isBg[y*W+W-1])      { isBg[y*W+W-1]=1;     q[qt++]=y*W+W-1;   }
+        }
+        while(qh<qt){
+          const idx=q[qh++],x=idx%W,y=(idx/W)|0;
+          if(x>0)    tryAdd(idx-1);
+          if(x<W-1)  tryAdd(idx+1);
+          if(y>0)    tryAdd(idx-W);
+          if(y<H-1)  tryAdd(idx+W);
+          if(x>0   &&y>0)    tryAdd(idx-W-1);
+          if(x<W-1 &&y>0)    tryAdd(idx-W+1);
+          if(x>0   &&y<H-1)  tryAdd(idx+W-1);
+          if(x<W-1 &&y<H-1)  tryAdd(idx+W+1);
+        }
+      }
+
+      flood(30);  // tight pass — clear bg
+      flood(60);  // loose pass — JPEG fringe & anti-alias at edges
+
+      // ── 4. Compute final alpha ────────────────────────────────────────────
+      // Definite bg → 0
+      // Fringe (in loose but close to threshold) → soft alpha
+      // Subject → 255 (untouched)
+      for(let i=0;i<N;i++){
+        if(!isBg[i]){ /* keep original alpha */ continue; }
+        // Soft feather: pixels at the very edge of the threshold get partial alpha
+        // dist 0-30 → fully transparent; dist 30-60 → 0-128 alpha
+        const t = Math.min(1, dist[i]/60);
+        px[i*4+3] = dist[i] <= 30 ? 0 : Math.round(t * t * 180);
+      }
+
+      // ── 5. One-pass edge smoothing: blur alpha only at boundaries ─────────
+      const alphaSnap=new Uint8Array(N);
+      for(let i=0;i<N;i++) alphaSnap[i]=px[i*4+3];
+
+      for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
+        const i=y*W+x;
+        if(!isBg[i]) continue; // only touch removed pixels near edge
+        // 3x3 average with neighbors that are NOT bg (subject pixels)
+        let sum=0,cnt=0,hasSubject=false;
+        for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+          const ni=(y+dy)*W+(x+dx);
+          if(ni<0||ni>=N) continue;
+          sum+=alphaSnap[ni]; cnt++;
+          if(!isBg[ni]) hasSubject=true;
+        }
+        if(hasSubject) px[i*4+3]=Math.round(sum/cnt);
       }
 
       ctx.putImageData(id,0,0);
