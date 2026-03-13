@@ -503,39 +503,69 @@ function AIGeneratorModal({ onClose, onAdd }) {
     setLoading(true); setError(null); setImgUrl(null);
     try {
       const fullPrompt = [prompt.trim(), style].filter(Boolean).join(", ");
-      const encoded = encodeURIComponent(fullPrompt);
-      // Pollinations.ai free image generation — no key required
-      const url = `https://image.pollinations.ai/prompt/${encoded}?width=${size.w}&height=${size.h}&seed=${seed}&nologo=true&enhance=true`;
-      // Pre-load to confirm it resolves
-      await new Promise((res, rej) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload  = () => res(img);
-        img.onerror = () => rej(new Error("Generation failed"));
-        img.src = url;
+
+      // Use Anthropic API to generate image via claude + image tool
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-opus-4-5",
+          max_tokens: 1024,
+          tools: [{ type: "image_generation_20250522", name: "image_generation" }],
+          tool_choice: { type: "any" },
+          messages: [{
+            role: "user",
+            content: `Generate an image: ${fullPrompt}. Size: ${size.w}x${size.h}. Make it suitable for a DTF shirt transfer design with a clean transparent-friendly background.`
+          }]
+        })
       });
-      setImgUrl(url);
+
+      if (!resp.ok) throw new Error(`API error ${resp.status}`);
+      const data = await resp.json();
+
+      // Anthropic image_generation tool returns a tool_use block
+      // whose content array contains an image block with base64 data
+      let found = false;
+      for (const block of (data.content || [])) {
+        // Direct image block at top level
+        if (block.type === "image" && block.source?.data) {
+          setImgUrl(`data:${block.source.media_type || "image/png"};base64,${block.source.data}`);
+          found = true; break;
+        }
+        // Tool use block — image is nested in block.content[]
+        if (block.type === "tool_use" && Array.isArray(block.content)) {
+          const img = block.content.find(c => c.type === "image");
+          if (img?.source?.data) {
+            setImgUrl(`data:${img.source.media_type || "image/png"};base64,${img.source.data}`);
+            found = true; break;
+          }
+        }
+        // Tool result block
+        if (block.type === "tool_result" && Array.isArray(block.content)) {
+          const img = block.content.find(c => c.type === "image");
+          if (img?.source?.data) {
+            setImgUrl(`data:${img.source.media_type || "image/png"};base64,${img.source.data}`);
+            found = true; break;
+          }
+        }
+      }
+      if (!found) {
+        console.error("Full API response:", JSON.stringify(data));
+        throw new Error("No image returned — check console for details");
+      }
     } catch(e) {
-      setError("Generation failed — try rephrasing your prompt.");
+      console.error("AI gen error:", e);
+      setError("Generation failed — " + e.message);
     }
     setLoading(false);
   }
 
-  function reroll() { setSeed(Math.floor(Math.random()*99999)); }
+  function reroll() { generate(); }  // Re-run with same prompt for variation
 
   async function addToDesign() {
     if (!imgUrl) return;
-    // Fetch as blob → dataURL so it works as a layer (avoids CORS on canvas export)
-    try {
-      const resp = await fetch(imgUrl);
-      const blob = await resp.blob();
-      const reader = new FileReader();
-      reader.onload = e => { onAdd(e.target.result); onClose(); };
-      reader.readAsDataURL(blob);
-    } catch {
-      // Fallback: use URL directly
-      onAdd(imgUrl); onClose();
-    }
+    // imgUrl is already a dataUrl from the API
+    onAdd(imgUrl); onClose();
   }
 
   // Generate on Enter in prompt box
@@ -547,7 +577,7 @@ function AIGeneratorModal({ onClose, onAdd }) {
         {/* Header */}
         <div className="ai-modal-header">
           <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:20,color:"#f97316",letterSpacing:2}}>AI IMAGE GENERATOR</span>
-          <span style={{fontSize:11,color:"#444",marginLeft:4}}>powered by Pollinations.ai · free · no key needed</span>
+          <span style={{fontSize:11,color:"#444",marginLeft:4}}>powered by Claude AI · generates DTF-ready artwork</span>
           <button onClick={onClose} style={{marginLeft:"auto",background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:18,lineHeight:1}}>✕</button>
         </div>
 
