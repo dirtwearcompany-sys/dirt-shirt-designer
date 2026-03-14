@@ -33,33 +33,9 @@
     .layer-row.selected { background: rgba(249,115,22,0.09); border-color: rgba(249,115,22,0.27); }
     .design-card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 16px; transition: border-color 0.2s; }
     .design-card:hover { border-color: #f97316; }
-
-    /* ── Unified canvas wrapper: all zones render at the same pixel box ── */
-    .shirt-stage {
-      position: relative;
-      width: 420px;
-      height: 520px;
-      border-radius: 10px;
-      overflow: hidden;
-      background: transparent;
-      box-shadow: 0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56);
-    }
-
-    /* The shirt photo always fills the stage, centered, fully visible */
-    .shirt-bg {
-      position: absolute; inset: 0; z-index: 0;
-      display: flex; align-items: center; justify-content: center;
-      background: transparent;
-    }
-    .shirt-bg img {
-      width: 100%; height: 100%;
-      object-fit: contain;
-      object-position: center center;
-      display: block;
-      transition: opacity 0.18s ease;
-    }
-
-    /* ── BG Eraser Modal ── */
+    .shirt-stage { position: relative; width: 420px; height: 520px; border-radius: 10px; overflow: hidden; background: transparent; box-shadow: 0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56); }
+    .shirt-bg { position: absolute; inset: 0; z-index: 0; display: flex; align-items: center; justify-content: center; background: transparent; }
+    .shirt-bg img { width: 100%; height: 100%; object-fit: contain; object-position: center center; display: block; transition: opacity 0.18s ease; }
     .bge-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:200; display:flex; flex-direction:column; }
     .bge-toolbar { background:#141414; border-bottom:1px solid #222; padding:10px 16px; display:flex; align-items:center; gap:12px; flex-shrink:0; flex-wrap:wrap; }
     .bge-canvas-wrap { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; cursor:none; }
@@ -92,7 +68,6 @@
     .lib-title { font-family: 'Bebas Neue', cursive; font-size: 28px; color: #f97316; letter-spacing: 1px; margin: 0; }
     .empty-state { text-align: center; color: #555; padding-top: 80px; }
     .empty-icon { font-size: 48px; margin-bottom: 12px; }
-    /* Print-guide and art layers positioned inside the stage */
     .print-guide { position: absolute; left: 15%; top: 14%; width: 70%; height: 72%; border: 1px dashed rgba(255,255,255,0.07); border-radius: 4px; pointer-events: none; z-index: 2; }
     .art-hint { position: absolute; left: 15%; top: 14%; width: 70%; height: 72%; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; z-index: 5; }
     .slider-row { margin-bottom: 10px; }
@@ -106,16 +81,43 @@
     .dtf-box-val { font-family: 'Bebas Neue', cursive; font-size: 22px; color: #fff; letter-spacing: 1px; }
     .dtf-box-sub { font-size: 10px; color: #555; margin-top: 2px; }
     .dot-indicator { display: inline-block; width: 6px; height: 6px; border-radius: 50%; vertical-align: middle; margin-left: 6px; }
+
     /* ── Drawing Modal ── */
-    .draw-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.82); z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-    .draw-modal { background:#161616; border:1px solid #2a2a2a; border-radius:14px; display:flex; flex-direction:column; overflow:hidden; width:min(900px,95vw); height:min(680px,90vh); box-shadow:0 40px 120px rgba(0,0,0,0.8); }
-    .draw-toolbar { background:#111; border-bottom:1px solid #222; padding:8px 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0; }
-    .draw-tool-btn { padding:5px 10px; border-radius:6px; border:1px solid #333; background:transparent; color:#888; cursor:pointer; font-size:12px; font-family:'DM Mono',monospace; transition:all 0.15s; white-space:nowrap; }
+    .draw-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .draw-modal { background:#161616; border:1px solid #2a2a2a; border-radius:14px; display:flex; flex-direction:column; overflow:hidden; width:min(1100px,98vw); height:min(760px,94vh); box-shadow:0 40px 120px rgba(0,0,0,0.8); }
+    .draw-toolbar { background:#111; border-bottom:1px solid #222; padding:7px 12px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; flex-shrink:0; }
+    .draw-tool-btn { padding:5px 9px; border-radius:6px; border:1px solid #333; background:transparent; color:#888; cursor:pointer; font-size:11px; font-family:'DM Mono',monospace; transition:all 0.15s; white-space:nowrap; }
     .draw-tool-btn:hover { border-color:#555; color:#ccc; }
     .draw-tool-btn.active { background:#f97316; color:#000; border-color:#f97316; }
+    .draw-body { flex:1; display:flex; overflow:hidden; min-height:0; }
     .draw-canvas-wrap { flex:1; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#0d0d0d; position:relative; }
-    .draw-canvas { cursor:crosshair; display:block; touch-action:none; }
-    .draw-footer { background:#111; border-top:1px solid #222; padding:10px 14px; display:flex; align-items:center; gap:10px; flex-shrink:0; justify-content:flex-end; }
+    .draw-canvas { display:block; touch-action:none; }
+    /* Overlaid selection canvas — same size, layered on top */
+    .draw-sel-canvas { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none; }
+    .draw-footer { background:#111; border-top:1px solid #222; padding:9px 14px; display:flex; align-items:center; gap:10px; flex-shrink:0; justify-content:flex-end; }
+
+    /* ── Draw sidebar (layers panel) ── */
+    .draw-sidebar { width:200px; background:#0f0f0f; border-left:1px solid #1e1e1e; display:flex; flex-direction:column; flex-shrink:0; overflow:hidden; }
+    .draw-sidebar-header { padding:8px 10px; font-size:10px; color:#555; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #1a1a1a; display:flex; align-items:center; justify-content:space-between; }
+    .draw-layer-item { display:flex; align-items:center; gap:7px; padding:5px 8px; cursor:pointer; border-bottom:1px solid #111; transition:background 0.12s; border-left:3px solid transparent; }
+    .draw-layer-item:hover { background:rgba(255,255,255,0.04); }
+    .draw-layer-item.selected { background:rgba(249,115,22,0.08); border-left-color:#f97316; }
+    .draw-layer-thumb { width:32px; height:32px; border-radius:4px; object-fit:contain; background:#1a1a1a; flex-shrink:0; border:1px solid #2a2a2a; }
+    .draw-layer-label { font-size:10px; color:#aaa; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .draw-layer-del { background:none; border:none; color:#444; cursor:pointer; font-size:13px; padding:2px; line-height:1; flex-shrink:0; }
+    .draw-layer-del:hover { color:#ef4444; }
+    .draw-layer-vis { background:none; border:none; color:#555; cursor:pointer; font-size:11px; padding:2px; line-height:1; flex-shrink:0; }
+    .draw-layer-vis:hover { color:#ccc; }
+
+    /* ── Properties panel (right side of draw modal) ── */
+    .draw-props { width:180px; background:#0f0f0f; border-left:1px solid #1e1e1e; display:flex; flex-direction:column; flex-shrink:0; overflow-y:auto; }
+    .draw-props-section { padding:10px; border-bottom:1px solid #1a1a1a; }
+    .draw-props-label { font-size:9px; color:#444; text-transform:uppercase; letter-spacing:1px; margin-bottom:7px; }
+
+    /* Arrange panel inside draw */
+    .arrange-btn { flex:1; padding:5px 4px; font-size:10px; background:#1a1a1a; border:1px solid #2a2a2a; color:#888; border-radius:5px; cursor:pointer; font-family:'DM Mono',monospace; transition:all 0.12s; }
+    .arrange-btn:hover { border-color:#555; color:#ccc; }
+
     /* ── AI Image Generator Modal ── */
     .ai-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000; display:flex; align-items:center; justify-content:center; }
     .ai-modal { background:#161616; border:1px solid #2a2a2a; border-radius:14px; width:min(680px,94vw); display:flex; flex-direction:column; overflow:hidden; box-shadow:0 40px 120px rgba(0,0,0,0.8); }
@@ -132,48 +134,31 @@
     .ai-chip { padding:4px 10px; border-radius:20px; border:1px solid #333; background:transparent; color:#888; font-size:11px; cursor:pointer; font-family:'DM Mono',monospace; transition:all 0.15s; }
     .ai-chip:hover { border-color:#f97316; color:#f97316; }
     .ai-chip.active { background:#f97316; color:#000; border-color:#f97316; }
+    /* Tooltips */
+    [data-tip] { position:relative; }
+    [data-tip]:hover::after { content:attr(data-tip); position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:#222; border:1px solid #333; color:#ccc; font-size:10px; padding:3px 7px; border-radius:4px; white-space:nowrap; pointer-events:none; z-index:999; font-family:'DM Mono',monospace; }
   </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useRef, useEffect, useCallback } = React;
+const { useState, useRef, useEffect, useCallback, useMemo } = React;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🖼️  SHIRT IMAGES — REPLACE THE "#" PATHS WITH YOUR OWN IMAGE URLS OR FILE PATHS
-//     Example:  short_front: "images/short-front.png"
-//               short_front: "https://yoursite.com/shirt-front.jpg"
+// SHIRT IMAGE PATHS — replace "#" with your image URLs or file paths
 // ═══════════════════════════════════════════════════════════════════════════════
 const SHIRT_IMAGE_SRCS = {
-  // ── Short Sleeve ──────────────────────────────────────────
-  short_front:  "front_shortsleeve.png",   // Short Sleeve Front
-  short_back:   "back_shortsleeve.png",    // Short Sleeve Back
-  short_sleeve: "side_shortsleeve.png",    // Short Sleeve Sleeve
-  // ── Long Sleeve ───────────────────────────────────────────
-  long_front:   "back_longsleeve (1).png", // Long Sleeve Front
-  long_back:    "back_longsleeve.png",     // Long Sleeve Back
-  long_sleeve:  "side_longsleeve.png",     // Long Sleeve Sleeve
+  short_front:  "front_shortsleeve.png",
+  short_back:   "back_shortsleeve.png",
+  short_sleeve: "side_shortsleeve.png",
+  long_front:   "back_longsleeve (1).png",
+  long_back:    "back_longsleeve.png",
+  long_sleeve:  "side_longsleeve.png",
 };
-
-// ── BASE COLOR OF EACH SHIRT IMAGE ────────────────────────────────────────────
-// Set this to the actual shirt color in your photos so recoloring works
-// correctly. Common values: "#ffffff" white, "#c8c8c8" light gray, "#888" gray
 const ZONE_BASE_COLOR = {
-  short_front:  "#7B3A2A",  // ← short sleeve photos: red-brown
-  short_back:   "#7B3A2A",
-  short_sleeve: "#7B3A2A",
-  long_front:   "#ffffff",  // ← long sleeve photos: white
-  long_back:    "#ffffff",
-  long_sleeve:  "#ffffff",
+  short_front:"#7B3A2A", short_back:"#7B3A2A", short_sleeve:"#7B3A2A",
+  long_front:"#ffffff",  long_back:"#ffffff",   long_sleeve:"#ffffff",
 };
-
-// ── SHIRT IMAGE POSITION OFFSETS ──────────────────────────────────────────────
-// Fine-tune where each shirt sits inside the canvas.
-// x: negative = move left,  positive = move right  (% of canvas width)
-// y: negative = move up,    positive = move down   (% of canvas height)
-// s: scale multiplier — 1.0 = default fit, 1.1 = 10% bigger, 0.9 = 10% smaller
-// TIP: Use the live sliders in the app under each zone tab, then copy
-//      the values you like back here so they're saved permanently.
 const ZONE_OFFSET = {
   short_front:  { x: 0, y: 0, s: 1.0 },
   short_back:   { x: 0, y: 0, s: 1.0 },
@@ -182,252 +167,156 @@ const ZONE_OFFSET = {
   long_back:    { x: 0, y: 0, s: 1.0 },
   long_sleeve:  { x: 0, y: 0, s: 1.0 },
 };
-// ═══════════════════════════════════════════════════════════════════════════════
 
-// ── One fixed stage size for ALL zones — guarantees identical frame on every switch ──
-const STAGE_W = 420;
-const STAGE_H = 520;
-
-// Art-layer coordinate space still uses per-zone logical sizes for DTF math,
-// but we normalise them to the stage so positions stay consistent.
+const STAGE_W = 420, STAGE_H = 520;
 const ZONE_LOGICAL = {
   short_front:[380,460], short_back:[380,460], short_sleeve:[380,240],
   long_front:[380,510],  long_back:[380,510],  long_sleeve:[250,510],
 };
-
 const SHIRT_COLORS = [
-  { name:"White",       hex:"#FFFFFF" }, { name:"Black",      hex:"#1a1a1a" },
-  { name:"Navy",        hex:"#1B2A4A" }, { name:"Royal Blue", hex:"#2563EB" },
-  { name:"Red",         hex:"#DC2626" }, { name:"Forest",     hex:"#166534" },
-  { name:"Charcoal",    hex:"#374151" }, { name:"Maroon",     hex:"#7F1D1D" },
-  { name:"Gold",        hex:"#D97706" }, { name:"Purple",     hex:"#7C3AED" },
-  { name:"Pink",        hex:"#EC4899" }, { name:"Orange",     hex:"#EA580C" },
-  { name:"Teal",        hex:"#0D9488" }, { name:"Gray",       hex:"#9CA3AF" },
-  { name:"Tan",         hex:"#D4A574" }, { name:"Lt Blue",    hex:"#93C5FD" },
+  {name:"White",hex:"#FFFFFF"},{name:"Black",hex:"#1a1a1a"},{name:"Navy",hex:"#1B2A4A"},
+  {name:"Royal Blue",hex:"#2563EB"},{name:"Red",hex:"#DC2626"},{name:"Forest",hex:"#166534"},
+  {name:"Charcoal",hex:"#374151"},{name:"Maroon",hex:"#7F1D1D"},{name:"Gold",hex:"#D97706"},
+  {name:"Purple",hex:"#7C3AED"},{name:"Pink",hex:"#EC4899"},{name:"Orange",hex:"#EA580C"},
+  {name:"Teal",hex:"#0D9488"},{name:"Gray",hex:"#9CA3AF"},{name:"Tan",hex:"#D4A574"},{name:"Lt Blue",hex:"#93C5FD"},
 ];
 const SHIRT_ZONES = {
-  short: [
-    { id:"short_front",  label:"Short Sleeve – Front",  maxW:12, maxH:14 },
-    { id:"short_back",   label:"Short Sleeve – Back",   maxW:12, maxH:14 },
-    { id:"short_sleeve", label:"Short Sleeve – Sleeve", maxW:4,  maxH:4  },
+  short:[
+    {id:"short_front",label:"Short Sleeve – Front",maxW:12,maxH:14},
+    {id:"short_back",label:"Short Sleeve – Back",maxW:12,maxH:14},
+    {id:"short_sleeve",label:"Short Sleeve – Sleeve",maxW:4,maxH:4},
   ],
-  long: [
-    { id:"long_front",  label:"Long Sleeve – Front",  maxW:12, maxH:14 },
-    { id:"long_back",   label:"Long Sleeve – Back",   maxW:12, maxH:14 },
-    { id:"long_sleeve", label:"Long Sleeve – Sleeve", maxW:4,  maxH:14 },
+  long:[
+    {id:"long_front",label:"Long Sleeve – Front",maxW:12,maxH:14},
+    {id:"long_back",label:"Long Sleeve – Back",maxW:12,maxH:14},
+    {id:"long_sleeve",label:"Long Sleeve – Sleeve",maxW:4,maxH:14},
   ],
 };
 const ZONE_LABELS = {
-  short_front:"Short Sleeve Front", short_back:"Short Sleeve Back", short_sleeve:"Short Sleeve Sleeve",
-  long_front:"Long Sleeve Front",   long_back:"Long Sleeve Back",   long_sleeve:"Long Sleeve Sleeve",
+  short_front:"Short Sleeve Front",short_back:"Short Sleeve Back",short_sleeve:"Short Sleeve Sleeve",
+  long_front:"Long Sleeve Front",long_back:"Long Sleeve Back",long_sleeve:"Long Sleeve Sleeve",
 };
 
-function calcDTF(pctW, pctH, maxW, maxH) {
-  return { w:((pctW/100)*maxW).toFixed(1), h:((pctH/100)*maxH).toFixed(1) };
-}
-
-function blankDesign(name="New Design") {
-  function srcOrNull(key) { const s = SHIRT_IMAGE_SRCS[key]; return (s && s !== "#") ? s : null; }
-  return {
-    id: Date.now() + Math.random(),
-    name,
-    shirtColor: "#FFFFFF",
-    shirtType: "short",
-    activeZone: "short_front",
-    shirtImages: {
-      short_front:  srcOrNull("short_front"),
-      short_back:   srcOrNull("short_back"),
-      short_sleeve: srcOrNull("short_sleeve"),
-      long_front:   srcOrNull("long_front"),
-      long_back:    srcOrNull("long_back"),
-      long_sleeve:  srcOrNull("long_sleeve"),
-    },
-    zones: { short_front:{layers:[]}, short_back:{layers:[]}, short_sleeve:{layers:[]}, long_front:{layers:[]}, long_back:{layers:[]}, long_sleeve:{layers:[]} },
+function calcDTF(pctW,pctH,maxW,maxH){return{w:((pctW/100)*maxW).toFixed(1),h:((pctH/100)*maxH).toFixed(1)};}
+function hexToRgb(hex){const h=hex.replace('#','');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+function blankDesign(name="New Design"){
+  function srcOrNull(key){const s=SHIRT_IMAGE_SRCS[key];return(s&&s!=="#")?s:null;}
+  return{
+    id:Date.now()+Math.random(),name,shirtColor:"#FFFFFF",shirtType:"short",activeZone:"short_front",
+    shirtImages:{short_front:srcOrNull("short_front"),short_back:srcOrNull("short_back"),short_sleeve:srcOrNull("short_sleeve"),long_front:srcOrNull("long_front"),long_back:srcOrNull("long_back"),long_sleeve:srcOrNull("long_sleeve")},
+    zones:{short_front:{layers:[]},short_back:{layers:[]},short_sleeve:{layers:[]},long_front:{layers:[]},long_back:{layers:[]},long_sleeve:{layers:[]}},
   };
 }
 
-// ─── Color helpers (used by removeBg + download) ─────────────────────────────
-function hexToRgb(hex) {
-  const h = hex.replace('#','');
-  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
-}
-function colorDist(r1,g1,b1,r2,g2,b2){ return Math.abs(r1-r2)+Math.abs(g1-g2)+Math.abs(b1-b2); }
-
 // ─── ShirtBackground ─────────────────────────────────────────────────────────
-// Renders shirt photo exactly as-is for maximum realism.
-function ShirtBackground({ shirtImage, shirtColor, baseColor, offset }) {
-  const canvasRef = useRef(null);
-  const [naturalImg, setNaturalImg] = useState(null);
-
-  useEffect(() => {
-    if (!shirtImage) return;
-    const img = new Image();
-    img.onload = () => setNaturalImg(img);
-    img.src = shirtImage;
-  }, [shirtImage]);
-
-  useEffect(() => {
-    if (!naturalImg || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    // Always render at fixed stage size so all zones align consistently
-    const W = 420, H = 520;
-    canvas.width  = W;
-    canvas.height = H;
-    ctx.clearRect(0, 0, W, H);
-
-    // ── Auto-crop: detect actual shirt content bounds by trimming dark border ──
-    // Draw full image to a temp canvas first so we can scan pixels
-    const tmp = document.createElement("canvas");
-    tmp.width = naturalImg.width; tmp.height = naturalImg.height;
-    const tctx = tmp.getContext("2d");
-    tctx.drawImage(naturalImg, 0, 0);
-    const raw = tctx.getImageData(0, 0, tmp.width, tmp.height);
-    const rp = raw.data, RW = tmp.width, RH = tmp.height;
-
-    // Find bounding box of non-background pixels (lum > 0.06 for dark bg)
-    let minX=RW, maxX=0, minY=RH, maxY=0;
-    // Sample bg lum from corners to decide threshold
-    const cornerLum = (0.299*rp[0]+0.587*rp[1]+0.114*rp[2])/255;
-    const LUM_THRESH = cornerLum < 0.12 ? 0.06 : 0.94; // dark bg or light bg
-    const isLightBg = cornerLum >= 0.12;
-    for (let y=0; y<RH; y++) for (let x=0; x<RW; x++) {
+function ShirtBackground({shirtImage,shirtColor,baseColor,offset}){
+  const canvasRef=useRef(null);
+  const [naturalImg,setNaturalImg]=useState(null);
+  useEffect(()=>{
+    if(!shirtImage)return;
+    const img=new Image();
+    img.onload=()=>setNaturalImg(img);
+    img.src=shirtImage;
+  },[shirtImage]);
+  useEffect(()=>{
+    if(!naturalImg||!canvasRef.current)return;
+    const canvas=canvasRef.current;
+    const ctx=canvas.getContext("2d");
+    const W=420,H=520;
+    canvas.width=W;canvas.height=H;
+    ctx.clearRect(0,0,W,H);
+    const tmp=document.createElement("canvas");
+    tmp.width=naturalImg.width;tmp.height=naturalImg.height;
+    const tctx=tmp.getContext("2d");
+    tctx.drawImage(naturalImg,0,0);
+    const raw=tctx.getImageData(0,0,tmp.width,tmp.height);
+    const rp=raw.data,RW=tmp.width,RH=tmp.height;
+    let minX=RW,maxX=0,minY=RH,maxY=0;
+    const cornerLum=(0.299*rp[0]+0.587*rp[1]+0.114*rp[2])/255;
+    const LUM_THRESH=cornerLum<0.12?0.06:0.94;
+    const isLightBg=cornerLum>=0.12;
+    for(let y=0;y<RH;y++)for(let x=0;x<RW;x++){
       const i=(y*RW+x)*4;
       const lum=(0.299*rp[i]+0.587*rp[i+1]+0.114*rp[i+2])/255;
-      const isShirt = isLightBg ? lum < LUM_THRESH : lum > LUM_THRESH;
-      if (isShirt) {
-        if (x<minX) minX=x; if (x>maxX) maxX=x;
-        if (y<minY) minY=y; if (y>maxY) maxY=y;
-      }
+      const isShirt=isLightBg?lum<LUM_THRESH:lum>LUM_THRESH;
+      if(isShirt){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;}
     }
-    // Add small padding (2% of image) so shirt doesn't clip
-    const padX = Math.floor(RW * 0.02), padY = Math.floor(RH * 0.02);
-    minX = Math.max(0, minX-padX); maxX = Math.min(RW-1, maxX+padX);
-    minY = Math.max(0, minY-padY); maxY = Math.min(RH-1, maxY+padY);
-    const cropW = maxX - minX + 1, cropH = maxY - minY + 1;
-
-    // Draw cropped shirt into stage canvas, centered with contain scaling
-    const scale = Math.min(W / cropW, H / cropH) * 0.96; // 0.96 = slight inset margin
-    const dw = cropW * scale, dh = cropH * scale;
-    const dx = (W - dw) / 2, dy = (H - dh) / 2;
-    ctx.drawImage(naturalImg, minX, minY, cropW, cropH, dx, dy, dw, dh);
-
-    const data = ctx.getImageData(0, 0, W, H);
-    const px = data.data;
-
-    // ── Step 1: Sample border to detect background color & type ─────────
+    const padX=Math.floor(RW*0.02),padY=Math.floor(RH*0.02);
+    minX=Math.max(0,minX-padX);maxX=Math.min(RW-1,maxX+padX);
+    minY=Math.max(0,minY-padY);maxY=Math.min(RH-1,maxY+padY);
+    const cropW=maxX-minX+1,cropH=maxY-minY+1;
+    const scale=Math.min(W/cropW,H/cropH)*0.96;
+    const dw=cropW*scale,dh=cropH*scale;
+    const dx=(W-dw)/2,dy=(H-dh)/2;
+    ctx.drawImage(naturalImg,minX,minY,cropW,cropH,dx,dy,dw,dh);
+    const data=ctx.getImageData(0,0,W,H);
+    const px=data.data;
     let sr=0,sg=0,sb=0,sc2=0;
-    for (let x=0;x<W;x++) {
-      for (const y of [0,H-1]) { const i=(y*W+x)*4; sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc2++; }
-    }
-    for (let y=1;y<H-1;y++) {
-      for (const x of [0,W-1]) { const i=(y*W+x)*4; sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc2++; }
-    }
-    const bgR=Math.round(sr/sc2), bgG=Math.round(sg/sc2), bgB=Math.round(sb/sc2);
-    const bgLum = (0.299*bgR + 0.587*bgG + 0.114*bgB) / 255;
-    const isDarkBg = bgLum < 0.12; // true for black backgrounds
-
-    // ── Step 2: Flood-fill from border — bg detection method depends on bg type ──
-    // Dark bg: use luminosity threshold (avoids leaking into shirt edges)
-    // Light bg: use color-distance threshold
-    const isBg = new Uint8Array(W * H);
-    const queue = new Int32Array(W * H * 2);
-    let qHead=0, qTail=0;
-    function seedPx(idx) { if(!isBg[idx]){ isBg[idx]=1; queue[qTail++]=idx; } }
-    for (let x=0;x<W;x++) { seedPx(x); seedPx((H-1)*W+x); }
-    for (let y=1;y<H-1;y++) { seedPx(y*W); seedPx(y*W+W-1); }
-
-    while (qHead < qTail) {
-      const idx=queue[qHead++], x=idx%W, y=(idx/W)|0;
-      for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++) {
-        if (!dx&&!dy) continue;
-        const nx=x+dx, ny=y+dy;
-        if (nx<0||nx>=W||ny<0||ny>=H) continue;
-        const ni=ny*W+nx;
-        if (isBg[ni]) continue;
-        const np=ni*4;
-        const nr=px[np], ng=px[np+1], nb2=px[np+2];
-        let isBgPixel = false;
-        if (isDarkBg) {
-          // For black backgrounds: pixel is bg if it's dark (luminosity-based)
-          // Use a tight lum threshold — shirt edge pixels are brighter than pure black bg
-          const pixLum = (0.299*nr + 0.587*ng + 0.114*nb2) / 255;
-          isBgPixel = pixLum < 0.06;
-        } else {
-          // For light/colored backgrounds: use color distance from sampled bg
-          const dr=nr-bgR, dg=ng-bgG, db=nb2-bgB;
-          isBgPixel = Math.sqrt(dr*dr+dg*dg+db*db) < 35;
-        }
-        if (isBgPixel) { isBg[ni]=1; queue[qTail++]=ni; }
+    for(let x=0;x<W;x++){for(const y of[0,H-1]){const i=(y*W+x)*4;sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc2++;}}
+    for(let y=1;y<H-1;y++){for(const x of[0,W-1]){const i=(y*W+x)*4;sr+=px[i];sg+=px[i+1];sb+=px[i+2];sc2++;}}
+    const bgR=Math.round(sr/sc2),bgG=Math.round(sg/sc2),bgB=Math.round(sb/sc2);
+    const bgLum=(0.299*bgR+0.587*bgG+0.114*bgB)/255;
+    const isDarkBg=bgLum<0.12;
+    const isBg=new Uint8Array(W*H);
+    const queue=new Int32Array(W*H*2);
+    let qHead=0,qTail=0;
+    function seedPx(idx){if(!isBg[idx]){isBg[idx]=1;queue[qTail++]=idx;}}
+    for(let x=0;x<W;x++){seedPx(x);seedPx((H-1)*W+x);}
+    for(let y=1;y<H-1;y++){seedPx(y*W);seedPx(y*W+W-1);}
+    while(qHead<qTail){
+      const idx=queue[qHead++],x=idx%W,y=(idx/W)|0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(!dx&&!dy)continue;
+        const nx=x+dx,ny=y+dy;
+        if(nx<0||nx>=W||ny<0||ny>=H)continue;
+        const ni=ny*W+nx;if(isBg[ni])continue;
+        const np=ni*4,nr=px[np],ng=px[np+1],nb2=px[np+2];
+        let isBgPixel=false;
+        if(isDarkBg){const pixLum=(0.299*nr+0.587*ng+0.114*nb2)/255;isBgPixel=pixLum<0.06;}
+        else{const dr=nr-bgR,dg=ng-bgG,db=nb2-bgB;isBgPixel=Math.sqrt(dr*dr+dg*dg+db*db)<35;}
+        if(isBgPixel){isBg[ni]=1;queue[qTail++]=ni;}
       }
     }
-
-    // ── Step 3: Recolor ALL non-background pixels ─────────────────────────
-    // Convert each shirt pixel to grayscale luminosity, normalize against
-    // the photo's base shirt color, then multiply by target color.
-    // This preserves every wrinkle, shadow, and highlight perfectly.
-    const [bR,bG,bB] = hexToRgb(baseColor || "#ffffff");
-    const baseLum2 = (0.299*bR + 0.587*bG + 0.114*bB) / 255 || 1;
-    const [tR,tG,tB] = hexToRgb(shirtColor || "#ffffff");
-
-    for (let i=0; i<W*H; i++) {
-      if (isBg[i]) continue;
-      const pi=i*4;
-      if (px[pi+3] < 10) continue;
-      const lum = (0.299*px[pi] + 0.587*px[pi+1] + 0.114*px[pi+2]) / 255;
-      const norm = Math.min(lum / baseLum2, 1.3);
-      px[pi]   = Math.min(255, Math.round(tR * norm));
-      px[pi+1] = Math.min(255, Math.round(tG * norm));
-      px[pi+2] = Math.min(255, Math.round(tB * norm));
+    const[bR,bG,bB]=hexToRgb(baseColor||"#ffffff");
+    const baseLum2=(0.299*bR+0.587*bG+0.114*bB)/255||1;
+    const[tR,tG,tB]=hexToRgb(shirtColor||"#ffffff");
+    for(let i=0;i<W*H;i++){
+      if(isBg[i])continue;
+      const pi=i*4;if(px[pi+3]<10)continue;
+      const lum=(0.299*px[pi]+0.587*px[pi+1]+0.114*px[pi+2])/255;
+      const norm=Math.min(lum/baseLum2,1.3);
+      px[pi]=Math.min(255,Math.round(tR*norm));
+      px[pi+1]=Math.min(255,Math.round(tG*norm));
+      px[pi+2]=Math.min(255,Math.round(tB*norm));
     }
-    ctx.putImageData(data, 0, 0);
-  }, [naturalImg, shirtColor, baseColor]);
-
-  if (!shirtImage) return null;
-  const ox = offset?.x || 0;
-  const oy = offset?.y || 0;
-  const sc2 = offset?.s || 1.0;
-  return (
+    ctx.putImageData(data,0,0);
+  },[naturalImg,shirtColor,baseColor]);
+  if(!shirtImage)return null;
+  const ox=offset?.x||0,oy=offset?.y||0,sc2=offset?.s||1.0;
+  return(
     <div className="shirt-bg">
-      <canvas ref={canvasRef}
-        style={{
-          width:"100%", height:"100%",
-          display:"block",
-          transform:`translate(${ox}%, ${oy}%) scale(${sc2})`,
-          transformOrigin:"center center",
-          transition:"transform 0.1s ease",
-        }} />
+      <canvas ref={canvasRef} style={{width:"100%",height:"100%",display:"block",transform:`translate(${ox}%,${oy}%) scale(${sc2})`,transformOrigin:"center center",transition:"transform 0.1s ease"}} />
     </div>
   );
 }
 
 // ─── ImgSrcPanel ─────────────────────────────────────────────────────────────
-const ALL_ZONES_ORDERED = [
-  { id:"short_front",  }, { id:"short_back",  }, { id:"short_sleeve" },
-  { id:"long_front",   }, { id:"long_back",   }, { id:"long_sleeve"  },
+const ALL_ZONES_ORDERED=[
+  {id:"short_front"},{id:"short_back"},{id:"short_sleeve"},
+  {id:"long_front"},{id:"long_back"},{id:"long_sleeve"},
 ];
-function ImgSrcPanel({ shirtImages, onUpload }) {
-  const fileRefs = useRef({});
-  ALL_ZONES_ORDERED.forEach(z => { if (!fileRefs.current[z.id]) fileRefs.current[z.id] = React.createRef(); });
-  function handleFile(zoneId, e) {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => onUpload(zoneId, ev.target.result);
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  }
-  const shortDone = ["short_front","short_back","short_sleeve"].every(id => shirtImages[id]);
-  const longDone  = ["long_front","long_back","long_sleeve"].every(id => shirtImages[id]);
-  if (shortDone && longDone) return null;
-  return (
+function ImgSrcPanel({shirtImages,onUpload}){
+  const fileRefs=useRef({});
+  ALL_ZONES_ORDERED.forEach(z=>{if(!fileRefs.current[z.id])fileRefs.current[z.id]=React.createRef();});
+  function handleFile(zoneId,e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>onUpload(zoneId,ev.target.result);reader.readAsDataURL(file);e.target.value="";}
+  const shortDone=["short_front","short_back","short_sleeve"].every(id=>shirtImages[id]);
+  const longDone=["long_front","long_back","long_sleeve"].every(id=>shirtImages[id]);
+  if(shortDone&&longDone)return null;
+  return(
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flex:1,padding:"24px 32px",gap:10}}>
       <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:15,color:"#555",letterSpacing:2,marginBottom:4}}>REPLACE # WITH YOUR IMAGE PATHS</div>
-      {ALL_ZONES_ORDERED.map(z=>(
-        <input key={z.id} ref={fileRefs.current[z.id]} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(z.id,e)} />
-      ))}
-      {[{label:"Short Sleeve", ids:["short_front","short_back","short_sleeve"], done:shortDone},
-        {label:"Long Sleeve",  ids:["long_front","long_back","long_sleeve"],  done:longDone}
-      ].filter(g=>!g.done).map(group=>(
+      {ALL_ZONES_ORDERED.map(z=>(<input key={z.id} ref={fileRefs.current[z.id]} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleFile(z.id,e)} />))}
+      {[{label:"Short Sleeve",ids:["short_front","short_back","short_sleeve"],done:shortDone},{label:"Long Sleeve",ids:["long_front","long_back","long_sleeve"],done:longDone}].filter(g=>!g.done).map(group=>(
         <div key={group.label} style={{width:"100%",maxWidth:540}}>
           <div style={{fontSize:10,color:"#444",textTransform:"uppercase",letterSpacing:2,marginBottom:6,fontFamily:"'DM Mono',monospace"}}>{group.label}</div>
           <div style={{background:"#111",border:"1px solid #1e1e1e",borderRadius:8,overflow:"hidden"}}>
@@ -453,992 +342,1155 @@ function ImgSrcPanel({ shirtImages, onUpload }) {
 }
 
 // ─── Slider ──────────────────────────────────────────────────────────────────
-function Slider({ label, value, min, max, onChange }) {
-  return (
+function Slider({label,value,min,max,onChange}){
+  return(
     <div className="slider-row">
-      <div className="slider-top">
-        <span className="slider-key">{label}</span>
-        <span className="slider-val">{Math.round(value)}</span>
-      </div>
-      <input type="range" min={min} max={max} step={label.includes("°")?1:0.5}
-        value={value} onChange={e => onChange(parseFloat(e.target.value))} />
+      <div className="slider-top"><span className="slider-key">{label}</span><span className="slider-val">{Math.round(value)}</span></div>
+      <input type="range" min={min} max={max} step={label.includes("°")?1:0.5} value={value} onChange={e=>onChange(parseFloat(e.target.value))} />
     </div>
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── DrawingModal (enhanced — Google Drawings-style with layer panel) ────────
+// Features: Select/move/resize, pen, eraser, line, arrow, rect, ellipse, text,
+//           polyline, star, triangle, callout, fill/stroke, opacity, shadow,
+//           layer panel (reorder, delete, visibility, rename), undo/redo,
+//           zoom, grid snap, align tools, word-art text styles, image insert.
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── AIGeneratorModal ─────────────────────────────────────────────────────────
-// Uses Pollinations.ai — completely free, no API key needed.
-// Generates images via a simple URL fetch.
-const AI_STYLES = [
-  { label:"No style",       val:""                          },
-  { label:"Sticker",        val:"sticker art, white outline, transparent background" },
-  { label:"Vintage",        val:"vintage screen print, distressed, retro"            },
-  { label:"Minimalist",     val:"minimalist flat design, simple, clean lines"        },
-  { label:"Graffiti",       val:"graffiti street art, bold, urban"                   },
-  { label:"Watercolor",     val:"watercolor illustration, soft edges"                },
-  { label:"Pixel Art",      val:"pixel art, 8-bit, retro game style"                 },
-  { label:"Sketch",         val:"pencil sketch, hand drawn, ink"                     },
-  { label:"Neon",           val:"neon glow, dark background, vibrant colors"         },
-  { label:"Cartoon",        val:"cartoon illustration, bold outlines, flat color"    },
-];
-const AI_SIZES = [
-  { label:"Square 1:1",   w:512,  h:512  },
-  { label:"Wide 16:9",    w:768,  h:432  },
-  { label:"Tall 9:16",    w:432,  h:768  },
-  { label:"Portrait 3:4", w:512,  h:682  },
-];
+// Each "draw layer" is an object stored in state:
+//  { id, type, visible, name, ...typeData }
+// type: "bitmap" → src (dataUrl), x,y,w,h,opacity,rotation
+// type: "shape"  → shapeType, x,y,w,h, stroke,strokeW, fill,fillOpacity, opacity,rotation,shadow
+// type: "text"   → text,x,y,fontSize,fontFamily,color,bold,italic,align,opacity,rotation
 
-function AIGeneratorModal({ onClose, onAdd }) {
-  const [prompt, setPrompt]     = useState("");
-  const [style, setStyle]       = useState("");
-  const [size, setSize]         = useState(AI_SIZES[0]);
-  const [imgUrl, setImgUrl]     = useState(null);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState(null);
-  const [seed, setSeed]         = useState(()=>Math.floor(Math.random()*99999));
+const DRAW_CW = 800, DRAW_CH = 600;
 
-  async function generate() {
-    if (!prompt.trim()) return;
-    setLoading(true); setError(null); setImgUrl(null);
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 
-    const fullPrompt = [prompt.trim(), style].filter(Boolean).join(", ");
+function getBoundingBox(layer){
+  if(layer.type==="bitmap"||layer.type==="shape"||layer.type==="text"){
+    return{x:layer.x,y:layer.y,w:layer.w||100,h:layer.h||40};
+  }
+  return{x:layer.x||0,y:layer.y||0,w:50,h:50};
+}
 
-    // Try multiple providers in order
-    const tryFetch = async (url) => {
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const blob = await resp.blob();
-      return new Promise((res, rej) => {
-        const reader = new FileReader();
-        reader.onload = e => res(e.target.result);
-        reader.onerror = rej;
-        reader.readAsDataURL(blob);
-      });
-    };
+function DrawingModal({onClose,onAdd,initialImage}){
+  const canvasRef  = useRef(null); // main drawing canvas
+  const selCanvRef = useRef(null); // selection overlay
+  const wrapRef    = useRef(null);
 
-    const providers = [
-      // Pollinations — flux
-      () => tryFetch(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${size.w}&height=${size.h}&seed=${seed}&nologo=true&model=flux`),
-      // Pollinations — turbo
-      () => tryFetch(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${size.w}&height=${size.h}&seed=${seed}&nologo=true&model=turbo`),
-      // Hugging Face — FLUX.1-schnell (free, no key needed for public models)
-      () => (async () => {
-        const resp = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ inputs: fullPrompt, parameters: { width: size.w, height: size.h } })
-        });
-        if (!resp.ok) throw new Error(`HF HTTP ${resp.status}`);
-        const blob = await resp.blob();
-        return new Promise((res, rej) => {
-          const reader = new FileReader();
-          reader.onload = e => res(e.target.result);
-          reader.onerror = rej;
-          reader.readAsDataURL(blob);
-        });
-      })(),
-    ];
+  const [tool, setTool]   = useState("select");
+  const [color, setColor] = useState("#ffffff");
+  const [fill,  setFill]  = useState("#f97316");
+  const [useFill,setUseFill]=useState(true);
+  const [strokeW,setStrokeW]=useState(3);
+  const [fontSize,setFontSize]=useState(32);
+  const [fontFamily,setFontFamily]=useState("'DM Mono', monospace");
+  const [bold,setBold]=useState(false);
+  const [italic,setItalic]=useState(false);
+  const [opacity,setOpacity]=useState(100);
+  const [useShadow,setUseShadow]=useState(false);
+  const [zoom,setZoom]=useState(1);
+  const [gridSnap,setGridSnap]=useState(false);
+  const [showGrid,setShowGrid]=useState(false);
+  const [dash,setDash]=useState(false);   // dashed stroke
 
-    let lastError = null;
-    for (let i = 0; i < providers.length; i++) {
-      try {
-        const dataUrl = await providers[i]();
-        setImgUrl(dataUrl);
-        setLoading(false);
-        return;
-      } catch(e) {
-        console.warn(`Provider ${i+1} failed:`, e.message);
-        lastError = e;
-      }
+  // Layers state — array of layer objects, last = top
+  const [layers,setLayers]=useState([]);
+  const [selId,setSelId]=useState(null);
+  const [renaming,setRenaming]=useState(null); // layerId being renamed
+  const [renameVal,setRenameVal]=useState("");
+
+  // Undo/redo stacks
+  const undoStack=useRef([]);
+  const redoStack=useRef([]);
+
+  // Drawing state refs (don't need re-render)
+  const drawing = useRef(false);
+  const startPt  = useRef({x:0,y:0});
+  const lastPt   = useRef({x:0,y:0});
+  const penPoints= useRef([]);  // for pen/polyline accumulation
+  const currentBitmapLayer = useRef(null); // live pen layer id
+  const dragSel  = useRef(null); // {id, ox,oy,mx,my} for move
+  const resizeSel= useRef(null); // {id, edge, ox,oy,ow,oh}
+  const polyPts  = useRef([]);   // for polyline tool
+  const [polyActive,setPolyActive]=useState(false);
+
+  const snap = v => gridSnap ? Math.round(v/20)*20 : v;
+
+  // ── Init ──
+  useEffect(()=>{
+    if(initialImage){
+      const img=new Image();
+      img.onload=()=>{
+        const asp=img.width/img.height;
+        const w=Math.min(DRAW_CW*0.8,img.width), h=w/asp;
+        const layer={id:uid(),type:"bitmap",visible:true,name:"Uploaded",src:initialImage,x:(DRAW_CW-w)/2,y:(DRAW_CH-h)/2,w,h,opacity:100,rotation:0};
+        setLayers([layer]);
+        pushHistory([layer]);
+      };
+      img.src=initialImage;
+    } else {
+      pushHistory([]);
+    }
+  },[]);
+
+  function pushHistory(ls){
+    undoStack.current=[...undoStack.current,JSON.stringify(ls??layers)].slice(-40);
+    redoStack.current=[];
+  }
+  function undo(){
+    if(undoStack.current.length<2)return;
+    const top=undoStack.current[undoStack.current.length-1];
+    redoStack.current=[top,...redoStack.current];
+    undoStack.current=undoStack.current.slice(0,-1);
+    setLayers(JSON.parse(undoStack.current[undoStack.current.length-1]));
+    setSelId(null);
+  }
+  function redo(){
+    if(!redoStack.current.length)return;
+    const next=redoStack.current[0];
+    redoStack.current=redoStack.current.slice(1);
+    undoStack.current=[...undoStack.current,next];
+    setLayers(JSON.parse(next));
+  }
+
+  // ── Redraw canvas when layers change ──
+  useEffect(()=>{renderAll();},[layers,selId,showGrid,zoom]);
+
+  function renderAll(){
+    const canvas=canvasRef.current; if(!canvas)return;
+    const ctx=canvas.getContext("2d");
+    const W=DRAW_CW,H=DRAW_CH;
+    ctx.clearRect(0,0,W,H);
+
+    // Grid
+    if(showGrid){
+      ctx.strokeStyle="rgba(255,255,255,0.06)";ctx.lineWidth=0.5;ctx.setLineDash([]);
+      for(let x=0;x<W;x+=20){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+      for(let y=0;y<H;y+=20){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
     }
 
-    setError(`All providers failed (${lastError?.message}). Pollinations may be down — try again in a moment.`);
-    setLoading(false);
+    // Layers bottom → top
+    for(const layer of layers){
+      if(!layer.visible)continue;
+      ctx.save();
+      ctx.globalAlpha=(layer.opacity??100)/100;
+      // Rotation around layer center
+      const bb=getBoundingBox(layer);
+      const cx=bb.x+bb.w/2, cy=bb.y+bb.h/2;
+      ctx.translate(cx,cy);ctx.rotate(((layer.rotation)||0)*Math.PI/180);ctx.translate(-cx,-cy);
+
+      if(layer.type==="bitmap"){
+        const img=imageCache.current[layer.src];
+        if(img) ctx.drawImage(img,layer.x,layer.y,layer.w,layer.h);
+      } else if(layer.type==="shape"){
+        renderShape(ctx,layer);
+      } else if(layer.type==="text"){
+        renderText(ctx,layer);
+      } else if(layer.type==="pen"){
+        renderPenLayer(ctx,layer);
+      }
+      ctx.restore();
+    }
+
+    // Selection handles
+    if(selId){
+      const layer=layers.find(l=>l.id===selId);
+      if(layer&&layer.visible){
+        const bb=getBoundingBox(layer);
+        const ctx2=canvasRef.current.getContext("2d");
+        ctx2.save();
+        const cx=bb.x+bb.w/2,cy=bb.y+bb.h/2;
+        ctx2.translate(cx,cy);ctx2.rotate(((layer.rotation)||0)*Math.PI/180);ctx2.translate(-cx,-cy);
+        ctx2.strokeStyle="#f97316";ctx2.lineWidth=2;ctx2.setLineDash([4,3]);
+        ctx2.strokeRect(bb.x-2,bb.y-2,bb.w+4,bb.h+4);
+        ctx2.setLineDash([]);
+        // Corner handles
+        for(const[hx,hy] of[[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h]]){
+          ctx2.fillStyle="#f97316";ctx2.beginPath();ctx2.arc(hx,hy,5,0,Math.PI*2);ctx2.fill();
+        }
+        // Rotation handle
+        ctx2.strokeStyle="#f97316";ctx2.lineWidth=1.5;ctx2.setLineDash([]);
+        ctx2.beginPath();ctx2.moveTo(cx,bb.y-2);ctx2.lineTo(cx,bb.y-22);ctx2.stroke();
+        ctx2.fillStyle="#f97316";ctx2.beginPath();ctx2.arc(cx,bb.y-26,5,0,Math.PI*2);ctx2.fill();
+        ctx2.restore();
+      }
+    }
   }
 
-  function reroll() { generate(); }  // Re-run with same prompt for variation
-
-  function addToDesign() {
-    if (!imgUrl) return;
-    onAdd(imgUrl); onClose();
+  function renderShape(ctx,layer){
+    ctx.strokeStyle=layer.stroke||"#ffffff";
+    ctx.lineWidth=layer.strokeW||2;
+    ctx.setLineDash(layer.dash?[8,4]:[]);
+    if(layer.useShadow){ctx.shadowColor="rgba(0,0,0,0.6)";ctx.shadowBlur=12;ctx.shadowOffsetX=3;ctx.shadowOffsetY=3;}
+    const{x,y,w,h}=layer;
+    if(layer.useFill){ctx.fillStyle=layer.fill||"#f97316";ctx.globalAlpha*=(layer.fillOpacity??100)/100;}
+    ctx.beginPath();
+    if(layer.shapeType==="rect")     {ctx.rect(x,y,w,h);}
+    else if(layer.shapeType==="ellipse"){ctx.ellipse(x+w/2,y+h/2,Math.abs(w/2),Math.abs(h/2),0,0,Math.PI*2);}
+    else if(layer.shapeType==="line"){ctx.moveTo(x,y);ctx.lineTo(x+w,y+h);}
+    else if(layer.shapeType==="arrow"){
+      const angle=Math.atan2(h,w),head=Math.max(14,layer.strokeW*4);
+      const ex=x+w,ey=y+h;
+      ctx.moveTo(x,y);ctx.lineTo(ex,ey);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(ex,ey);
+      ctx.lineTo(ex-head*Math.cos(angle-0.4),ey-head*Math.sin(angle-0.4));
+      ctx.lineTo(ex-head*Math.cos(angle+0.4),ey-head*Math.sin(angle+0.4));
+      ctx.closePath();ctx.fillStyle=layer.stroke||"#ffffff";ctx.fill();
+      ctx.setLineDash([]);ctx.shadowColor="transparent";return;
+    }
+    else if(layer.shapeType==="triangle"){ctx.moveTo(x+w/2,y);ctx.lineTo(x+w,y+h);ctx.lineTo(x,y+h);ctx.closePath();}
+    else if(layer.shapeType==="star"){
+      const cx2=x+w/2,cy2=y+h/2,or=Math.min(w,h)/2,ir=or*0.45,pts=5;
+      for(let i=0;i<pts*2;i++){
+        const r=i%2===0?or:ir,a=(i*Math.PI/pts)-Math.PI/2;
+        i===0?ctx.moveTo(cx2+r*Math.cos(a),cy2+r*Math.sin(a)):ctx.lineTo(cx2+r*Math.cos(a),cy2+r*Math.sin(a));
+      }
+      ctx.closePath();
+    }
+    else if(layer.shapeType==="diamond"){ctx.moveTo(x+w/2,y);ctx.lineTo(x+w,y+h/2);ctx.lineTo(x+w/2,y+h);ctx.lineTo(x,y+h/2);ctx.closePath();}
+    else if(layer.shapeType==="hexagon"){
+      const cx2=x+w/2,cy2=y+h/2,r=Math.min(w,h)/2;
+      for(let i=0;i<6;i++){const a=(i*Math.PI/3)-Math.PI/6;i===0?ctx.moveTo(cx2+r*Math.cos(a),cy2+r*Math.sin(a)):ctx.lineTo(cx2+r*Math.cos(a),cy2+r*Math.sin(a));}
+      ctx.closePath();
+    }
+    else if(layer.shapeType==="callout"){
+      const r=10;
+      ctx.roundRect?ctx.roundRect(x,y,w,h*0.75,r):(ctx.rect(x,y,w,h*0.75));
+      ctx.moveTo(x+w*0.25,y+h*0.75);ctx.lineTo(x+w*0.15,y+h);ctx.lineTo(x+w*0.4,y+h*0.75);
+    }
+    if(layer.useFill){ctx.fill();}
+    ctx.stroke();
+    ctx.setLineDash([]);ctx.shadowColor="transparent";ctx.shadowBlur=0;
   }
 
-  // Generate on Enter in prompt box
-  function onKeyDown(e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); generate(); } }
+  function renderText(ctx,layer){
+    const style=[layer.italic?"italic":"",layer.bold?"bold":"",`${layer.fontSize||32}px`,layer.fontFamily||"'DM Mono',monospace"].filter(Boolean).join(" ");
+    ctx.font=style;
+    if(layer.useShadow){ctx.shadowColor="rgba(0,0,0,0.7)";ctx.shadowBlur=8;ctx.shadowOffsetX=2;ctx.shadowOffsetY=2;}
+    ctx.fillStyle=layer.color||"#ffffff";
+    ctx.textAlign=layer.align||"left";
+    ctx.textBaseline="top";
+    // word wrap
+    const maxW=layer.w||300;
+    const words=(layer.text||"").split(" ");
+    let line="",lineY=layer.y;
+    const lh=(layer.fontSize||32)*1.3;
+    for(const word of words){
+      const test=line?line+" "+word:word;
+      if(ctx.measureText(test).width>maxW&&line){
+        ctx.fillText(line,layer.x,lineY);
+        line=word;lineY+=lh;
+      } else line=test;
+    }
+    ctx.fillText(line,layer.x,lineY);
+    ctx.shadowColor="transparent";ctx.shadowBlur=0;
+    // Update height to match actual text
+    const lines=Math.ceil((layer.text||"").split("\n").length);
+    if(!layer.h||layer.h<lh*lines){ /* will update on commit */ }
+  }
 
-  return (
-    <div className="ai-modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className="ai-modal">
-        {/* Header */}
-        <div className="ai-modal-header">
-          <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:20,color:"#f97316",letterSpacing:2}}>AI IMAGE GENERATOR</span>
-          <span style={{fontSize:11,color:"#444",marginLeft:4}}>powered by Pollinations · FLUX · free · no key needed</span>
-          <button onClick={onClose} style={{marginLeft:"auto",background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:18,lineHeight:1}}>✕</button>
+  function renderPenLayer(ctx,layer){
+    if(!layer.points||layer.points.length<2)return;
+    ctx.strokeStyle=layer.stroke||"#ffffff";
+    ctx.lineWidth=layer.strokeW||3;
+    ctx.lineCap="round";ctx.lineJoin="round";
+    ctx.setLineDash([]);
+    ctx.globalCompositeOperation=layer.eraser?"destination-out":"source-over";
+    ctx.beginPath();ctx.moveTo(layer.points[0].x,layer.points[0].y);
+    for(const p of layer.points.slice(1)) ctx.lineTo(p.x,p.y);
+    ctx.stroke();
+    ctx.globalCompositeOperation="source-over";
+  }
+
+  // Image cache so we don't reload on every render
+  const imageCache=useRef({});
+  useEffect(()=>{
+    layers.forEach(l=>{
+      if(l.type==="bitmap"&&l.src&&!imageCache.current[l.src]){
+        const img=new Image();img.onload=()=>{imageCache.current[l.src]=img;renderAll();};img.src=l.src;
+      }
+    });
+  },[layers]);
+
+  // ── Canvas coordinate helper ──
+  function getPos(e){
+    const rect=canvasRef.current.getBoundingClientRect();
+    const scaleX=DRAW_CW/rect.width,scaleY=DRAW_CH/rect.height;
+    const cl=e.touches?e.touches[0]:e;
+    return{x:snap(Math.round((cl.clientX-rect.left)*scaleX)),y:snap(Math.round((cl.clientY-rect.top)*scaleY))};
+  }
+
+  // ── Hit test ──
+  function hitTest(x,y){
+    for(let i=layers.length-1;i>=0;i--){
+      const l=layers[i];if(!l.visible)continue;
+      const bb=getBoundingBox(l);
+      if(x>=bb.x-4&&x<=bb.x+bb.w+4&&y>=bb.y-4&&y<=bb.y+bb.h+4)return l;
+    }
+    return null;
+  }
+  function hitHandle(x,y,layer){
+    if(!layer)return null;
+    const bb=getBoundingBox(layer);
+    const cx=bb.x+bb.w/2;
+    if(Math.hypot(x-cx,y-(bb.y-26))<10)return"rotate";
+    const corners=[["tl",bb.x,bb.y],["tr",bb.x+bb.w,bb.y],["bl",bb.x,bb.y+bb.h],["br",bb.x+bb.w,bb.y+bb.h]];
+    for(const[id,hx,hy] of corners){if(Math.hypot(x-hx,y-hy)<8)return id;}
+    return null;
+  }
+
+  function onPointerDown(e){
+    e.preventDefault();
+    const p=getPos(e);
+    if(tool==="select"){
+      const selLayer=layers.find(l=>l.id===selId);
+      const handle=selLayer?hitHandle(p.x,p.y,selLayer):null;
+      if(handle==="rotate"){
+        const bb=getBoundingBox(selLayer);
+        dragSel.current={id:selId,mode:"rotate",cx:bb.x+bb.w/2,cy:bb.y+bb.h/2,startAngle:Math.atan2(p.y-(bb.y+bb.h/2),p.x-(bb.x+bb.w/2)),origRot:selLayer.rotation||0};
+        drawing.current=true;return;
+      }
+      if(handle&&handle!=="rotate"){
+        const bb=getBoundingBox(selLayer);
+        resizeSel.current={id:selId,edge:handle,startX:p.x,startY:p.y,ox:selLayer.x,oy:selLayer.y,ow:selLayer.w||100,oh:selLayer.h||40};
+        drawing.current=true;return;
+      }
+      const hit=hitTest(p.x,p.y);
+      if(hit){
+        setSelId(hit.id);
+        dragSel.current={id:hit.id,mode:"move",startX:p.x,startY:p.y,ox:hit.x,oy:hit.y};
+        drawing.current=true;
+      } else {setSelId(null);}
+      return;
+    }
+    if(tool==="text"){handleTextClick(p);return;}
+    if(tool==="polyline"){
+      if(!polyActive){
+        setPolyActive(true);
+        polyPts.current=[p];
+      } else {
+        polyPts.current=[...polyPts.current,p];
+      }
+      return;
+    }
+    drawing.current=true;
+    startPt.current=p;lastPt.current=p;
+    if(tool==="pen"||tool==="eraser"){
+      penPoints.current=[p];
+      const newLayer={id:uid(),type:"pen",visible:true,name:tool==="eraser"?"Eraser":"Stroke",
+        points:[p],stroke:color,strokeW:tool==="eraser"?strokeW*3:strokeW,eraser:tool==="eraser"};
+      currentBitmapLayer.current=newLayer.id;
+      setLayers(ls=>[...ls,newLayer]);
+    }
+  }
+
+  function onPointerMove(e){
+    if(!drawing.current)return;
+    e.preventDefault();
+    const p=getPos(e);
+
+    if(tool==="select"&&dragSel.current){
+      const{id,mode}=dragSel.current;
+      if(mode==="rotate"){
+        const{cx,cy,startAngle,origRot}=dragSel.current;
+        const angle=Math.atan2(p.y-cy,p.x-cx);
+        const delta=(angle-startAngle)*180/Math.PI;
+        setLayers(ls=>ls.map(l=>l.id===id?{...l,rotation:(origRot+delta+360)%360}:l));
+      } else if(mode==="move"){
+        const{startX,startY,ox,oy}=dragSel.current;
+        setLayers(ls=>ls.map(l=>l.id===id?{...l,x:snap(ox+p.x-startX),y:snap(oy+p.y-startY)}:l));
+      }
+      return;
+    }
+    if(tool==="select"&&resizeSel.current){
+      const{id,edge,startX,startY,ox,oy,ow,oh}=resizeSel.current;
+      const dx=p.x-startX,dy=p.y-startY;
+      let nx=ox,ny=oy,nw=ow,nh=oh;
+      if(edge.includes("r")) nw=Math.max(20,ow+dx);
+      if(edge.includes("b")) nh=Math.max(20,oh+dy);
+      if(edge.includes("l")){nx=ox+dx;nw=Math.max(20,ow-dx);}
+      if(edge.includes("t")){ny=oy+dy;nh=Math.max(20,oh-dy);}
+      setLayers(ls=>ls.map(l=>l.id===id?{...l,x:nx,y:ny,w:nw,h:nh}:l));
+      return;
+    }
+
+    if(tool==="pen"||tool==="eraser"){
+      penPoints.current=[...penPoints.current,p];
+      setLayers(ls=>ls.map(l=>l.id===currentBitmapLayer.current?{...l,points:penPoints.current}:l));
+      return;
+    }
+    lastPt.current=p;
+    // For shape tools, update a preview layer
+    if(["rect","ellipse","line","arrow","triangle","star","diamond","hexagon","callout"].includes(tool)){
+      const id=currentBitmapLayer.current||"preview_"+tool;
+      const x=Math.min(startPt.current.x,p.x),y=Math.min(startPt.current.y,p.y);
+      const w=Math.abs(p.x-startPt.current.x),h=Math.abs(p.y-startPt.current.y);
+      const shapeData={x,y,w:Math.max(2,w),h:Math.max(2,h),
+        ...(tool==="line"||tool==="arrow")?{x:startPt.current.x,y:startPt.current.y,w:p.x-startPt.current.x,h:p.y-startPt.current.y}:{},
+      };
+      if(!currentBitmapLayer.current){
+        const newLayer={id,type:"shape",visible:true,name:tool,shapeType:tool,...shapeData,
+          stroke:color,strokeW,fill,useFill,fillOpacity:opacity,dash,useShadow,opacity:100,rotation:0};
+        currentBitmapLayer.current=id;
+        setLayers(ls=>[...ls,newLayer]);
+      } else {
+        setLayers(ls=>ls.map(l=>l.id===id?{...l,...shapeData}:l));
+      }
+    }
+  }
+
+  function onPointerUp(e){
+    if(!drawing.current)return;
+    drawing.current=false;
+    if(dragSel.current){
+      pushHistory();
+      dragSel.current=null;return;
+    }
+    if(resizeSel.current){
+      pushHistory();
+      resizeSel.current=null;return;
+    }
+    if(tool==="pen"||tool==="eraser"){
+      currentBitmapLayer.current=null;
+      penPoints.current=[];
+      pushHistory();return;
+    }
+    if(currentBitmapLayer.current&&["rect","ellipse","line","arrow","triangle","star","diamond","hexagon","callout"].includes(tool)){
+      currentBitmapLayer.current=null;
+      pushHistory();
+    }
+  }
+
+  function handleTextClick(p){
+    const existing=hitTest(p.x,p.y);
+    if(existing&&existing.type==="text"){setSelId(existing.id);return;}
+    const text=window.prompt("Enter text:");
+    if(!text)return;
+    const lh=(fontSize*1.3);
+    const lines=text.split("\n").length;
+    const newLayer={id:uid(),type:"text",visible:true,name:text.slice(0,16)||"Text",
+      text,x:p.x,y:p.y,w:300,h:lh*lines+10,fontSize,fontFamily,color,bold,italic,
+      align:"left",opacity:100,rotation:0,useShadow};
+    setLayers(ls=>[...ls,newLayer]);
+    pushHistory([...layers,newLayer]);
+    setSelId(newLayer.id);
+  }
+
+  function finishPolyline(){
+    if(polyPts.current.length<2){setPolyActive(false);polyPts.current=[];return;}
+    const pts=polyPts.current;
+    const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
+    const minX=Math.min(...xs),minY=Math.min(...ys),maxX=Math.max(...xs),maxY=Math.max(...ys);
+    const newLayer={id:uid(),type:"pen",visible:true,name:"Polyline",
+      points:pts,stroke:color,strokeW,eraser:false};
+    setLayers(ls=>[...ls,newLayer]);
+    pushHistory([...layers,newLayer]);
+    setPolyActive(false);polyPts.current=[];
+  }
+
+  // ── Layer operations ──
+  function deleteLayer(id){setLayers(ls=>{const nl=ls.filter(l=>l.id!==id);pushHistory(nl);return nl;});if(selId===id)setSelId(null);}
+  function toggleVisible(id){setLayers(ls=>ls.map(l=>l.id===id?{...l,visible:!l.visible}:l));}
+  function moveLayerUp(id){setLayers(ls=>{const i=ls.findIndex(l=>l.id===id);if(i>=ls.length-1)return ls;const n=[...ls];[n[i],n[i+1]]=[n[i+1],n[i]];pushHistory(n);return n;});}
+  function moveLayerDown(id){setLayers(ls=>{const i=ls.findIndex(l=>l.id===id);if(i<=0)return ls;const n=[...ls];[n[i],n[i+1]]=[n[i+1],n[i]];pushHistory(n);return n;});}
+  function duplicateLayer(id){
+    const l=layers.find(x=>x.id===id);if(!l)return;
+    const copy={...JSON.parse(JSON.stringify(l)),id:uid(),x:l.x+20,y:l.y+20,name:l.name+" copy"};
+    const nl=[...layers,copy];pushHistory(nl);setLayers(nl);setSelId(copy.id);
+  }
+  function groupSelected(){/* future */}
+  function alignLayers(dir){
+    if(!selId)return;
+    const l=layers.find(x=>x.id===selId);if(!l)return;
+    const bb=getBoundingBox(l);
+    let patch={};
+    if(dir==="left")   patch={x:0};
+    if(dir==="right")  patch={x:DRAW_CW-bb.w};
+    if(dir==="center") patch={x:(DRAW_CW-bb.w)/2};
+    if(dir==="top")    patch={y:0};
+    if(dir==="bottom") patch={y:DRAW_CH-bb.h};
+    if(dir==="middle") patch={y:(DRAW_CH-bb.h)/2};
+    setLayers(ls=>ls.map(l2=>l2.id===selId?{...l2,...patch}:l2));
+    pushHistory();
+  }
+
+  // ── Apply property change to selected layer ──
+  function applyProp(patch){
+    if(!selId)return;
+    setLayers(ls=>ls.map(l=>l.id===selId?{...l,...patch}:l));
+  }
+
+  // ── Import image into layers ──
+  const importRef=useRef(null);
+  function handleImportFile(e){
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const img=new Image();
+      img.onload=()=>{
+        const asp=img.width/img.height;
+        const w=Math.min(DRAW_CW*0.5,img.width),h=w/asp;
+        const nl={id:uid(),type:"bitmap",visible:true,name:file.name.replace(/\.\w+$/,""),
+          src:ev.target.result,x:(DRAW_CW-w)/2,y:(DRAW_CH-h)/2,w,h,opacity:100,rotation:0};
+        const newLs=[...layers,nl];
+        imageCache.current[ev.target.result]=img;
+        setLayers(newLs);pushHistory(newLs);setSelId(nl.id);
+      };img.src=ev.target.result;
+    };
+    reader.readAsDataURL(file);e.target.value="";
+  }
+
+  // ── Export ──
+  function exportAndAdd(){
+    // Flatten all layers onto export canvas
+    const expCanvas=document.createElement("canvas");
+    expCanvas.width=DRAW_CW;expCanvas.height=DRAW_CH;
+    const ctx=expCanvas.getContext("2d");
+    // Re-render without selection handles
+    const savedSelId=selId; // render without sel
+    for(const layer of layers){
+      if(!layer.visible)continue;
+      ctx.save();
+      ctx.globalAlpha=(layer.opacity??100)/100;
+      const bb=getBoundingBox(layer);
+      const cx=bb.x+bb.w/2,cy=bb.y+bb.h/2;
+      ctx.translate(cx,cy);ctx.rotate(((layer.rotation)||0)*Math.PI/180);ctx.translate(-cx,-cy);
+      if(layer.type==="bitmap"){const img=imageCache.current[layer.src];if(img)ctx.drawImage(img,layer.x,layer.y,layer.w,layer.h);}
+      else if(layer.type==="shape")renderShape(ctx,layer);
+      else if(layer.type==="text")renderText(ctx,layer);
+      else if(layer.type==="pen")renderPenLayer(ctx,layer);
+      ctx.restore();
+    }
+    onAdd(expCanvas.toDataURL("image/png"));
+    onClose();
+  }
+
+  // ── Keyboard shortcuts ──
+  useEffect(()=>{
+    function onKey(e){
+      if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
+      if(e.key==="Delete"||e.key==="Backspace"){if(selId)deleteLayer(selId);return;}
+      if(e.ctrlKey||e.metaKey){
+        if(e.key==="z"){e.preventDefault();undo();return;}
+        if(e.key==="y"||e.key==="Z"){e.preventDefault();redo();return;}
+        if(e.key==="d"){e.preventDefault();if(selId)duplicateLayer(selId);return;}
+      }
+      if(e.key==="Escape"){if(polyActive){finishPolyline();}else{setSelId(null);}return;}
+      if(e.key==="Enter"&&polyActive){finishPolyline();return;}
+      const MOVE=e.shiftKey?10:2;
+      if(selId&&["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)){
+        e.preventDefault();
+        const dx=e.key==="ArrowLeft"?-MOVE:e.key==="ArrowRight"?MOVE:0;
+        const dy=e.key==="ArrowUp"?-MOVE:e.key==="ArrowDown"?MOVE:0;
+        setLayers(ls=>ls.map(l=>l.id===selId?{...l,x:(l.x||0)+dx,y:(l.y||0)+dy}:l));
+      }
+    }
+    window.addEventListener("keydown",onKey);
+    return()=>window.removeEventListener("keydown",onKey);
+  },[selId,polyActive,layers]);
+
+  const selLayer=layers.find(l=>l.id===selId);
+
+  const TOOLS_BASIC=[
+    {id:"select",label:"↖ Select",tip:"Select & move (V)"},
+    {id:"pen",   label:"✏️ Pen",   tip:"Freehand draw (P)"},
+    {id:"eraser",label:"⬜ Eraser",tip:"Erase pixels (E)"},
+  ];
+  const TOOLS_SHAPE=[
+    {id:"line",    label:"╱ Line"},
+    {id:"arrow",   label:"→ Arrow"},
+    {id:"rect",    label:"▭ Rect"},
+    {id:"ellipse", label:"◯ Ellipse"},
+    {id:"triangle",label:"△ Triangle"},
+    {id:"star",    label:"★ Star"},
+    {id:"diamond", label:"◇ Diamond"},
+    {id:"hexagon", label:"⬡ Hexagon"},
+    {id:"callout", label:"💬 Callout"},
+    {id:"polyline",label:"╱╱ Polyline"},
+  ];
+  const FONTS=[
+    {label:"Mono",    val:"'DM Mono', monospace"},
+    {label:"Bebas",   val:"'Bebas Neue', cursive"},
+    {label:"Serif",   val:"Georgia, serif"},
+    {label:"Sans",    val:"Arial, sans-serif"},
+    {label:"Impact",  val:"Impact, sans-serif"},
+  ];
+
+  const cursorMap={select:"default",pen:"crosshair",eraser:"cell",text:"text"};
+  const cursor=cursorMap[tool]||"crosshair";
+
+  return(
+    <div className="draw-modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="draw-modal">
+        {/* ── Toolbar ── */}
+        <div className="draw-toolbar">
+          {/* Basic tools */}
+          <div style={{display:"flex",gap:4,alignItems:"center"}}>
+            {TOOLS_BASIC.map(t=>(
+              <button key={t.id} className={`draw-tool-btn${tool===t.id?" active":""}`} onClick={()=>setTool(t.id)} data-tip={t.tip}>{t.label}</button>
+            ))}
+            <button className={`draw-tool-btn${tool==="text"?" active":""}`} onClick={()=>setTool("text")} data-tip="Text (T)">T Text</button>
+          </div>
+          <div style={{width:1,height:22,background:"#2a2a2a",margin:"0 2px"}} />
+          {/* Shape tools */}
+          <div style={{display:"flex",gap:3,flexWrap:"wrap",maxWidth:360}}>
+            {TOOLS_SHAPE.map(t=>(
+              <button key={t.id} className={`draw-tool-btn${tool===t.id?" active":""}`} onClick={()=>{setTool(t.id);if(t.id!=="polyline")setPolyActive(false);}} style={{fontSize:10}}>{t.label}</button>
+            ))}
+          </div>
+          <div style={{width:1,height:22,background:"#2a2a2a",margin:"0 2px"}} />
+          {/* Colors */}
+          <div style={{display:"flex",alignItems:"center",gap:5}}>
+            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+              <div style={{fontSize:9,color:"#444",lineHeight:1}}>Stroke</div>
+              <input type="color" value={color} onChange={e=>{setColor(e.target.value);if(selId)applyProp({stroke:e.target.value,color:e.target.value});}}
+                style={{width:26,height:22,border:"1px solid #333",borderRadius:3,background:"none",cursor:"pointer",padding:1}} />
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+              <div style={{fontSize:9,color:"#444",lineHeight:1}}>Fill</div>
+              <div style={{display:"flex",gap:2,alignItems:"center"}}>
+                <input type="checkbox" checked={useFill} onChange={e=>{setUseFill(e.target.checked);if(selId)applyProp({useFill:e.target.checked});}}
+                  style={{accentColor:"#f97316",cursor:"pointer"}} />
+                <input type="color" value={fill} onChange={e=>{setFill(e.target.value);if(selId)applyProp({fill:e.target.value});}}
+                  style={{width:26,height:22,border:"1px solid #333",borderRadius:3,background:"none",cursor:"pointer",padding:1,opacity:useFill?1:0.3}} />
+              </div>
+            </div>
+          </div>
+          <div style={{width:1,height:22,background:"#2a2a2a",margin:"0 2px"}} />
+          {/* Stroke width */}
+          <div style={{display:"flex",alignItems:"center",gap:5,minWidth:90}}>
+            <span style={{fontSize:9,color:"#444",whiteSpace:"nowrap"}}>Size {tool==="text"?fontSize:strokeW}</span>
+            <input type="range" min={tool==="text"?8:1} max={tool==="text"?120:40}
+              value={tool==="text"?fontSize:strokeW}
+              onChange={e=>{const v=+e.target.value;tool==="text"?(setFontSize(v),applyProp({fontSize:v})):(setStrokeW(v),applyProp({strokeW:v}));}}
+              style={{width:60,accentColor:"#f97316"}} />
+          </div>
+          {/* Dash */}
+          <label style={{display:"flex",alignItems:"center",gap:3,fontSize:9,color:"#555",cursor:"pointer"}}>
+            <input type="checkbox" checked={dash} onChange={e=>{setDash(e.target.checked);if(selId)applyProp({dash:e.target.checked});}} style={{accentColor:"#f97316"}} />
+            Dash
+          </label>
+          {/* Shadow */}
+          <label style={{display:"flex",alignItems:"center",gap:3,fontSize:9,color:"#555",cursor:"pointer"}}>
+            <input type="checkbox" checked={useShadow} onChange={e=>{setUseShadow(e.target.checked);if(selId)applyProp({useShadow:e.target.checked});}} style={{accentColor:"#f97316"}} />
+            Shadow
+          </label>
+          {/* Grid */}
+          <label style={{display:"flex",alignItems:"center",gap:3,fontSize:9,color:"#555",cursor:"pointer"}}>
+            <input type="checkbox" checked={showGrid} onChange={e=>setShowGrid(e.target.checked)} style={{accentColor:"#f97316"}} />
+            Grid
+          </label>
+          <label style={{display:"flex",alignItems:"center",gap:3,fontSize:9,color:"#555",cursor:"pointer"}}>
+            <input type="checkbox" checked={gridSnap} onChange={e=>setGridSnap(e.target.checked)} style={{accentColor:"#f97316"}} />
+            Snap
+          </label>
+          {/* Undo/Redo */}
+          <div style={{marginLeft:"auto",display:"flex",gap:4}}>
+            <button className="draw-tool-btn" onClick={undo} data-tip="Undo (Ctrl+Z)">↩</button>
+            <button className="draw-tool-btn" onClick={redo} data-tip="Redo (Ctrl+Y)">↪</button>
+          </div>
         </div>
 
+        {/* Text toolbar — shows when text tool or text layer selected */}
+        {(tool==="text"||(selLayer&&selLayer.type==="text"))&&(
+          <div style={{background:"#0f0f0f",borderBottom:"1px solid #1a1a1a",padding:"5px 12px",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            <span style={{fontSize:10,color:"#444"}}>Font:</span>
+            <select value={selLayer?.fontFamily||fontFamily} onChange={e=>{setFontFamily(e.target.value);applyProp({fontFamily:e.target.value});}}
+              style={{background:"#1a1a1a",border:"1px solid #2a2a2a",color:"#aaa",borderRadius:4,padding:"3px 6px",fontSize:10,fontFamily:"'DM Mono',monospace"}}>
+              {FONTS.map(f=><option key={f.val} value={f.val}>{f.label}</option>)}
+            </select>
+            <button className={`draw-tool-btn${(selLayer?.bold||bold)?" active":""}`} onClick={()=>{setBold(b=>!b);applyProp({bold:!selLayer?.bold});}} style={{fontWeight:"bold",padding:"3px 8px"}}>B</button>
+            <button className={`draw-tool-btn${(selLayer?.italic||italic)?" active":""}`} onClick={()=>{setItalic(b=>!b);applyProp({italic:!selLayer?.italic});}} style={{fontStyle:"italic",padding:"3px 8px"}}>I</button>
+            {["left","center","right"].map(a=>(
+              <button key={a} className={`draw-tool-btn${(selLayer?.align||"left")===a?" active":""}`}
+                onClick={()=>applyProp({align:a})} style={{padding:"3px 6px",fontSize:10}}>
+                {a==="left"?"⬛⬛⬜":a==="center"?"⬜⬛⬜":"⬜⬛⬛"}
+              </button>
+            ))}
+            <span style={{fontSize:10,color:"#444",marginLeft:8}}>Text color:</span>
+            <input type="color" value={selLayer?.color||color} onChange={e=>{setColor(e.target.value);applyProp({color:e.target.value});}}
+              style={{width:24,height:20,border:"1px solid #333",borderRadius:3,cursor:"pointer",padding:1}} />
+            <span style={{fontSize:10,color:"#444",marginLeft:8}}>Edit text:</span>
+            <input type="text" value={selLayer?.text||""} onChange={e=>applyProp({text:e.target.value})}
+              style={{background:"#1a1a1a",border:"1px solid #2a2a2a",color:"#e8e8e8",borderRadius:4,padding:"3px 8px",fontSize:11,fontFamily:"'DM Mono',monospace",outline:"none",minWidth:120}}
+              placeholder="Edit selected text..." />
+          </div>
+        )}
+
+        {/* ── Body: canvas + layer panel ── */}
+        <div className="draw-body">
+          {/* Canvas area */}
+          <div className="draw-canvas-wrap" ref={wrapRef}
+            onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp}
+            onTouchStart={onPointerDown} onTouchMove={onPointerMove} onTouchEnd={onPointerUp}>
+            <canvas ref={canvasRef} width={DRAW_CW} height={DRAW_CH} className="draw-canvas"
+              style={{maxWidth:"100%",maxHeight:"100%",cursor,userSelect:"none",
+                background:"repeating-conic-gradient(#1a1a1a 0% 25%, #161616 0% 50%) 0 0/20px 20px"}} />
+            {/* Polyline indicator */}
+            {polyActive&&(
+              <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",background:"rgba(249,115,22,0.9)",color:"#000",borderRadius:6,padding:"4px 14px",fontSize:11,pointerEvents:"none",fontFamily:"'DM Mono',monospace"}}>
+                Polyline: click to add points · Enter or Escape to finish
+              </div>
+            )}
+          </div>
+
+          {/* ── Layer Panel ── */}
+          <div className="draw-sidebar">
+            <div className="draw-sidebar-header">
+              <span>Layers ({layers.length})</span>
+              <div style={{display:"flex",gap:4}}>
+                <input ref={importRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleImportFile} />
+                <button onClick={()=>importRef.current.click()} style={{background:"none",border:"none",color:"#f97316",cursor:"pointer",fontSize:11,fontFamily:"'DM Mono',monospace"}} title="Import image as layer">+Img</button>
+              </div>
+            </div>
+            <div style={{flex:1,overflowY:"auto"}}>
+              {layers.length===0&&<div style={{padding:12,fontSize:10,color:"#333",textAlign:"center",marginTop:20}}>No layers yet.<br/>Draw or import something.</div>}
+              {/* Reverse so top layer appears first */}
+              {[...layers].reverse().map(layer=>(
+                <div key={layer.id} className={`draw-layer-item${selId===layer.id?" selected":""}`}
+                  onClick={()=>{setSelId(layer.id===selId?null:layer.id);}}
+                  title="Click to select · Delete key to remove">
+                  {/* Thumb */}
+                  {layer.type==="bitmap"
+                    ?<img src={layer.src} className="draw-layer-thumb" alt="" />
+                    :<div className="draw-layer-thumb" style={{display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>
+                      {layer.type==="shape"?{rect:"▭",ellipse:"◯",line:"╱",arrow:"→",triangle:"△",star:"★",diamond:"◇",hexagon:"⬡",callout:"💬"}[layer.shapeType]||"◻":layer.type==="text"?"T":"✏️"}
+                    </div>
+                  }
+                  {/* Name */}
+                  {renaming===layer.id
+                    ?<input autoFocus value={renameVal}
+                        onChange={e=>setRenameVal(e.target.value)}
+                        onBlur={()=>{setLayers(ls=>ls.map(l=>l.id===layer.id?{...l,name:renameVal}:l));setRenaming(null);}}
+                        onKeyDown={e=>{if(e.key==="Enter"){setLayers(ls=>ls.map(l=>l.id===layer.id?{...l,name:renameVal}:l));setRenaming(null);}}}
+                        onClick={e=>e.stopPropagation()}
+                        style={{flex:1,background:"#1a1a1a",border:"1px solid #f97316",color:"#e8e8e8",borderRadius:3,padding:"2px 4px",fontSize:10,outline:"none",fontFamily:"'DM Mono',monospace"}} />
+                    :<span className="draw-layer-label"
+                        onDoubleClick={e=>{e.stopPropagation();setRenaming(layer.id);setRenameVal(layer.name||"Layer");}}>
+                      {layer.name||"Layer"}
+                    </span>
+                  }
+                  {/* Visibility toggle */}
+                  <button className="draw-layer-vis" title={layer.visible?"Hide":"Show"}
+                    onClick={e=>{e.stopPropagation();toggleVisible(layer.id);}}>
+                    {layer.visible?"👁":"🚫"}
+                  </button>
+                  {/* Delete */}
+                  <button className="draw-layer-del" title="Delete layer"
+                    onClick={e=>{e.stopPropagation();deleteLayer(layer.id);}}>✕</button>
+                </div>
+              ))}
+            </div>
+
+            {/* Layer actions for selected */}
+            {selId&&(
+              <div style={{borderTop:"1px solid #1a1a1a",padding:"8px",display:"flex",flexDirection:"column",gap:6}}>
+                <div style={{fontSize:9,color:"#444",textTransform:"uppercase",letterSpacing:1}}>Layer Actions</div>
+                <div style={{display:"flex",gap:4}}>
+                  <button className="arrange-btn" onClick={()=>moveLayerUp(selId)} title="Move forward">↑ Fwd</button>
+                  <button className="arrange-btn" onClick={()=>moveLayerDown(selId)} title="Move back">↓ Back</button>
+                  <button className="arrange-btn" onClick={()=>duplicateLayer(selId)} title="Duplicate (Ctrl+D)">⧉</button>
+                  <button className="arrange-btn" style={{color:"#ef4444",borderColor:"rgba(239,68,68,0.3)"}} onClick={()=>deleteLayer(selId)} title="Delete (Del)">🗑</button>
+                </div>
+                <div style={{fontSize:9,color:"#444",textTransform:"uppercase",letterSpacing:1,marginTop:2}}>Align to Canvas</div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                  {[["left","⊢L"],["center","⊢C"],["right","L⊣"],["top","⊤T"],["middle","⊢M"],["bottom","⊥B"]].map(([d,l])=>(
+                    <button key={d} className="arrange-btn" onClick={()=>alignLayers(d)} title={`Align ${d}`}>{l}</button>
+                  ))}
+                </div>
+                {/* Opacity for selected layer */}
+                <div style={{fontSize:9,color:"#444",textTransform:"uppercase",letterSpacing:1,marginTop:2}}>Opacity</div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <input type="range" min={0} max={100} value={selLayer?.opacity??100}
+                    onChange={e=>applyProp({opacity:+e.target.value})}
+                    style={{flex:1,accentColor:"#f97316"}} />
+                  <span style={{fontSize:9,color:"#888",width:25}}>{selLayer?.opacity??100}%</span>
+                </div>
+                {/* Rotation */}
+                <div style={{fontSize:9,color:"#444",textTransform:"uppercase",letterSpacing:1}}>Rotation</div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <input type="range" min={-180} max={180} value={selLayer?.rotation??0}
+                    onChange={e=>applyProp({rotation:+e.target.value})}
+                    style={{flex:1,accentColor:"#f97316"}} />
+                  <span style={{fontSize:9,color:"#888",width:30}}>{Math.round(selLayer?.rotation??0)}°</span>
+                </div>
+                {selLayer?.type==="bitmap"&&(
+                  <>
+                    <div style={{fontSize:9,color:"#444",textTransform:"uppercase",letterSpacing:1}}>Size</div>
+                    <div style={{display:"flex",gap:4}}>
+                      <input type="number" value={Math.round(selLayer.w||0)} onChange={e=>applyProp({w:+e.target.value})}
+                        style={{flex:1,background:"#1a1a1a",border:"1px solid #2a2a2a",color:"#aaa",borderRadius:3,padding:"2px 4px",fontSize:10,fontFamily:"'DM Mono',monospace",outline:"none"}} />
+                      <span style={{fontSize:9,color:"#333",alignSelf:"center"}}>×</span>
+                      <input type="number" value={Math.round(selLayer.h||0)} onChange={e=>applyProp({h:+e.target.value})}
+                        style={{flex:1,background:"#1a1a1a",border:"1px solid #2a2a2a",color:"#aaa",borderRadius:3,padding:"2px 4px",fontSize:10,fontFamily:"'DM Mono',monospace",outline:"none"}} />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Footer ── */}
+        <div className="draw-footer">
+          <span style={{fontSize:10,color:"#333",marginRight:"auto"}}>
+            {initialImage?"Editing existing layer — layers stack on top":"Shapes + pen + text · layers panel on right · Del to delete selected layer"}
+          </span>
+          <span style={{fontSize:10,color:"#444",marginRight:8}}>Layers: {layers.length}</span>
+          <button className="btn btn-ghost" onClick={onClose} style={{fontSize:11}}>Cancel</button>
+          <button className="btn btn-primary" onClick={exportAndAdd} style={{fontSize:11}}>
+            {initialImage?"💾 Save as New Layer":"✅ Add to Design"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── AIGeneratorModal ─────────────────────────────────────────────────────────
+const AI_STYLES=[
+  {label:"No style",val:""},
+  {label:"Sticker",val:"sticker art, white outline, transparent background"},
+  {label:"Vintage",val:"vintage screen print, distressed, retro"},
+  {label:"Minimalist",val:"minimalist flat design, simple, clean lines"},
+  {label:"Graffiti",val:"graffiti street art, bold, urban"},
+  {label:"Watercolor",val:"watercolor illustration, soft edges"},
+  {label:"Pixel Art",val:"pixel art, 8-bit, retro game style"},
+  {label:"Sketch",val:"pencil sketch, hand drawn, ink"},
+  {label:"Neon",val:"neon glow, dark background, vibrant colors"},
+  {label:"Cartoon",val:"cartoon illustration, bold outlines, flat color"},
+];
+const AI_SIZES=[
+  {label:"Square 1:1",w:512,h:512},
+  {label:"Wide 16:9",w:768,h:432},
+  {label:"Tall 9:16",w:432,h:768},
+  {label:"Portrait 3:4",w:512,h:682},
+];
+function AIGeneratorModal({onClose,onAdd}){
+  const[prompt,setPrompt]=useState(""),
+       [style,setStyle]=useState(""),
+       [size,setSize]=useState(AI_SIZES[0]),
+       [imgUrl,setImgUrl]=useState(null),
+       [loading,setLoading]=useState(false),
+       [error,setError]=useState(null),
+       [seed,setSeed]=useState(()=>Math.floor(Math.random()*99999));
+  async function generate(){
+    if(!prompt.trim())return;
+    setLoading(true);setError(null);setImgUrl(null);
+    const fullPrompt=[prompt.trim(),style].filter(Boolean).join(", ");
+    const tryFetch=async(url)=>{
+      const resp=await fetch(url);if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
+      const blob=await resp.blob();
+      return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(blob);});
+    };
+    const providers=[
+      ()=>tryFetch(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${size.w}&height=${size.h}&seed=${seed}&nologo=true&model=flux`),
+      ()=>tryFetch(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${size.w}&height=${size.h}&seed=${seed}&nologo=true&model=turbo`),
+    ];
+    let lastErr=null;
+    for(const p of providers){try{const d=await p();setImgUrl(d);setLoading(false);return;}catch(e){lastErr=e;}}
+    setError(`All providers failed (${lastErr?.message}). Try again.`);setLoading(false);
+  }
+  return(
+    <div className="ai-modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="ai-modal">
+        <div className="ai-modal-header">
+          <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:20,color:"#f97316",letterSpacing:2}}>AI IMAGE GENERATOR</span>
+          <span style={{fontSize:11,color:"#444",marginLeft:4}}>powered by Pollinations · free · no key needed</span>
+          <button onClick={onClose} style={{marginLeft:"auto",background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:18}}>✕</button>
+        </div>
         <div className="ai-modal-body">
-          {/* Prompt */}
           <div>
             <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Describe your image</div>
             <div className="ai-prompt-row">
-              <textarea className="ai-prompt-input" rows={2} placeholder='e.g. "a fierce eagle wearing sunglasses, logo style"'
-                value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={onKeyDown} />
+              <textarea className="ai-prompt-input" rows={2} placeholder='"a fierce eagle wearing sunglasses, logo style"'
+                value={prompt} onChange={e=>setPrompt(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();generate();}}} />
               <button className="btn btn-primary" style={{padding:"0 18px",fontSize:13,flexShrink:0}} onClick={generate} disabled={loading||!prompt.trim()}>
                 {loading?"⏳":"✨"} {loading?"Generating…":"Generate"}
               </button>
             </div>
           </div>
-
-          {/* Style chips */}
           <div>
             <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Style</div>
             <div className="ai-style-chips">
-              {AI_STYLES.map(s=>(
-                <button key={s.label} className={`ai-chip${style===s.val?" active":""}`} onClick={()=>setStyle(s.val)}>{s.label}</button>
-              ))}
+              {AI_STYLES.map(s=>(<button key={s.label} className={`ai-chip${style===s.val?" active":""}`} onClick={()=>setStyle(s.val)}>{s.label}</button>))}
             </div>
           </div>
-
-          {/* Size + seed row */}
           <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
             <div>
               <div style={{fontSize:10,color:"#555",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Size</div>
               <div style={{display:"flex",gap:6}}>
-                {AI_SIZES.map(s=>(
-                  <button key={s.label} className={`ai-chip${size===s?" active":""}`} onClick={()=>setSize(s)}>{s.label}</button>
-                ))}
+                {AI_SIZES.map(s=>(<button key={s.label} className={`ai-chip${size===s?" active":""}`} onClick={()=>setSize(s)}>{s.label}</button>))}
               </div>
             </div>
-            <button className="btn btn-ghost" style={{marginLeft:"auto",fontSize:11,padding:"5px 12px"}} onClick={()=>{reroll();}} title="New random seed = different variation">
-              🎲 New Variation
-            </button>
+            <button className="btn btn-ghost" style={{marginLeft:"auto",fontSize:11,padding:"5px 12px"}} onClick={()=>{setSeed(Math.floor(Math.random()*99999));generate();}}>🎲 New Variation</button>
           </div>
-
-          {/* Preview */}
           <div className="ai-preview-area">
-            {loading && <div className="ai-spinner" />}
-            {!loading && !imgUrl && !error && (
-              <div style={{textAlign:"center",color:"#333"}}>
-                <div style={{fontSize:32,marginBottom:8}}>✨</div>
-                <div style={{fontSize:12}}>Your image will appear here</div>
-              </div>
-            )}
-            {error && <div style={{color:"#ef4444",fontSize:12,padding:16,textAlign:"center"}}>{error}</div>}
-            {imgUrl && !loading && <img src={imgUrl} className="ai-preview-img" alt="AI generated" crossOrigin="anonymous" />}
+            {loading&&<div className="ai-spinner"/>}
+            {!loading&&!imgUrl&&!error&&<div style={{textAlign:"center",color:"#333"}}><div style={{fontSize:32,marginBottom:8}}>✨</div><div style={{fontSize:12}}>Your image will appear here</div></div>}
+            {error&&<div style={{color:"#ef4444",fontSize:12,padding:16,textAlign:"center"}}>{error}</div>}
+            {imgUrl&&!loading&&<img src={imgUrl} className="ai-preview-img" alt="AI generated" crossOrigin="anonymous"/>}
           </div>
         </div>
-
-        {/* Footer */}
         <div style={{padding:"12px 18px",borderTop:"1px solid #1e1e1e",display:"flex",gap:8,justifyContent:"flex-end",background:"#111"}}>
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          {imgUrl && (
-            <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>{reroll();generate();}}>🔄 Regenerate</button>
-          )}
-          <button className="btn btn-primary" onClick={addToDesign} disabled={!imgUrl||loading}>
-            ✅ Add to Design
-          </button>
+          <button className="btn btn-primary" onClick={()=>{if(imgUrl){onAdd(imgUrl);onClose();}}} disabled={!imgUrl||loading}>✅ Add to Design</button>
         </div>
       </div>
     </div>
   );
 }
-
-// ─── DrawingModal ─────────────────────────────────────────────────────────────
-function DrawingModal({ onClose, onAdd, initialImage }) {
-  const canvasRef   = useRef(null);
-  const overlayRef  = useRef(null);
-  const [tool, setTool]         = useState("pen");
-  const [color, setColor]       = useState("#ffffff");
-  const [fillColor, setFillColor] = useState("#f97316");
-  const [useFill, setUseFill]   = useState(false);
-  const [size, setSize]         = useState(4);
-  const [fontSize, setFontSize] = useState(28);
-  const [fontFamily, setFontFamily] = useState("'DM Mono', monospace");
-  const [history, setHistory]   = useState([]);
-  const drawing = useRef(false);
-  const startPt  = useRef({x:0,y:0});
-  const snapData = useRef(null);
-
-  const CW = 700, CH = 520;
-
-  // Init: if editing an existing image, draw it onto the canvas first
-  useEffect(()=>{
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.clearRect(0,0,CW,CH);
-    if (initialImage) {
-      const img = new Image();
-      img.onload = () => {
-        // Scale image to fit canvas while preserving aspect ratio
-        const scale = Math.min(CW / img.width, CH / img.height);
-        const dw = img.width * scale, dh = img.height * scale;
-        const dx = (CW - dw) / 2, dy = (CH - dh) / 2;
-        ctx.drawImage(img, dx, dy, dw, dh);
-        pushHistory();
-      };
-      img.src = initialImage;
-    } else {
-      pushHistory();
-    }
-  },[]);
-
-  function pushHistory() {
-    const ctx = canvasRef.current.getContext("2d");
-    setHistory(h => [...h.slice(-20), ctx.getImageData(0,0,CW,CH)]);
-  }
-  function undo() {
-    if (history.length < 2) return;
-    const prev = history[history.length-2];
-    canvasRef.current.getContext("2d").putImageData(prev,0,0);
-    setHistory(h => h.slice(0,-1));
-  }
-  function clearCanvas() {
-    canvasRef.current.getContext("2d").clearRect(0,0,CW,CH);
-    pushHistory();
-  }
-
-  function getPos(e) {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const scaleX = CW / rect.width, scaleY = CH / rect.height;
-    if (e.touches) return { x:(e.touches[0].clientX-rect.left)*scaleX, y:(e.touches[0].clientY-rect.top)*scaleY };
-    return { x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY };
-  }
-
-  function applyStroke(ctx) {
-    ctx.strokeStyle = color;
-    ctx.lineWidth   = size;
-    ctx.lineCap     = "round";
-    ctx.lineJoin    = "round";
-    if (useFill) { ctx.fillStyle = fillColor; }
-  }
-
-  function onPointerDown(e) {
-    if (tool === "text") { handleTextClick(e); return; }
-    drawing.current = true;
-    const p = getPos(e);
-    startPt.current = p;
-    const ctx = canvasRef.current.getContext("2d");
-    if (tool === "pen" || tool === "eraser") {
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-    }
-    if (["rect","ellipse","line","arrow"].includes(tool)) {
-      snapData.current = ctx.getImageData(0,0,CW,CH);
-    }
-    e.preventDefault();
-  }
-
-  function onPointerMove(e) {
-    if (!drawing.current) return;
-    const p = getPos(e);
-    const ctx = canvasRef.current.getContext("2d");
-    if (tool === "pen") {
-      applyStroke(ctx); ctx.lineTo(p.x,p.y); ctx.stroke();
-    } else if (tool === "eraser") {
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.lineWidth = size * 4; ctx.lineCap = "round"; ctx.lineJoin = "round";
-      ctx.lineTo(p.x,p.y); ctx.stroke();
-      ctx.globalCompositeOperation = "source-over";
-    } else if (["rect","ellipse","line","arrow"].includes(tool)) {
-      // Restore snapshot then draw preview
-      ctx.putImageData(snapData.current,0,0);
-      const {x:sx,y:sy} = startPt.current;
-      applyStroke(ctx);
-      ctx.beginPath();
-      if (tool === "rect") {
-        if (useFill) ctx.fillRect(sx,sy,p.x-sx,p.y-sy);
-        ctx.strokeRect(sx,sy,p.x-sx,p.y-sy);
-      } else if (tool === "ellipse") {
-        ctx.ellipse((sx+p.x)/2,(sy+p.y)/2,Math.abs(p.x-sx)/2,Math.abs(p.y-sy)/2,0,0,Math.PI*2);
-        if (useFill) ctx.fill(); ctx.stroke();
-      } else if (tool === "line") {
-        ctx.moveTo(sx,sy); ctx.lineTo(p.x,p.y); ctx.stroke();
-      } else if (tool === "arrow") {
-        const angle = Math.atan2(p.y-sy,p.x-sx);
-        const headLen = Math.max(14, size*3);
-        ctx.moveTo(sx,sy); ctx.lineTo(p.x,p.y); ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(p.x,p.y);
-        ctx.lineTo(p.x-headLen*Math.cos(angle-0.4),p.y-headLen*Math.sin(angle-0.4));
-        ctx.lineTo(p.x-headLen*Math.cos(angle+0.4),p.y-headLen*Math.sin(angle+0.4));
-        ctx.closePath(); ctx.fillStyle=color; ctx.fill();
-      }
-    }
-    e.preventDefault();
-  }
-
-  function onPointerUp(e) {
-    if (!drawing.current) return;
-    drawing.current = false;
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.globalCompositeOperation = "source-over";
-    pushHistory();
-    e.preventDefault();
-  }
-
-  function handleTextClick(e) {
-    const p = getPos(e);
-    const text = window.prompt("Enter text:");
-    if (!text) return;
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.font = `${fontSize}px ${fontFamily}`;
-    ctx.fillStyle = color;
-    ctx.fillText(text, p.x, p.y);
-    pushHistory();
-  }
-
-  function addToDesign() {
-    const data = canvasRef.current.toDataURL("image/png");
-    onAdd(data);
-    onClose();
-  }
-
-  const TOOLS = [
-    { id:"pen",     label:"✏️ Pen"     },
-    { id:"eraser",  label:"⬜ Eraser"  },
-    { id:"line",    label:"╱ Line"    },
-    { id:"arrow",   label:"→ Arrow"   },
-    { id:"rect",    label:"▭ Rect"    },
-    { id:"ellipse", label:"◯ Ellipse" },
-    { id:"text",    label:"T Text"    },
-  ];
-  const FONTS = [
-    { label:"Mono",    val:"'DM Mono', monospace"   },
-    { label:"Bebas",   val:"'Bebas Neue', cursive"   },
-    { label:"Serif",   val:"Georgia, serif"           },
-    { label:"Sans",    val:"Arial, sans-serif"        },
-  ];
-
-  return (
-    <div className="draw-modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className="draw-modal">
-        {/* Toolbar */}
-        <div className="draw-toolbar">
-          {/* Tools */}
-          {TOOLS.map(t=>(
-            <button key={t.id} className={`draw-tool-btn${tool===t.id?" active":""}`} onClick={()=>setTool(t.id)}>{t.label}</button>
-          ))}
-          <div style={{width:1,height:24,background:"#333",margin:"0 2px"}} />
-          {/* Stroke color */}
-          <div style={{display:"flex",alignItems:"center",gap:5}}>
-            <span style={{fontSize:10,color:"#555"}}>Stroke</span>
-            <input type="color" value={color} onChange={e=>setColor(e.target.value)}
-              style={{width:28,height:24,border:"1px solid #333",borderRadius:4,background:"none",cursor:"pointer"}} />
-          </div>
-          {/* Fill */}
-          <div style={{display:"flex",alignItems:"center",gap:5}}>
-            <input type="checkbox" checked={useFill} onChange={e=>setUseFill(e.target.checked)}
-              style={{accentColor:"#f97316",cursor:"pointer"}} id="fill-chk" />
-            <label htmlFor="fill-chk" style={{fontSize:10,color:"#555",cursor:"pointer"}}>Fill</label>
-            <input type="color" value={fillColor} onChange={e=>setFillColor(e.target.value)}
-              style={{width:28,height:24,border:"1px solid #333",borderRadius:4,background:"none",cursor:"pointer",opacity:useFill?1:0.3}} />
-          </div>
-          <div style={{width:1,height:24,background:"#333",margin:"0 2px"}} />
-          {/* Size */}
-          <div style={{display:"flex",alignItems:"center",gap:6,minWidth:100}}>
-            <span style={{fontSize:10,color:"#555",whiteSpace:"nowrap"}}>{tool==="text"?"Font":"Size"} {tool==="text"?fontSize:size}px</span>
-            <input type="range" min={tool==="text"?10:1} max={tool==="text"?120:40} value={tool==="text"?fontSize:size}
-              onChange={e=>tool==="text"?setFontSize(+e.target.value):setSize(+e.target.value)}
-              style={{width:70,accentColor:"#f97316"}} />
-          </div>
-          {/* Font picker (text only) */}
-          {tool==="text" && (
-            <select value={fontFamily} onChange={e=>setFontFamily(e.target.value)}
-              style={{background:"#1a1a1a",border:"1px solid #333",color:"#aaa",borderRadius:6,padding:"4px 8px",fontSize:11,fontFamily:"'DM Mono',monospace",cursor:"pointer"}}>
-              {FONTS.map(f=><option key={f.val} value={f.val}>{f.label}</option>)}
-            </select>
-          )}
-          <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-            <button className="draw-tool-btn" onClick={undo} title="Undo">↩ Undo</button>
-            <button className="draw-tool-btn" onClick={clearCanvas}>🗑 Clear</button>
-          </div>
-        </div>
-
-        {/* Canvas */}
-        <div className="draw-canvas-wrap">
-          <canvas ref={canvasRef} width={CW} height={CH} className="draw-canvas"
-            style={{maxWidth:"100%",maxHeight:"100%",cursor:tool==="eraser"?"cell":tool==="text"?"text":"crosshair"}}
-            onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp} onMouseLeave={onPointerUp}
-            onTouchStart={onPointerDown} onTouchMove={onPointerMove} onTouchEnd={onPointerUp} />
-        </div>
-
-        {/* Footer */}
-        <div className="draw-footer">
-          <span style={{fontSize:11,color:"#444",marginRight:"auto"}}>
-            {initialImage ? "✏️ Editing existing layer — draw on top to modify" : "Click on canvas to start drawing · Click outside to cancel"}
-          </span>
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={addToDesign}>
-            {initialImage ? "💾 Save Changes" : "✅ Add to Design"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 // ─── BgEraserModal ────────────────────────────────────────────────────────────
-// Canva-style manual background eraser — paint to erase or restore pixels
-function BgEraserModal({ src, onClose, onSave }) {
-  const canvasRef   = useRef(null);
-  const displayRef  = useRef(null); // shown canvas (checkerboard bg)
-  const [mode, setMode]         = useState("erase");   // "erase" | "restore"
-  const [brushSize, setBrushSize] = useState(24);
-  const [zoom, setZoom]         = useState(1);
-  const [cursorPos, setCursorPos] = useState({x:-999,y:-999});
-  const painting    = useRef(false);
-  const naturalImg  = useRef(null);
-  const CW = useRef(0), CH = useRef(0);
-
-  useEffect(() => {
-    const img = new Image();
-    img.onload = () => {
-      naturalImg.current = img;
-      const canvas = canvasRef.current;
-      canvas.width  = img.width;
-      canvas.height = img.height;
-      CW.current = img.width; CH.current = img.height;
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, img.width, img.height);
-      ctx.drawImage(img, 0, 0);
-      renderDisplay();
-    };
-    img.src = src;
-  }, []);
-
-  function renderDisplay() {
-    const src = canvasRef.current;
-    const dst = displayRef.current;
-    if (!src || !dst) return;
-    dst.width  = src.width;
-    dst.height = src.height;
-    const dctx = dst.getContext("2d");
-    // Checkerboard background
-    const size = Math.max(8, Math.floor(src.width / 60));
-    for (let y=0; y<src.height; y+=size) for (let x=0; x<src.width; x+=size) {
-      dctx.fillStyle = ((Math.floor(x/size)+Math.floor(y/size))%2===0) ? "#ccc" : "#999";
-      dctx.fillRect(x, y, size, size);
-    }
-    dctx.drawImage(src, 0, 0);
-  }
-
-  function getCanvasPos(e) {
-    const rect = displayRef.current.getBoundingClientRect();
-    const scaleX = CW.current / rect.width;
-    const scaleY = CH.current / rect.height;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x:(clientX-rect.left)*scaleX, y:(clientY-rect.top)*scaleY };
-  }
-
-  function paint(e) {
-    if (!painting.current) return;
-    const {x, y} = getCanvasPos(e);
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.globalCompositeOperation = mode==="erase" ? "destination-out" : "source-over";
-    if (mode === "restore" && naturalImg.current) {
-      // Restore: draw from original image clipped to brush circle
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(x, y, brushSize/2, 0, Math.PI*2);
-      ctx.clip();
-      ctx.drawImage(naturalImg.current, 0, 0);
-      ctx.restore();
-    } else {
-      // Erase: paint transparent circle
-      ctx.beginPath();
-      ctx.arc(x, y, brushSize/2, 0, Math.PI*2);
-      ctx.fillStyle = "rgba(0,0,0,1)";
-      ctx.fill();
-    }
-    ctx.globalCompositeOperation = "source-over";
-    renderDisplay();
-  }
-
-  function onMouseMove(e) {
-    setCursorPos({x: e.clientX, y: e.clientY});
-    paint(e);
-  }
-  function onMouseDown(e) { painting.current=true; paint(e); e.preventDefault(); }
-  function onMouseUp()    { painting.current=false; }
-
-  function handleSave() {
-    onSave(canvasRef.current.toDataURL("image/png"));
-    onClose();
-  }
-
-  // Display brush size in canvas pixels scaled to display size
-  const displayBrushPx = displayRef.current
-    ? brushSize * (displayRef.current.getBoundingClientRect().width / (CW.current||1))
-    : brushSize;
-
-  return (
+function BgEraserModal({src,onClose,onSave}){
+  const canvasRef=useRef(null),displayRef=useRef(null);
+  const[mode,setMode]=useState("erase"),[brushSize,setBrushSize]=useState(24),[cursorPos,setCursorPos]=useState({x:-999,y:-999});
+  const painting=useRef(false),naturalImg=useRef(null),CW=useRef(0),CH=useRef(0);
+  useEffect(()=>{const img=new Image();img.onload=()=>{naturalImg.current=img;const canvas=canvasRef.current;canvas.width=img.width;canvas.height=img.height;CW.current=img.width;CH.current=img.height;const ctx=canvas.getContext("2d");ctx.clearRect(0,0,img.width,img.height);ctx.drawImage(img,0,0);renderDisplay();};img.src=src;},[]);
+  function renderDisplay(){const s=canvasRef.current,d=displayRef.current;if(!s||!d)return;d.width=s.width;d.height=s.height;const dc=d.getContext("2d");const sz=Math.max(8,Math.floor(s.width/60));for(let y=0;y<s.height;y+=sz)for(let x=0;x<s.width;x+=sz){dc.fillStyle=((Math.floor(x/sz)+Math.floor(y/sz))%2===0)?"#ccc":"#999";dc.fillRect(x,y,sz,sz);}dc.drawImage(s,0,0);}
+  function getCanvasPos(e){const rect=displayRef.current.getBoundingClientRect();const scaleX=CW.current/rect.width,scaleY=CH.current/rect.height;const cl=e.touches?e.touches[0]:e;return{x:(cl.clientX-rect.left)*scaleX,y:(cl.clientY-rect.top)*scaleY};}
+  function paint(e){if(!painting.current)return;const{x,y}=getCanvasPos(e);const ctx=canvasRef.current.getContext("2d");ctx.globalCompositeOperation=mode==="erase"?"destination-out":"source-over";if(mode==="restore"&&naturalImg.current){ctx.save();ctx.beginPath();ctx.arc(x,y,brushSize/2,0,Math.PI*2);ctx.clip();ctx.drawImage(naturalImg.current,0,0);ctx.restore();}else{ctx.beginPath();ctx.arc(x,y,brushSize/2,0,Math.PI*2);ctx.fillStyle="rgba(0,0,0,1)";ctx.fill();}ctx.globalCompositeOperation="source-over";renderDisplay();}
+  const displayBrushPx=displayRef.current?brushSize*(displayRef.current.getBoundingClientRect().width/(CW.current||1)):brushSize;
+  return(
     <div className="bge-overlay">
-      {/* Cursor */}
-      <div className="bge-cursor" style={{
-        left: cursorPos.x, top: cursorPos.y,
-        width: displayBrushPx, height: displayBrushPx,
-        borderColor: mode==="erase" ? "rgba(255,80,80,0.9)" : "rgba(80,255,80,0.9)",
-      }} />
-
-      {/* Toolbar */}
+      <div className="bge-cursor" style={{left:cursorPos.x,top:cursorPos.y,width:displayBrushPx,height:displayBrushPx,borderColor:mode==="erase"?"rgba(255,80,80,0.9)":"rgba(80,255,80,0.9)"}} />
       <div className="bge-toolbar">
         <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:15,color:"#f97316",letterSpacing:2}}>BG ERASER</span>
-        <div style={{width:1,height:20,background:"#333"}} />
-        {/* Mode toggle */}
         <div style={{display:"flex",gap:4}}>
           {[{val:"erase",label:"🧹 Erase"},{val:"restore",label:"✏️ Restore"}].map(m=>(
-            <button key={m.val} className="btn" style={{
-              fontSize:11, padding:"5px 10px",
-              background: mode===m.val ? "#f97316" : "#222",
-              color: mode===m.val ? "#000" : "#888",
-              border: "1px solid " + (mode===m.val?"#f97316":"#333"),
-            }} onClick={()=>setMode(m.val)}>{m.label}</button>
+            <button key={m.val} className="btn" style={{fontSize:11,padding:"5px 10px",background:mode===m.val?"#f97316":"#222",color:mode===m.val?"#000":"#888",border:"1px solid "+(mode===m.val?"#f97316":"#333")}} onClick={()=>setMode(m.val)}>{m.label}</button>
           ))}
         </div>
-        <div style={{width:1,height:20,background:"#333"}} />
-        {/* Brush size */}
         <div style={{display:"flex",alignItems:"center",gap:8,minWidth:160}}>
           <span style={{fontSize:11,color:"#666",whiteSpace:"nowrap"}}>Brush {brushSize}px</span>
-          <input type="range" min={4} max={120} value={brushSize}
-            onChange={e=>setBrushSize(+e.target.value)}
-            style={{width:100,accentColor:"#f97316"}} />
-        </div>
-        <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-          <span style={{fontSize:10,color:"#444",alignSelf:"center"}}>
-            {mode==="erase"?"Paint red to erase":"Paint green to restore"}
-          </span>
+          <input type="range" min={4} max={120} value={brushSize} onChange={e=>setBrushSize(+e.target.value)} style={{width:100,accentColor:"#f97316"}} />
         </div>
       </div>
-
-      {/* Canvas */}
-      <div className="bge-canvas-wrap"
-        onMouseMove={onMouseMove} onMouseDown={onMouseDown}
-        onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
-        <canvas ref={displayRef}
-          style={{
-            maxWidth:"95%", maxHeight:"100%",
-            imageRendering:"pixelated",
-            boxShadow:"0 0 40px rgba(0,0,0,0.8)",
-          }} />
+      <div className="bge-canvas-wrap" onMouseMove={e=>{setCursorPos({x:e.clientX,y:e.clientY});paint(e);}} onMouseDown={e=>{painting.current=true;paint(e);e.preventDefault();}} onMouseUp={()=>{painting.current=false;}} onMouseLeave={()=>{painting.current=false;}}>
+        <canvas ref={displayRef} style={{maxWidth:"95%",maxHeight:"100%",imageRendering:"pixelated",boxShadow:"0 0 40px rgba(0,0,0,0.8)"}} />
         <canvas ref={canvasRef} style={{display:"none"}} />
       </div>
-
-      {/* Footer */}
       <div className="bge-footer">
-        <span style={{fontSize:11,color:"#444",marginRight:"auto"}}>
-          Paint over areas to erase · Switch to Restore to paint back
-        </span>
+        <span style={{fontSize:11,color:"#444",marginRight:"auto"}}>Paint over areas to erase · Switch to Restore to paint back</span>
         <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" onClick={handleSave}>✅ Save Changes</button>
+        <button className="btn btn-primary" onClick={()=>{onSave(canvasRef.current.toDataURL("image/png"));onClose();}}>✅ Save Changes</button>
       </div>
     </div>
   );
 }
 
-function App() {
-  const [designs, setDesigns] = useState([]);
-  const [activeId, setActiveId] = useState(null);
-  const [view, setView] = useState("editor");
-  function createDesign(name) {
-    const d = blankDesign(name || "New Design");
-    setDesigns(prev => [d, ...prev]);
-    setActiveId(d.id);
-    setView("editor");
-    return d;
-  }
-  function saveDesign(updated) { setDesigns(prev => prev.map(d => d.id === updated.id ? updated : d)); setActiveId(updated.id); }
-  function duplicateDesign(d) {
-    const copy = JSON.parse(JSON.stringify(d));
-    copy.id = Date.now() + Math.random();
-    copy.name = d.name + " (Copy)";
-    setDesigns(prev => [copy, ...prev]); setActiveId(copy.id); setView("editor");
-  }
-  function deleteDesign(id) {
-    setDesigns(prev => prev.filter(d => d.id !== id));
-    if (activeId === id) { setActiveId(null); setView("library"); }
-  }
-  function openDesign(d) { setActiveId(d.id); setView("editor"); }
-  useEffect(() => { createDesign("My First Design"); }, []);
-  const activeDesign = designs.find(d => d.id === activeId) || null;
-  return (
+// ─── App ─────────────────────────────────────────────────────────────────────
+function App(){
+  const[designs,setDesigns]=useState([]);
+  const[activeId,setActiveId]=useState(null);
+  const[view,setView]=useState("editor");
+  function createDesign(name){const d=blankDesign(name||"New Design");setDesigns(prev=>[d,...prev]);setActiveId(d.id);setView("editor");return d;}
+  function saveDesign(updated){setDesigns(prev=>prev.map(d=>d.id===updated.id?updated:d));setActiveId(updated.id);}
+  function duplicateDesign(d){const copy=JSON.parse(JSON.stringify(d));copy.id=Date.now()+Math.random();copy.name=d.name+" (Copy)";setDesigns(prev=>[copy,...prev]);setActiveId(copy.id);setView("editor");}
+  function deleteDesign(id){setDesigns(prev=>prev.filter(d=>d.id!==id));if(activeId===id){setActiveId(null);setView("library");}}
+  useEffect(()=>{createDesign("My First Design");},[]);
+  const activeDesign=designs.find(d=>d.id===activeId)||null;
+  return(
     <div style={{display:"flex",flexDirection:"column",height:"100vh",overflow:"hidden"}}>
       <div className="header">
-        <span className="logo-dirt">DIRT</span>
-        <span className="logo-shirt">SHIRT</span>
-        <span className="logo-des">DESIGNER</span>
+        <span className="logo-dirt">DIRT</span><span className="logo-shirt">SHIRT</span><span className="logo-des">DESIGNER</span>
         <span style={{color:"#2a2a2a",fontSize:20,lineHeight:1,margin:"0 4px"}}>|</span>
         <span className="logo-sub">DTF Transfer Studio</span>
         <div style={{marginLeft:"auto",display:"flex",gap:8}}>
-          <button className="btn btn-ghost" onClick={() => setView("library")}>📂 My Designs ({designs.length})</button>
-          <button className="btn btn-primary" onClick={() => createDesign()}>+ New Design</button>
+          <button className="btn btn-ghost" onClick={()=>setView("library")}>📂 My Designs ({designs.length})</button>
+          <button className="btn btn-primary" onClick={()=>createDesign()}>+ New Design</button>
         </div>
       </div>
       <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-        {view === "library" ? (
-          <Library designs={designs} onOpen={openDesign} onDuplicate={duplicateDesign} onDelete={deleteDesign} onNew={() => createDesign()} />
-        ) : activeDesign ? (
-          <Editor key={activeDesign.id} design={activeDesign} onSave={saveDesign} onDuplicate={() => duplicateDesign(activeDesign)} onBack={() => setView("library")} />
-        ) : (
-          <div style={{display:"flex",justifyContent:"center",alignItems:"center",flex:1,flexDirection:"column",gap:16}}>
-            <p style={{color:"#555"}}>No design selected</p>
-            <button className="btn btn-primary" onClick={() => createDesign()}>Create New Design</button>
-          </div>
-        )}
+        {view==="library"
+          ?<Library designs={designs} onOpen={d=>{setActiveId(d.id);setView("editor");}} onDuplicate={duplicateDesign} onDelete={deleteDesign} onNew={()=>createDesign()} />
+          :activeDesign
+            ?<Editor key={activeDesign.id} design={activeDesign} onSave={saveDesign} onDuplicate={()=>duplicateDesign(activeDesign)} onBack={()=>setView("library")} />
+            :<div style={{display:"flex",justifyContent:"center",alignItems:"center",flex:1,flexDirection:"column",gap:16}}>
+              <p style={{color:"#555"}}>No design selected</p>
+              <button className="btn btn-primary" onClick={()=>createDesign()}>Create New Design</button>
+            </div>
+        }
       </div>
     </div>
   );
 }
 
 // ─── Library ─────────────────────────────────────────────────────────────────
-function Library({ designs, onOpen, onDuplicate, onDelete, onNew }) {
-  return (
+function Library({designs,onOpen,onDuplicate,onDelete,onNew}){
+  return(
     <div className="lib-wrap">
-      <div className="lib-header">
-        <h2 className="lib-title">MY DESIGNS</h2>
-        <button className="btn btn-primary" style={{marginLeft:"auto"}} onClick={onNew}>+ New Design</button>
-      </div>
-      {designs.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">👕</div>
-          <p style={{marginBottom:16}}>No designs yet</p>
-          <button className="btn btn-primary" onClick={onNew}>Create Your First Design</button>
-        </div>
-      ) : (
-        <div className="lib-grid">
-          {designs.map(d => {
-            const previewImg = Object.values(d.shirtImages||{}).find(Boolean);
-            const totalLayers = Object.values(d.zones||{}).reduce((s,z) => s+(z.layers?.length||0), 0);
-            return (
+      <div className="lib-header"><h2 className="lib-title">MY DESIGNS</h2><button className="btn btn-primary" style={{marginLeft:"auto"}} onClick={onNew}>+ New Design</button></div>
+      {designs.length===0
+        ?<div className="empty-state"><div className="empty-icon">👕</div><p style={{marginBottom:16}}>No designs yet</p><button className="btn btn-primary" onClick={onNew}>Create Your First Design</button></div>
+        :<div className="lib-grid">
+          {designs.map(d=>{
+            const previewImg=Object.values(d.shirtImages||{}).find(Boolean);
+            const totalLayers=Object.values(d.zones||{}).reduce((s,z)=>s+(z.layers?.length||0),0);
+            return(
               <div key={d.id} className="design-card">
-                <div style={{background:"#111",borderRadius:8,height:130,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,cursor:"pointer",overflow:"hidden"}} onClick={() => onOpen(d)}>
-                  {previewImg ? <img src={previewImg} alt="preview" style={{width:"100%",height:"100%",objectFit:"contain",objectPosition:"center"}} /> : <div style={{fontSize:42,opacity:0.18}}>👕</div>}
+                <div style={{background:"#111",borderRadius:8,height:130,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,cursor:"pointer",overflow:"hidden"}} onClick={()=>onOpen(d)}>
+                  {previewImg?<img src={previewImg} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} />:<div style={{fontSize:42,opacity:0.18}}>👕</div>}
                 </div>
-                <div style={{fontWeight:500,fontSize:13,marginBottom:3,color:"#e8e8e8"}}>{d.name}</div>
+                <div style={{fontWeight:500,fontSize:13,marginBottom:3}}>{d.name}</div>
                 <div style={{fontSize:11,color:"#555",marginBottom:10}}>{d.shirtType==="short"?"Short Sleeve":"Long Sleeve"} · {totalLayers} art layer{totalLayers!==1?"s":""}</div>
                 <div style={{display:"flex",gap:6}}>
-                  <button className="btn btn-primary" style={{flex:1,padding:"5px 8px",fontSize:11}} onClick={() => onOpen(d)}>Edit</button>
-                  <button className="btn btn-ghost" style={{padding:"5px 10px"}} onClick={() => onDuplicate(d)} title="Duplicate">⧉</button>
-                  <button className="btn btn-danger" style={{padding:"5px 10px"}} onClick={() => onDelete(d.id)}>✕</button>
+                  <button className="btn btn-primary" style={{flex:1,padding:"5px 8px",fontSize:11}} onClick={()=>onOpen(d)}>Edit</button>
+                  <button className="btn btn-ghost" style={{padding:"5px 10px"}} onClick={()=>onDuplicate(d)}>⧉</button>
+                  <button className="btn btn-danger" style={{padding:"5px 10px"}} onClick={()=>onDelete(d.id)}>✕</button>
                 </div>
               </div>
             );
           })}
         </div>
-      )}
+      }
     </div>
   );
 }
 
 // ─── Editor ──────────────────────────────────────────────────────────────────
-function Editor({ design, onSave, onDuplicate, onBack }) {
-  const [d, setD] = useState(() => JSON.parse(JSON.stringify(design)));
-  const [selectedLayer, setSelectedLayer] = useState(null);
-  const [bgRemoving, setBgRemoving] = useState(false);
-  const [editingName, setEditingName] = useState(false);
-  const [nameVal, setNameVal] = useState(d.name);
-  const [prevZoneImg, setPrevZoneImg] = useState(null);
-  // Per-zone shirt image offsets — initialized from ZONE_OFFSET config, editable live
-  const [offsets, setOffsets] = useState(() => JSON.parse(JSON.stringify(ZONE_OFFSET)));
-  const [showNudge, setShowNudge] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [showDrawing, setShowDrawing] = useState(false);
-  const [showBgEraser, setShowBgEraser] = useState(false);
-  const [editingLayerId, setEditingLayerId] = useState(null); // layer being edited in drawing board
-  const [showAI, setShowAI] = useState(false);
-  const stageRef = useRef(null);
-  const isDragging = useRef(false);
-  const dragStart = useRef({});
-  const artFileRef = useRef(null);
+function Editor({design,onSave,onDuplicate,onBack}){
+  const[d,setD]=useState(()=>JSON.parse(JSON.stringify(design)));
+  const[selectedLayer,setSelectedLayer]=useState(null);
+  const[bgRemoving,setBgRemoving]=useState(false);
+  const[editingName,setEditingName]=useState(false);
+  const[nameVal,setNameVal]=useState(d.name);
+  const[offsets,setOffsets]=useState(()=>JSON.parse(JSON.stringify(ZONE_OFFSET)));
+  const[showNudge,setShowNudge]=useState(false);
+  const[copied,setCopied]=useState(false);
+  const[showDrawing,setShowDrawing]=useState(false);
+  const[showBgEraser,setShowBgEraser]=useState(false);
+  const[editingLayerId,setEditingLayerId]=useState(null);
+  const[showAI,setShowAI]=useState(false);
+  const stageRef=useRef(null),isDragging=useRef(false),dragStart=useRef({}),artFileRef=useRef(null);
 
-  const zone = d.zones[d.activeZone];
-  const allZones = [...SHIRT_ZONES.short, ...SHIRT_ZONES.long];
-  const zoneInfo = allZones.find(z => z.id === d.activeZone);
-  const [lW, lH] = ZONE_LOGICAL[d.activeZone] || [380, 460]; // logical size for DTF math
-  const selLayer = zone.layers.find(l => l.id === selectedLayer);
-  const dtfInfo = selLayer ? calcDTF(selLayer.w, selLayer.h, zoneInfo?.maxW||12, zoneInfo?.maxH||14) : null;
-  const allImagesSet = Object.values(d.shirtImages).every(Boolean);
-  const currentShirtImg = d.shirtImages?.[d.activeZone];
+  const zone=d.zones[d.activeZone];
+  const allZones=[...SHIRT_ZONES.short,...SHIRT_ZONES.long];
+  const zoneInfo=allZones.find(z=>z.id===d.activeZone);
+  const[lW,lH]=ZONE_LOGICAL[d.activeZone]||[380,460];
+  const selLayer=zone.layers.find(l=>l.id===selectedLayer);
+  const dtfInfo=selLayer?calcDTF(selLayer.w,selLayer.h,zoneInfo?.maxW||12,zoneInfo?.maxH||14):null;
+  const allImagesSet=Object.values(d.shirtImages).every(Boolean);
+  const currentShirtImg=d.shirtImages?.[d.activeZone];
 
-  const upd = useCallback(patch => setD(p => ({...p,...patch})), []);
-  const updZone = useCallback((zid, patch) => setD(p => ({...p, zones:{...p.zones,[zid]:{...p.zones[zid],...patch}}})), []);
-  const updLayer = useCallback((lid, patch) => {
-    setD(p => {
-      const layers = p.zones[p.activeZone].layers.map(l => l.id===lid ? {...l,...patch} : l);
-      return {...p, zones:{...p.zones,[p.activeZone]:{...p.zones[p.activeZone],layers}}};
-    });
-  }, []);
+  const upd=useCallback(patch=>setD(p=>({...p,...patch})),[]);
+  const updZone=useCallback((zid,patch)=>setD(p=>({...p,zones:{...p.zones,[zid]:{...p.zones[zid],...patch}}})),[]);
+  const updLayer=useCallback((lid,patch)=>{setD(p=>{const layers=p.zones[p.activeZone].layers.map(l=>l.id===lid?{...l,...patch}:l);return{...p,zones:{...p.zones,[p.activeZone]:{...p.zones[p.activeZone],layers}}};});},[]);
+  const updOffset=useCallback((zid,patch)=>setOffsets(o=>({...o,[zid]:{...o[zid],...patch}})),[]);
 
-  const updOffset = useCallback((zid, patch) => setOffsets(o => ({...o, [zid]:{...o[zid],...patch}})), []);
-
-  // Delete selected layer with keyboard
-  useEffect(() => {
-    function onKeyDown(e) {
-      if (!selectedLayer) return;
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-      if (e.key === "Delete" || e.key === "Backspace") {
-        e.preventDefault();
-        deleteLayer(selectedLayer);
-      }
+  useEffect(()=>{
+    function onKeyDown(e){
+      if(!selectedLayer)return;
+      if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
+      if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();deleteLayer(selectedLayer);}
     }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedLayer]);
-  const prevImgRef = useRef(currentShirtImg);
-  useEffect(() => {
-    if (currentShirtImg !== prevImgRef.current) {
-      setPrevZoneImg(prevImgRef.current);
-      prevImgRef.current = currentShirtImg;
-    }
-  }, [currentShirtImg]);
+    window.addEventListener("keydown",onKeyDown);
+    return()=>window.removeEventListener("keydown",onKeyDown);
+  },[selectedLayer]);
 
-  function setShirtImg(zid, src) { setD(p => ({...p, shirtImages:{...p.shirtImages,[zid]:src}})); }
-  function addArtLayer(dataUrl) {
-    const img = new Image();
-    img.onload = () => {
-      const asp = img.width/img.height;
-      const w=42, h=w/asp;
-      const layer = {id:Date.now()+Math.random(),src:dataUrl,x:29,y:22,w,h,opacity:100,rotation:0,locked:false};
-      updZone(d.activeZone, {layers:[...zone.layers, layer]});
+  function setShirtImg(zid,src){setD(p=>({...p,shirtImages:{...p.shirtImages,[zid]:src}}));}
+  function addArtLayer(dataUrl){
+    const img=new Image();
+    img.onload=()=>{
+      const asp=img.width/img.height;
+      const w=42,h=w/asp;
+      const layer={id:Date.now()+Math.random(),src:dataUrl,x:29,y:22,w,h,opacity:100,rotation:0,locked:false};
+      updZone(d.activeZone,{layers:[...zone.layers,layer]});
       setSelectedLayer(layer.id);
     };
-    img.src = dataUrl;
+    img.src=dataUrl;
   }
-  function handleArtFile(e) {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => addArtLayer(ev.target.result);
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  }
-  async function removeBg() {
-    if (!selLayer) return;
+  function handleArtFile(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>addArtLayer(ev.target.result);reader.readAsDataURL(file);e.target.value="";}
+  async function removeBg(){
+    if(!selLayer)return;
     setBgRemoving(true);
-    await new Promise(r => setTimeout(r, 10));
-
-    try {
-      const srcImg = await new Promise((res,rej) => {
-        const i = new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=selLayer.src;
-      });
-
-      const W=srcImg.width, H=srcImg.height, N=W*H;
-      const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
-      const ctx=cv.getContext("2d"); ctx.drawImage(srcImg,0,0);
-      const id=ctx.getImageData(0,0,W,H); const px=id.data;
-
-      // ── 1. Sample corners for bg color ───────────────────────────────────
+    await new Promise(r=>setTimeout(r,10));
+    try{
+      const srcImg=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=selLayer.src;});
+      const W=srcImg.width,H=srcImg.height,N=W*H;
+      const cv=document.createElement("canvas");cv.width=W;cv.height=H;
+      const ctx=cv.getContext("2d");ctx.drawImage(srcImg,0,0);
+      const id=ctx.getImageData(0,0,W,H);const px=id.data;
       const cpts=[[0,0],[W-1,0],[0,H-1],[W-1,H-1],[1,1],[W-2,1],[1,H-2],[W-2,H-2]];
       let bgR=0,bgG=0,bgB=0;
-      cpts.forEach(([x,y])=>{ const i=(y*W+x)*4; bgR+=px[i]; bgG+=px[i+1]; bgB+=px[i+2]; });
-      bgR/=cpts.length; bgG/=cpts.length; bgB/=cpts.length;
-
-      // ── 2. Euclidean distance from bg for every pixel ────────────────────
+      cpts.forEach(([x,y])=>{const i=(y*W+x)*4;bgR+=px[i];bgG+=px[i+1];bgB+=px[i+2];});
+      bgR/=cpts.length;bgG/=cpts.length;bgB/=cpts.length;
       const dist=new Float32Array(N);
-      for(let i=0;i<N;i++){
-        const dr=px[i*4]-bgR, dg=px[i*4+1]-bgG, db=px[i*4+2]-bgB;
-        dist[i]=Math.sqrt(dr*dr+dg*dg+db*db);
-      }
-
-      // ── 3. Multi-pass flood fill — each pass re-seeds from all prior bg ──
-      // This lets later (looser) passes crawl through fringe pixels to reach
-      // enclosed background pockets. Still safe: can't cross high-dist subject pixels.
+      for(let i=0;i<N;i++){const dr=px[i*4]-bgR,dg=px[i*4+1]-bgG,db=px[i*4+2]-bgB;dist[i]=Math.sqrt(dr*dr+dg*dg+db*db);}
       const isBg=new Uint8Array(N);
-
-      function floodPass(thresh) {
-        const q=new Uint32Array(N*2); let qh=0,qt=0;
-        function tryAdd(i){
-          if(i>=0&&i<N&&!isBg[i]&&dist[i]<=thresh){ isBg[i]=1; q[qt++]=i; }
-        }
-        // Re-seed from ALL existing bg pixels first (handles enclosed areas)
-        for(let i=0;i<N;i++) if(isBg[i]) q[qt++]=i;
-        // Seed entire border
-        for(let x=0;x<W;x++){
-          if(!isBg[x])          { isBg[x]=1;         q[qt++]=x;          }
-          if(!isBg[(H-1)*W+x]) { isBg[(H-1)*W+x]=1; q[qt++]=(H-1)*W+x; }
-        }
-        for(let y=1;y<H-1;y++){
-          if(!isBg[y*W])        { isBg[y*W]=1;        q[qt++]=y*W;        }
-          if(!isBg[y*W+W-1])    { isBg[y*W+W-1]=1;    q[qt++]=y*W+W-1;   }
-        }
+      function floodPass(thresh){
+        const q=new Uint32Array(N*2);let qh=0,qt=0;
+        for(let i=0;i<N;i++)if(isBg[i]){q[qt++]=i;}
+        for(let x=0;x<W;x++){if(!isBg[x]){isBg[x]=1;q[qt++]=x;}if(!isBg[(H-1)*W+x]){isBg[(H-1)*W+x]=1;q[qt++]=(H-1)*W+x;}}
+        for(let y=1;y<H-1;y++){if(!isBg[y*W]){isBg[y*W]=1;q[qt++]=y*W;}if(!isBg[y*W+W-1]){isBg[y*W+W-1]=1;q[qt++]=y*W+W-1;}}
         while(qh<qt){
           const idx=q[qh++],x=idx%W,y=(idx/W)|0;
-          if(x>0)    tryAdd(idx-1);
-          if(x<W-1)  tryAdd(idx+1);
-          if(y>0)    tryAdd(idx-W);
-          if(y<H-1)  tryAdd(idx+W);
-          if(x>0   &&y>0)    tryAdd(idx-W-1);
-          if(x<W-1 &&y>0)    tryAdd(idx-W+1);
-          if(x>0   &&y<H-1)  tryAdd(idx+W-1);
-          if(x<W-1 &&y<H-1)  tryAdd(idx+W+1);
+          if(x>0)tryAdd(idx-1);if(x<W-1)tryAdd(idx+1);if(y>0)tryAdd(idx-W);if(y<H-1)tryAdd(idx+W);
+          if(x>0&&y>0)tryAdd(idx-W-1);if(x<W-1&&y>0)tryAdd(idx-W+1);if(x>0&&y<H-1)tryAdd(idx+W-1);if(x<W-1&&y<H-1)tryAdd(idx+W+1);
         }
+        function tryAdd(i){if(i>=0&&i<N&&!isBg[i]&&dist[i]<=thresh){isBg[i]=1;q[qt++]=i;}}
       }
-
-      floodPass(30);   // tight: clear unambiguous bg
-      floodPass(60);   // medium: JPEG fringe + anti-alias edges
-      floodPass(100);  // loose: soft shadows + compression artifacts
-
-      // ── 4. Apply alpha with soft fringe ──────────────────────────────────
-      for(let i=0;i<N;i++){
-        if(!isBg[i]) continue;
-        const d=dist[i];
-        if(d<=40) px[i*4+3]=0;
-        else {
-          const t=Math.min(1,(d-40)/60);
-          px[i*4+3]=Math.round(Math.pow(t,1.5)*255);
-        }
-      }
-
-      // ── 5. Edge cleanup: fade dark/light fringe on fg edge pixels ────────
-      // For each non-bg pixel adjacent to a removed pixel:
-      // if it's close to the bg color, fade it proportionally
-      const alphaSnap=new Uint8Array(N);
-      for(let i=0;i<N;i++) alphaSnap[i]=px[i*4+3];
-
-      for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){
-        const i=y*W+x;
-        if(isBg[i]) continue;
-        if(alphaSnap[i]<10) continue;
-        const nearBg=isBg[i-1]||isBg[i+1]||isBg[i-W]||isBg[i+W];
-        if(!nearBg) continue;
-        // Fade fringe: the closer to bg color, the more transparent
-        const fringeFactor=Math.max(0, 1-dist[i]/120);
-        if(fringeFactor>0) px[i*4+3]=Math.round(alphaSnap[i]*(1-fringeFactor*0.85));
-      }
-
+      floodPass(30);floodPass(60);floodPass(100);
+      for(let i=0;i<N;i++){if(!isBg[i])continue;const dv=dist[i];if(dv<=40)px[i*4+3]=0;else{const t=Math.min(1,(dv-40)/60);px[i*4+3]=Math.round(Math.pow(t,1.5)*255);}}
       ctx.putImageData(id,0,0);
       updLayer(selLayer.id,{src:cv.toDataURL("image/png")});
-
-    } catch(err) {
-      console.error("removeBg:",err);
-      alert("Background removal failed: "+err.message);
-    }
+    }catch(err){alert("Background removal failed: "+err.message);}
     setBgRemoving(false);
   }
-  function deleteLayer(id) { updZone(d.activeZone, {layers:zone.layers.filter(l=>l.id!==id)}); if (selectedLayer===id) setSelectedLayer(null); }
-  function reorderLayer(id, dir) {
-    const layers=[...zone.layers], idx=layers.findIndex(l=>l.id===id), ni=idx+dir;
-    if(ni<0||ni>=layers.length) return;
-    [layers[idx],layers[ni]]=[layers[ni],layers[idx]];
-    updZone(d.activeZone,{layers});
-  }
-  function layerAt(cx,cy) {
-    // Convert stage pixel coords → logical % then back to check hit
-    const scaleX = lW/STAGE_W, scaleY = lH/STAGE_H;
+  function deleteLayer(id){updZone(d.activeZone,{layers:zone.layers.filter(l=>l.id!==id)});if(selectedLayer===id)setSelectedLayer(null);}
+  function reorderLayer(id,dir){const layers=[...zone.layers],idx=layers.findIndex(l=>l.id===id),ni=idx+dir;if(ni<0||ni>=layers.length)return;[layers[idx],layers[ni]]=[layers[ni],layers[idx]];updZone(d.activeZone,{layers});}
+  function layerAt(cx,cy){
     for(let i=zone.layers.length-1;i>=0;i--){
       const l=zone.layers[i];
-      const lx=(l.x/100)*STAGE_W, ly=(l.y/100)*STAGE_H;
-      const lw=(l.w/100)*STAGE_W, lh=(l.h/100)*STAGE_H;
-      if(cx>=lx&&cx<=lx+lw&&cy>=ly&&cy<=ly+lh) return l;
+      const lx=(l.x/100)*STAGE_W,ly=(l.y/100)*STAGE_H,lw=(l.w/100)*STAGE_W,lh=(l.h/100)*STAGE_H;
+      if(cx>=lx&&cx<=lx+lw&&cy>=ly&&cy<=ly+lh)return l;
     }
     return null;
   }
-  function onMD(e) {
-    const rect=stageRef.current.getBoundingClientRect();
-    const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
-    const layer=layerAt(cx,cy);
-    if(layer&&!layer.locked){ setSelectedLayer(layer.id); isDragging.current=true; dragStart.current={cx,cy,ox:layer.x,oy:layer.y}; }
-    else if(!layer) setSelectedLayer(null);
-  }
-  function onMM(e) {
-    if(!isDragging.current||!selectedLayer) return;
-    const rect=stageRef.current.getBoundingClientRect();
-    const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
-    const dx=((cx-dragStart.current.cx)/STAGE_W)*100;
-    const dy=((cy-dragStart.current.cy)/STAGE_H)*100;
-    updLayer(selectedLayer,{x:Math.max(0,dragStart.current.ox+dx),y:Math.max(0,dragStart.current.oy+dy)});
-  }
-  function onMU() { isDragging.current=false; }
+  function onMD(e){const rect=stageRef.current.getBoundingClientRect();const cx=e.clientX-rect.left,cy=e.clientY-rect.top;const layer=layerAt(cx,cy);if(layer&&!layer.locked){setSelectedLayer(layer.id);isDragging.current=true;dragStart.current={cx,cy,ox:layer.x,oy:layer.y};}else if(!layer)setSelectedLayer(null);}
+  function onMM(e){if(!isDragging.current||!selectedLayer)return;const rect=stageRef.current.getBoundingClientRect();const cx=e.clientX-rect.left,cy=e.clientY-rect.top;const dx=((cx-dragStart.current.cx)/STAGE_W)*100,dy=((cy-dragStart.current.cy)/STAGE_H)*100;updLayer(selectedLayer,{x:Math.max(0,dragStart.current.ox+dx),y:Math.max(0,dragStart.current.oy+dy)});}
+  function onMU(){isDragging.current=false;}
 
-  async function download(withShirt) {
-    const sc=2.5, w=STAGE_W*sc, h=STAGE_H*sc;
-    const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
-    const ctx=cv.getContext("2d");
-    ctx.clearRect(0,0,w,h);
+  async function download(withShirt){
+    const sc=2.5,w=STAGE_W*sc,h=STAGE_H*sc;
+    const cv=document.createElement("canvas");cv.width=w;cv.height=h;
+    const ctx=cv.getContext("2d");ctx.clearRect(0,0,w,h);
     if(withShirt){
       const src=d.shirtImages?.[d.activeZone];
       if(src){
         await new Promise(res=>{
-          const img=new Image();
-          img.crossOrigin="anonymous";
+          const img=new Image();img.crossOrigin="anonymous";
           img.onload=()=>{
-            // Recolor shirt for download using same flood-fill logic as preview
-            const tmp=document.createElement("canvas");
-            tmp.width=img.width; tmp.height=img.height;
-            const tctx=tmp.getContext("2d");
-            tctx.drawImage(img,0,0);
-            const idata=tctx.getImageData(0,0,tmp.width,tmp.height);
-            const ipx=idata.data, IW=tmp.width, IH=tmp.height;
-            // Sample border for bg detection
+            const tmp=document.createElement("canvas");tmp.width=img.width;tmp.height=img.height;
+            const tctx=tmp.getContext("2d");tctx.drawImage(img,0,0);
+            const idata=tctx.getImageData(0,0,tmp.width,tmp.height);const ipx=idata.data,IW=tmp.width,IH=tmp.height;
             let sr2=0,sg2=0,sb2=0,sc3=0;
             for(let x=0;x<IW;x++){for(const y of[0,IH-1]){const i=(y*IW+x)*4;sr2+=ipx[i];sg2+=ipx[i+1];sb2+=ipx[i+2];sc3++;}}
             for(let y=1;y<IH-1;y++){for(const x of[0,IW-1]){const i=(y*IW+x)*4;sr2+=ipx[i];sg2+=ipx[i+1];sb2+=ipx[i+2];sc3++;}}
             const ibgR=Math.round(sr2/sc3),ibgG=Math.round(sg2/sc3),ibgB=Math.round(sb2/sc3);
-            const ibgLum=(0.299*ibgR+0.587*ibgG+0.114*ibgB)/255;
-            const isDark=ibgLum<0.12;
-            // Flood fill bg
-            const iBg=new Uint8Array(IW*IH), iq=new Int32Array(IW*IH*2);
-            let iqH=0,iqT=0;
+            const ibgLum=(0.299*ibgR+0.587*ibgG+0.114*ibgB)/255;const isDark=ibgLum<0.12;
+            const iBg=new Uint8Array(IW*IH),iq=new Int32Array(IW*IH*2);let iqH=0,iqT=0;
             function sp(i){if(!iBg[i]){iBg[i]=1;iq[iqT++]=i;}}
-            for(let x=0;x<IW;x++){sp(x);sp((IH-1)*IW+x);}
-            for(let y=1;y<IH-1;y++){sp(y*IW);sp(y*IW+IW-1);}
-            while(iqH<iqT){
-              const idx=iq[iqH++],ix=idx%IW,iy=(idx/IW)|0;
-              for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-                if(!dx&&!dy)continue;
-                const nx=ix+dx,ny=iy+dy;
-                if(nx<0||nx>=IW||ny<0||ny>=IH)continue;
-                const ni=ny*IW+nx;if(iBg[ni])continue;
-                const np=ni*4,nr=ipx[np],ng=ipx[np+1],nb3=ipx[np+2];
-                let hit=false;
-                if(isDark){const pl=(0.299*nr+0.587*ng+0.114*nb3)/255;hit=pl<0.06;}
-                else{const dr=nr-ibgR,dg=ng-ibgG,db=nb3-ibgB;hit=Math.sqrt(dr*dr+dg*dg+db*db)<35;}
-                if(hit){iBg[ni]=1;iq[iqT++]=ni;}
-              }
-            }
-            // Recolor shirt pixels
-            const [bR2,bG2,bB2]=hexToRgb(ZONE_BASE_COLOR[d.activeZone]||"#ffffff");
-            const bLum=(0.299*bR2+0.587*bG2+0.114*bB2)/255||1;
-            const [tR2,tG2,tB2]=hexToRgb(d.shirtColor||"#ffffff");
-            for(let i=0;i<IW*IH;i++){
-              if(iBg[i])continue;
-              const pi=i*4;if(ipx[pi+3]<10)continue;
-              const lm=(0.299*ipx[pi]+0.587*ipx[pi+1]+0.114*ipx[pi+2])/255;
-              const nm=Math.min(lm/bLum,1.3);
-              ipx[pi]=Math.min(255,Math.round(tR2*nm));
-              ipx[pi+1]=Math.min(255,Math.round(tG2*nm));
-              ipx[pi+2]=Math.min(255,Math.round(tB2*nm));
-            }
-            tctx.putImageData(idata,0,0);
-            const scale=Math.min(w/img.width,h/img.height);
-            const dw=img.width*scale, dh=img.height*scale;
-            ctx.drawImage(tmp,(w-dw)/2,(h-dh)/2,dw,dh);
-            res();
-          };
-          img.src=src;
+            for(let x=0;x<IW;x++){sp(x);sp((IH-1)*IW+x);}for(let y=1;y<IH-1;y++){sp(y*IW);sp(y*IW+IW-1);}
+            while(iqH<iqT){const idx=iq[iqH++],ix=idx%IW,iy=(idx/IW)|0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=ix+dx,ny=iy+dy;if(nx<0||nx>=IW||ny<0||ny>=IH)continue;const ni=ny*IW+nx;if(iBg[ni])continue;const np=ni*4,nr=ipx[np],ng=ipx[np+1],nb3=ipx[np+2];let hit=false;if(isDark){const pl=(0.299*nr+0.587*ng+0.114*nb3)/255;hit=pl<0.06;}else{const dr=nr-ibgR,dg=ng-ibgG,db=nb3-ibgB;hit=Math.sqrt(dr*dr+dg*dg+db*db)<35;}if(hit){iBg[ni]=1;iq[iqT++]=ni;}}}
+            const[bR2,bG2,bB2]=hexToRgb(ZONE_BASE_COLOR[d.activeZone]||"#ffffff");const bLum=(0.299*bR2+0.587*bG2+0.114*bB2)/255||1;const[tR2,tG2,tB2]=hexToRgb(d.shirtColor||"#ffffff");
+            for(let i=0;i<IW*IH;i++){if(iBg[i])continue;const pi=i*4;if(ipx[pi+3]<10)continue;const lm=(0.299*ipx[pi]+0.587*ipx[pi+1]+0.114*ipx[pi+2])/255;const nm=Math.min(lm/bLum,1.3);ipx[pi]=Math.min(255,Math.round(tR2*nm));ipx[pi+1]=Math.min(255,Math.round(tG2*nm));ipx[pi+2]=Math.min(255,Math.round(tB2*nm));}
+            tctx.putImageData(idata,0,0);const scale=Math.min(w/img.width,h/img.height);const dw=img.width*scale,dh=img.height*scale;ctx.drawImage(tmp,(w-dw)/2,(h-dh)/2,dw,dh);res();
+          };img.src=src;
         });
-      } else { ctx.fillStyle="#555"; ctx.fillRect(0,0,w,h); }
+      }else{ctx.fillStyle="#555";ctx.fillRect(0,0,w,h);}
     }
     for(const layer of zone.layers){
-      await new Promise(res=>{
-        const img=new Image();
-        img.onload=()=>{
-          ctx.globalAlpha=layer.opacity/100;
-          const lx=(layer.x/100)*w, ly=(layer.y/100)*h;
-          const lw=(layer.w/100)*w, lh=(layer.h/100)*h;
-          ctx.save(); ctx.translate(lx+lw/2,ly+lh/2); ctx.rotate((layer.rotation||0)*Math.PI/180);
-          ctx.drawImage(img,-lw/2,-lh/2,lw,lh); ctx.restore(); ctx.globalAlpha=1; res();
-        };
-        img.src=layer.src;
-      });
+      await new Promise(res=>{const img=new Image();img.onload=()=>{ctx.globalAlpha=layer.opacity/100;const lx=(layer.x/100)*w,ly=(layer.y/100)*h,lw=(layer.w/100)*w,lh=(layer.h/100)*h;ctx.save();ctx.translate(lx+lw/2,ly+lh/2);ctx.rotate((layer.rotation||0)*Math.PI/180);ctx.drawImage(img,-lw/2,-lh/2,lw,lh);ctx.restore();ctx.globalAlpha=1;res();};img.src=layer.src;});
     }
-    const a=document.createElement("a");
-    a.href=cv.toDataURL("image/png");
-    a.download=`${d.name.replace(/\s+/g,"-")}-${d.activeZone}${withShirt?"-with-shirt":"-logo"}.png`;
-    a.click();
+    const a=document.createElement("a");a.href=cv.toDataURL("image/png");a.download=`${d.name.replace(/\s+/g,"-")}-${d.activeZone}${withShirt?"-with-shirt":"-logo"}.png`;a.click();
   }
 
-  return (
+  return(
     <div style={{display:"flex",height:"calc(100vh - 53px)",overflow:"hidden"}} className="editor-wrap">
       {/* LEFT */}
       <div className="left-panel">
@@ -1446,9 +1498,8 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
           <div className="panel-label">Shirt Type</div>
           <div style={{display:"flex",gap:6,marginBottom:12}}>
             {["short","long"].map(t=>(
-              <button key={t} className="btn-type"
-                style={{background:d.shirtType===t?"#f97316":"#222",color:d.shirtType===t?"#000":"#888"}}
-                onClick={()=>{ upd({shirtType:t,activeZone:t==="short"?"short_front":"long_front"}); setSelectedLayer(null); }}>
+              <button key={t} className="btn-type" style={{background:d.shirtType===t?"#f97316":"#222",color:d.shirtType===t?"#000":"#888"}}
+                onClick={()=>{upd({shirtType:t,activeZone:t==="short"?"short_front":"long_front"});setSelectedLayer(null);}}>
                 {t==="short"?"Short Sleeve":"Long Sleeve"}
               </button>
             ))}
@@ -1457,50 +1508,29 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
           <div style={{display:"flex",flexDirection:"column",gap:4}}>
             {SHIRT_ZONES[d.shirtType].map(z=>(
               <button key={z.id} className={`zone-tab${d.activeZone===z.id?" active":""}`}
-                onClick={()=>{ upd({activeZone:z.id}); setSelectedLayer(null); }}>
+                onClick={()=>{upd({activeZone:z.id});setSelectedLayer(null);}}>
                 {z.label.split("–")[1]?.trim()}
                 {d.shirtImages?.[z.id]&&<span className="dot-indicator" style={{background:d.activeZone===z.id?"#000":"#f97316"}} />}
               </button>
             ))}
           </div>
         </div>
-
-        {/* ── Shirt Position Nudge ── */}
         <div className="panel-section" style={{paddingBottom:showNudge?10:12}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setShowNudge(v=>!v)}>
             <span className="panel-label" style={{margin:0}}>Shirt Position</span>
             <span style={{fontSize:10,color:"#555"}}>{showNudge?"▲":"▼"}</span>
           </div>
-          {showNudge && (
+          {showNudge&&(
             <div style={{marginTop:8}}>
-              {[
-                {key:"x", label:"← → Nudge X", min:-30, max:30, step:0.5},
-                {key:"y", label:"↑ ↓ Nudge Y", min:-30, max:30, step:0.5},
-                {key:"s", label:"⊞ Scale",      min:0.6, max:1.6, step:0.01},
-              ].map(({key,label,min,max,step})=>{
-                const val = offsets[d.activeZone]?.[key] ?? (key==="s"?1:0);
-                return (
-                  <div key={key} className="slider-row">
-                    <div className="slider-top">
-                      <span className="slider-key">{label}</span>
-                      <span className="slider-val">{key==="s"?val.toFixed(2):Math.round(val)}</span>
-                    </div>
-                    <input type="range" min={min} max={max} step={step} value={val}
-                      onChange={e=>updOffset(d.activeZone,{[key]:parseFloat(e.target.value)})} />
-                  </div>
-                );
+              {[{key:"x",label:"← → Nudge X",min:-30,max:30,step:0.5},{key:"y",label:"↑ ↓ Nudge Y",min:-30,max:30,step:0.5},{key:"s",label:"⊞ Scale",min:0.6,max:1.6,step:0.01}].map(({key,label,min,max,step})=>{
+                const val=offsets[d.activeZone]?.[key]??(key==="s"?1:0);
+                return(<div key={key} className="slider-row"><div className="slider-top"><span className="slider-key">{label}</span><span className="slider-val">{key==="s"?val.toFixed(2):Math.round(val)}</span></div><input type="range" min={min} max={max} step={step} value={val} onChange={e=>updOffset(d.activeZone,{[key]:parseFloat(e.target.value)})} /></div>);
               })}
               <button className="btn btn-ghost" style={{width:"100%",fontSize:10,marginTop:4,padding:"5px 0"}}
-                onClick={()=>{
-                  const lines = Object.keys(ZONE_OFFSET).map(k=>`  ${k.padEnd(13)}: { x: ${(offsets[k]?.x||0).toFixed(1)}, y: ${(offsets[k]?.y||0).toFixed(1)}, s: ${(offsets[k]?.s||1).toFixed(2)} },`).join('\n');
-                  navigator.clipboard.writeText(`const ZONE_OFFSET = {\n${lines}\n};`).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
-                }}>
+                onClick={()=>{const lines=Object.keys(ZONE_OFFSET).map(k=>`  ${k.padEnd(13)}: { x: ${(offsets[k]?.x||0).toFixed(1)}, y: ${(offsets[k]?.y||0).toFixed(1)}, s: ${(offsets[k]?.s||1).toFixed(2)} },`).join('\n');navigator.clipboard.writeText(`const ZONE_OFFSET = {\n${lines}\n};`).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);});}}>
                 {copied?"✅ Copied!":"📋 Copy config for all zones"}
               </button>
-              <button className="btn btn-ghost" style={{width:"100%",fontSize:10,marginTop:4,padding:"5px 0"}}
-                onClick={()=>updOffset(d.activeZone,{x:0,y:0,s:1.0})}>
-                ↺ Reset this zone
-              </button>
+              <button className="btn btn-ghost" style={{width:"100%",fontSize:10,marginTop:4,padding:"5px 0"}} onClick={()=>updOffset(d.activeZone,{x:0,y:0,s:1.0})}>↺ Reset this zone</button>
             </div>
           )}
         </div>
@@ -1508,37 +1538,30 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
           <div className="panel-label">Shirt Color</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5}}>
             {SHIRT_COLORS.map(c=>(
-              <div key={c.hex} title={c.name} className="color-swatch"
-                style={{background:c.hex,borderColor:d.shirtColor===c.hex?"#f97316":"#2a2a2a"}}
-                onClick={()=>upd({shirtColor:c.hex})} />
+              <div key={c.hex} title={c.name} className="color-swatch" style={{background:c.hex,borderColor:d.shirtColor===c.hex?"#f97316":"#2a2a2a"}} onClick={()=>upd({shirtColor:c.hex})} />
             ))}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
             <span style={{fontSize:10,color:"#555"}}>Custom:</span>
-            <input type="color" value={d.shirtColor} onChange={e=>upd({shirtColor:e.target.value})}
-              style={{width:32,height:24,border:"1px solid #333",borderRadius:4,background:"none"}} />
+            <input type="color" value={d.shirtColor} onChange={e=>upd({shirtColor:e.target.value})} style={{width:32,height:24,border:"1px solid #333",borderRadius:4,background:"none"}} />
           </div>
         </div>
         <div className="scrollable">
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <span className="panel-label" style={{margin:0}}>Art Layers ({zone.layers.length})</span>
-            <button style={{fontSize:10,color:"#f97316",background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Mono',monospace"}}
-              onClick={()=>artFileRef.current.click()}>+ Add</button>
+            <button style={{fontSize:10,color:"#f97316",background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Mono',monospace"}} onClick={()=>artFileRef.current.click()}>+ Add</button>
           </div>
           {zone.layers.length===0&&<div style={{color:"#3a3a3a",fontSize:11,textAlign:"center",paddingTop:16,lineHeight:1.8}}>No art layers yet.<br/>Upload a logo above.</div>}
           {[...zone.layers].reverse().map((layer,i)=>(
             <div key={layer.id} className={`layer-row${selectedLayer===layer.id?" selected":""}`}
               onClick={()=>setSelectedLayer(layer.id===selectedLayer?null:layer.id)}
-              onDoubleClick={()=>{ setSelectedLayer(layer.id); setEditingLayerId(layer.id); setShowDrawing(true); }}
+              onDoubleClick={()=>{setSelectedLayer(layer.id);setEditingLayerId(layer.id);setShowDrawing(true);}}
               title="Click to select · Double-click to edit in Drawing Board">
               <div style={{width:28,height:28,borderRadius:4,overflow:"hidden",flexShrink:0,background:"#222"}}>
                 <img src={layer.src} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="" />
               </div>
-              <span style={{fontSize:11,flex:1,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {layer.locked?"🔒 ":""}Layer {zone.layers.length-i}
-              </span>
-              <button style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:13,padding:0,lineHeight:1}}
-                onClick={e=>{e.stopPropagation();deleteLayer(layer.id);}}>✕</button>
+              <span style={{fontSize:11,flex:1,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{layer.locked?"🔒 ":""}Layer {zone.layers.length-i}</span>
+              <button style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:13,padding:0,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteLayer(layer.id);}}>✕</button>
             </div>
           ))}
         </div>
@@ -1546,53 +1569,29 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
 
       {/* CENTER */}
       <div className="center-area" style={{flexDirection:"column"}}>
-        {!allImagesSet && <ImgSrcPanel shirtImages={d.shirtImages} onUpload={(zid,src)=>setShirtImg(zid,src)} />}
-        {allImagesSet && (
+        {!allImagesSet&&<ImgSrcPanel shirtImages={d.shirtImages} onUpload={(zid,src)=>setShirtImg(zid,src)} />}
+        {allImagesSet&&(
           <>
             <div className="zone-badge">{zoneInfo?.label} · max print {zoneInfo?.maxW}" × {zoneInfo?.maxH}"</div>
-
-            {/* ── Unified fixed-size stage — identical frame on every zone switch ── */}
-            <div ref={stageRef} className="shirt-stage"
-              style={{cursor:zone.layers.length>0?"crosshair":"default"}}
+            <div ref={stageRef} className="shirt-stage" style={{cursor:zone.layers.length>0?"crosshair":"default"}}
               onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
-
-              {/* Shirt image with smooth cross-fade */}
               <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} />
-
-              {/* Dashed print-area guide */}
               <div className="print-guide" />
-
-              {/* Art layers — coordinates stored as % of stage */}
               {zone.layers.map(layer=>{
-                const lx=(layer.x/100)*STAGE_W, ly=(layer.y/100)*STAGE_H;
-                const lw=(layer.w/100)*STAGE_W, lh=(layer.h/100)*STAGE_H;
+                const lx=(layer.x/100)*STAGE_W,ly=(layer.y/100)*STAGE_H,lw=(layer.w/100)*STAGE_W,lh=(layer.h/100)*STAGE_H;
                 const isSel=layer.id===selectedLayer;
-                return (
-                  <div key={layer.id} style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:10,
-                    opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",
-                    outline:isSel?"2px solid #f97316":"none",cursor:layer.locked?"not-allowed":"move"}}>
+                return(
+                  <div key={layer.id} style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:10,opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",outline:isSel?"2px solid #f97316":"none",cursor:layer.locked?"not-allowed":"move"}}>
                     <img src={layer.src} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",pointerEvents:"none"}} alt="" draggable={false} />
                     {isSel&&(
-                      <div className="resize-handle"
-                        onMouseDown={e=>{
-                          e.stopPropagation();
-                          const sx=e.clientX,sy=e.clientY,sw=layer.w,sh=layer.h;
-                          const mv=ev=>updLayer(layer.id,{w:Math.max(5,sw+((ev.clientX-sx)/STAGE_W)*100),h:Math.max(5,sh+((ev.clientY-sy)/STAGE_H)*100)});
-                          const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};
-                          window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up);
-                        }} />
+                      <div className="resize-handle" onMouseDown={e=>{e.stopPropagation();const sx=e.clientX,sy=e.clientY,sw=layer.w,sh=layer.h;const mv=ev=>updLayer(layer.id,{w:Math.max(5,sw+((ev.clientX-sx)/STAGE_W)*100),h:Math.max(5,sh+((ev.clientY-sy)/STAGE_H)*100)});const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);}} />
                     )}
                   </div>
                 );
               })}
-
             </div>
-
             {dtfInfo&&selLayer&&(
-              <div className="dtf-badge" style={{marginTop:14}}>
-                <span className="dtf-label">DTF Transfer Size</span>
-                <span className="dtf-value">{dtfInfo.w}" × {dtfInfo.h}"</span>
-              </div>
+              <div className="dtf-badge"><span className="dtf-label">DTF Transfer Size</span><span className="dtf-value">{dtfInfo.w}" × {dtfInfo.h}"</span></div>
             )}
           </>
         )}
@@ -1601,98 +1600,60 @@ function Editor({ design, onSave, onDuplicate, onBack }) {
       {/* RIGHT */}
       <div className="right-panel">
         <div className="panel-section">
-          {editingName ? (
-            <input className="name-input" autoFocus value={nameVal}
-              onChange={e=>setNameVal(e.target.value)}
-              onBlur={()=>{upd({name:nameVal});setEditingName(false);}}
-              onKeyDown={e=>e.key==="Enter"&&(upd({name:nameVal}),setEditingName(false))} />
-          ) : (
-            <div className="name-display" onClick={()=>setEditingName(true)}>
-              {d.name} <span style={{color:"#444",fontSize:11}}>✏️</span>
-            </div>
-          )}
+          {editingName
+            ?<input className="name-input" autoFocus value={nameVal} onChange={e=>setNameVal(e.target.value)} onBlur={()=>{upd({name:nameVal});setEditingName(false);}} onKeyDown={e=>e.key==="Enter"&&(upd({name:nameVal}),setEditingName(false))} />
+            :<div className="name-display" onClick={()=>setEditingName(true)}>{d.name} <span style={{color:"#444",fontSize:11}}>✏️</span></div>
+          }
           <div style={{display:"flex",gap:6,marginTop:8}}>
             <button className="btn btn-primary" style={{flex:1,fontSize:10,padding:"6px 0"}} onClick={()=>onSave(d)}>💾 Save</button>
-            <button className="btn btn-ghost" style={{fontSize:10,padding:"6px 8px"}} onClick={onDuplicate} title="Duplicate">⧉</button>
+            <button className="btn btn-ghost" style={{fontSize:10,padding:"6px 8px"}} onClick={onDuplicate}>⧉</button>
             <button className="btn btn-ghost" style={{fontSize:10,padding:"6px 8px"}} onClick={onBack}>← Back</button>
           </div>
         </div>
         <div className="panel-section">
           <div className="panel-label">Upload Art / Logo</div>
           <input ref={artFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleArtFile} />
-          <button className="btn btn-primary" style={{width:"100%",padding:"9px 0",fontSize:12,marginBottom:6}} onClick={()=>artFileRef.current.click()}>
-            📁 Upload Image
-          </button>
-          <button className="btn btn-ghost" style={{width:"100%",padding:"9px 0",fontSize:12,marginBottom:6}} onClick={()=>setShowDrawing(true)}>
-            ✏️ Open Drawing Board
-          </button>
-          <button className="btn btn-ghost" style={{width:"100%",padding:"9px 0",fontSize:12,borderColor:"rgba(249,115,22,0.4)",color:"#f97316"}} onClick={()=>setShowAI(true)}>
-            ✨ AI Image Generator
-          </button>
+          <button className="btn btn-primary" style={{width:"100%",padding:"9px 0",fontSize:12,marginBottom:6}} onClick={()=>artFileRef.current.click()}>📁 Upload Image</button>
+          <button className="btn btn-ghost" style={{width:"100%",padding:"9px 0",fontSize:12,marginBottom:6}} onClick={()=>{setEditingLayerId(null);setShowDrawing(true);}}>✏️ Open Drawing Board</button>
+          <button className="btn btn-ghost" style={{width:"100%",padding:"9px 0",fontSize:12,borderColor:"rgba(249,115,22,0.4)",color:"#f97316"}} onClick={()=>setShowAI(true)}>✨ AI Image Generator</button>
         </div>
-        {showBgEraser && selLayer && (
-          <BgEraserModal
-            src={selLayer.src}
-            onClose={()=>setShowBgEraser(false)}
-            onSave={dataUrl=>updLayer(selLayer.id,{src:dataUrl})}
-          />
+        {showBgEraser&&selLayer&&(
+          <BgEraserModal src={selLayer.src} onClose={()=>setShowBgEraser(false)} onSave={dataUrl=>updLayer(selLayer.id,{src:dataUrl})} />
         )}
-        {showDrawing && (
+        {showDrawing&&(
           <DrawingModal
-            onClose={()=>{ setShowDrawing(false); setEditingLayerId(null); }}
-            initialImage={editingLayerId ? zone.layers.find(l=>l.id===editingLayerId)?.src : null}
-            onAdd={dataUrl => {
-              if (editingLayerId) {
-                // Replace existing layer's image with the edited version
-                updLayer(editingLayerId, { src: dataUrl });
-                setEditingLayerId(null);
-              } else {
-                addArtLayer(dataUrl);
-              }
+            onClose={()=>{setShowDrawing(false);setEditingLayerId(null);}}
+            initialImage={editingLayerId?zone.layers.find(l=>l.id===editingLayerId)?.src:null}
+            onAdd={dataUrl=>{
+              if(editingLayerId){updLayer(editingLayerId,{src:dataUrl});setEditingLayerId(null);}
+              else{addArtLayer(dataUrl);}
             }}
           />
         )}
-        {showAI && <AIGeneratorModal onClose={()=>setShowAI(false)} onAdd={addArtLayer} />}
-        {selLayer ? (
+        {showAI&&<AIGeneratorModal onClose={()=>setShowAI(false)} onAdd={addArtLayer} />}
+        {selLayer?(
           <div className="scrollable">
             <div className="panel-label">Layer Properties</div>
-            <button className="btn btn-primary" style={{width:"100%",marginBottom:6,fontSize:11,padding:"7px 0"}}
-              onClick={()=>{ setEditingLayerId(selLayer.id); setShowDrawing(true); }}>
-              ✏️ Edit in Drawing Board
-            </button>
+            <button className="btn btn-primary" style={{width:"100%",marginBottom:6,fontSize:11,padding:"7px 0"}} onClick={()=>{setEditingLayerId(selLayer.id);setShowDrawing(true);}}>✏️ Edit in Drawing Board</button>
             <div style={{display:"flex",gap:5,marginBottom:10}}>
-              <button className="btn btn-ghost" style={{flex:1,fontSize:10,padding:"7px 0",borderColor:bgRemoving?"#f97316":"#333"}}
-                onClick={removeBg} disabled={bgRemoving}>
-                {bgRemoving?"⏳ Auto...":"⚡ Auto Remove"}
-              </button>
-              <button className="btn btn-ghost" style={{flex:1,fontSize:10,padding:"7px 0",borderColor:"rgba(249,115,22,0.4)",color:"#f97316"}}
-                onClick={()=>setShowBgEraser(true)} disabled={bgRemoving}>
-                🖌️ Manual Erase
-              </button>
+              <button className="btn btn-ghost" style={{flex:1,fontSize:10,padding:"7px 0",borderColor:bgRemoving?"#f97316":"#333"}} onClick={removeBg} disabled={bgRemoving}>{bgRemoving?"⏳ Auto...":"⚡ Auto Remove"}</button>
+              <button className="btn btn-ghost" style={{flex:1,fontSize:10,padding:"7px 0",borderColor:"rgba(249,115,22,0.4)",color:"#f97316"}} onClick={()=>setShowBgEraser(true)} disabled={bgRemoving}>🖌️ Manual Erase</button>
             </div>
-            <Slider label="Width %"    value={selLayer.w}           min={5}    max={100} onChange={v=>updLayer(selLayer.id,{w:v})} />
-            <Slider label="Height %"   value={selLayer.h}           min={5}    max={100} onChange={v=>updLayer(selLayer.id,{h:v})} />
-            <Slider label="X Position" value={selLayer.x}           min={0}    max={90}  onChange={v=>updLayer(selLayer.id,{x:v})} />
-            <Slider label="Y Position" value={selLayer.y}           min={0}    max={90}  onChange={v=>updLayer(selLayer.id,{y:v})} />
-            <Slider label="Opacity"    value={selLayer.opacity}     min={0}    max={100} onChange={v=>updLayer(selLayer.id,{opacity:v})} />
+            <Slider label="Width %" value={selLayer.w} min={5} max={100} onChange={v=>updLayer(selLayer.id,{w:v})} />
+            <Slider label="Height %" value={selLayer.h} min={5} max={100} onChange={v=>updLayer(selLayer.id,{h:v})} />
+            <Slider label="X Position" value={selLayer.x} min={0} max={90} onChange={v=>updLayer(selLayer.id,{x:v})} />
+            <Slider label="Y Position" value={selLayer.y} min={0} max={90} onChange={v=>updLayer(selLayer.id,{y:v})} />
+            <Slider label="Opacity" value={selLayer.opacity} min={0} max={100} onChange={v=>updLayer(selLayer.id,{opacity:v})} />
             <Slider label="Rotation °" value={selLayer.rotation||0} min={-180} max={180} onChange={v=>updLayer(selLayer.id,{rotation:v})} />
             <div style={{marginTop:10,display:"flex",gap:5,flexWrap:"wrap"}}>
               <button className="btn btn-ghost" style={{fontSize:10,flex:1}} onClick={()=>reorderLayer(selLayer.id,-1)}>⬆ Fwd</button>
               <button className="btn btn-ghost" style={{fontSize:10,flex:1}} onClick={()=>reorderLayer(selLayer.id,1)}>⬇ Back</button>
-              <button className="btn btn-ghost" style={{fontSize:10,flex:1}} onClick={()=>updLayer(selLayer.id,{locked:!selLayer.locked})}>
-                {selLayer.locked?"🔓":"🔒"}
-              </button>
+              <button className="btn btn-ghost" style={{fontSize:10,flex:1}} onClick={()=>updLayer(selLayer.id,{locked:!selLayer.locked})}>{selLayer.locked?"🔓":"🔒"}</button>
               <button className="btn btn-danger" style={{fontSize:10,flex:1}} onClick={()=>deleteLayer(selLayer.id)}>🗑</button>
             </div>
-            {dtfInfo&&(
-              <div className="dtf-box">
-                <div className="dtf-box-label">DTF Transfer Size</div>
-                <div className="dtf-box-val">{dtfInfo.w}" × {dtfInfo.h}"</div>
-                <div className="dtf-box-sub">relative to {zoneInfo?.maxW}"×{zoneInfo?.maxH}" max area</div>
-              </div>
-            )}
+            {dtfInfo&&(<div className="dtf-box"><div className="dtf-box-label">DTF Transfer Size</div><div className="dtf-box-val">{dtfInfo.w}" × {dtfInfo.h}"</div><div className="dtf-box-sub">relative to {zoneInfo?.maxW}"×{zoneInfo?.maxH}" max area</div></div>)}
           </div>
-        ) : (
+        ):(
           <div style={{flex:1,padding:12}}>
             <div style={{fontSize:10,color:"#3a3a3a",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>No Layer Selected</div>
             <div style={{fontSize:11,color:"#333",lineHeight:1.8}}>Upload art using the button above, then click a layer to edit it.</div>
