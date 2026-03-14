@@ -370,10 +370,15 @@ const DRAW_CW = 800, DRAW_CH = 600;
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 
 function getBoundingBox(layer){
-  if(layer.type==="bitmap"||layer.type==="shape"||layer.type==="text"){
-    return{x:layer.x,y:layer.y,w:layer.w||100,h:layer.h||40};
+  if(layer.type==="pen"){
+    if(!layer.points||layer.points.length===0) return{x:0,y:0,w:10,h:10};
+    const xs=layer.points.map(p=>p.x), ys=layer.points.map(p=>p.y);
+    const pad=(layer.strokeW||3)+6;
+    const minX=Math.min(...xs)-pad, minY=Math.min(...ys)-pad;
+    const w=Math.max(...xs)-minX+pad, h=Math.max(...ys)-minY+pad;
+    return{x:minX,y:minY,w:Math.max(10,w),h:Math.max(10,h)};
   }
-  return{x:layer.x||0,y:layer.y||0,w:50,h:50};
+  return{x:layer.x||0,y:layer.y||0,w:layer.w||100,h:layer.h||40};
 }
 
 function DrawingModal({onClose,onAdd,initialImage}){
@@ -624,12 +629,13 @@ function DrawingModal({onClose,onAdd,initialImage}){
     return{x:snap(Math.round((cl.clientX-rect.left)*scaleX)),y:snap(Math.round((cl.clientY-rect.top)*scaleY))};
   }
 
-  // ── Hit test ──
+  // ── Hit test — generous padding so thin strokes/text are easy to grab ──
   function hitTest(x,y){
     for(let i=layers.length-1;i>=0;i--){
       const l=layers[i];if(!l.visible)continue;
       const bb=getBoundingBox(l);
-      if(x>=bb.x-4&&x<=bb.x+bb.w+4&&y>=bb.y-4&&y<=bb.y+bb.h+4)return l;
+      const pad=l.type==="pen"?0:8; // pen already has padding in getBoundingBox
+      if(x>=bb.x-pad&&x<=bb.x+bb.w+pad&&y>=bb.y-pad&&y<=bb.y+bb.h+pad)return l;
     }
     return null;
   }
@@ -637,10 +643,29 @@ function DrawingModal({onClose,onAdd,initialImage}){
     if(!layer)return null;
     const bb=getBoundingBox(layer);
     const cx=bb.x+bb.w/2;
-    if(Math.hypot(x-cx,y-(bb.y-26))<10)return"rotate";
+    // Rotation knob above the box
+    if(Math.hypot(x-cx,y-(bb.y-26))<12)return"rotate";
+    // Corner resize handles — bigger hit area (12px radius)
     const corners=[["tl",bb.x,bb.y],["tr",bb.x+bb.w,bb.y],["bl",bb.x,bb.y+bb.h],["br",bb.x+bb.w,bb.y+bb.h]];
-    for(const[id,hx,hy] of corners){if(Math.hypot(x-hx,y-hy)<8)return id;}
+    for(const[id,hx,hy] of corners){if(Math.hypot(x-hx,y-hy)<12)return id;}
     return null;
+  }
+
+  // ── Cursor state — reflects what would happen on click ──
+  const [canvasCursor,setCanvasCursor]=useState("crosshair");
+  function updateCursor(p){
+    if(tool!=="select"){
+      setCanvasCursor(tool==="eraser"?"cell":tool==="text"?"text":"crosshair");
+      return;
+    }
+    const selLayer=layers.find(l=>l.id===selId);
+    const handle=selLayer?hitHandle(p.x,p.y,selLayer):null;
+    if(handle==="rotate")         {setCanvasCursor("grab");return;}
+    if(handle==="tl"||handle==="br"){setCanvasCursor("nwse-resize");return;}
+    if(handle==="tr"||handle==="bl"){setCanvasCursor("nesw-resize");return;}
+    const hit=hitTest(p.x,p.y);
+    if(hit) {setCanvasCursor("move");return;}
+    setCanvasCursor("default");
   }
 
   function onPointerDown(e){
@@ -651,30 +676,37 @@ function DrawingModal({onClose,onAdd,initialImage}){
       const handle=selLayer?hitHandle(p.x,p.y,selLayer):null;
       if(handle==="rotate"){
         const bb=getBoundingBox(selLayer);
-        dragSel.current={id:selId,mode:"rotate",cx:bb.x+bb.w/2,cy:bb.y+bb.h/2,startAngle:Math.atan2(p.y-(bb.y+bb.h/2),p.x-(bb.x+bb.w/2)),origRot:selLayer.rotation||0};
-        drawing.current=true;return;
+        dragSel.current={id:selId,mode:"rotate",cx:bb.x+bb.w/2,cy:bb.y+bb.h/2,
+          startAngle:Math.atan2(p.y-(bb.y+bb.h/2),p.x-(bb.x+bb.w/2)),origRot:selLayer.rotation||0};
+        drawing.current=true;setCanvasCursor("grabbing");return;
       }
       if(handle&&handle!=="rotate"){
         const bb=getBoundingBox(selLayer);
-        resizeSel.current={id:selId,edge:handle,startX:p.x,startY:p.y,ox:selLayer.x,oy:selLayer.y,ow:selLayer.w||100,oh:selLayer.h||40};
+        resizeSel.current={id:selId,edge:handle,startX:p.x,startY:p.y,
+          ox:selLayer.x,oy:selLayer.y,ow:selLayer.w||100,oh:selLayer.h||40};
         drawing.current=true;return;
       }
       const hit=hitTest(p.x,p.y);
       if(hit){
         setSelId(hit.id);
-        dragSel.current={id:hit.id,mode:"move",startX:p.x,startY:p.y,ox:hit.x,oy:hit.y};
-        drawing.current=true;
-      } else {setSelId(null);}
+        // For pen layers, track offset differently (move all points)
+        if(hit.type==="pen"){
+          const bb=getBoundingBox(hit);
+          dragSel.current={id:hit.id,mode:"move-pen",startX:p.x,startY:p.y,origPoints:[...hit.points.map(pt=>({...pt}))]};
+        } else {
+          dragSel.current={id:hit.id,mode:"move",startX:p.x,startY:p.y,ox:hit.x,oy:hit.y};
+        }
+        drawing.current=true;setCanvasCursor("grabbing");
+      } else {
+        setSelId(null);
+      }
       return;
     }
+    // Non-select tools: clicking on existing object in any tool auto-selects it (like Google Drawings)
     if(tool==="text"){handleTextClick(p);return;}
     if(tool==="polyline"){
-      if(!polyActive){
-        setPolyActive(true);
-        polyPts.current=[p];
-      } else {
-        polyPts.current=[...polyPts.current,p];
-      }
+      if(!polyActive){setPolyActive(true);polyPts.current=[p];}
+      else{polyPts.current=[...polyPts.current,p];}
       return;
     }
     drawing.current=true;
@@ -689,9 +721,10 @@ function DrawingModal({onClose,onAdd,initialImage}){
   }
 
   function onPointerMove(e){
-    if(!drawing.current)return;
-    e.preventDefault();
     const p=getPos(e);
+    // Always update cursor on hover
+    if(!drawing.current){updateCursor(p);return;}
+    e.preventDefault();
 
     if(tool==="select"&&dragSel.current){
       const{id,mode}=dragSel.current;
@@ -702,7 +735,14 @@ function DrawingModal({onClose,onAdd,initialImage}){
         setLayers(ls=>ls.map(l=>l.id===id?{...l,rotation:(origRot+delta+360)%360}:l));
       } else if(mode==="move"){
         const{startX,startY,ox,oy}=dragSel.current;
-        setLayers(ls=>ls.map(l=>l.id===id?{...l,x:snap(ox+p.x-startX),y:snap(oy+p.y-startY)}:l));
+        const nx=ox+p.x-startX, ny=oy+p.y-startY;
+        setLayers(ls=>ls.map(l=>l.id===id?{...l,x:gridSnap?snap(nx):nx,y:gridSnap?snap(ny):ny}:l));
+      } else if(mode==="move-pen"){
+        // Move all pen points by delta
+        const{startX,startY,origPoints}=dragSel.current;
+        const dx=p.x-startX, dy=p.y-startY;
+        const newPts=origPoints.map(pt=>({x:pt.x+dx,y:pt.y+dy}));
+        setLayers(ls=>ls.map(l=>l.id===id?{...l,points:newPts}:l));
       }
       return;
     }
@@ -748,7 +788,9 @@ function DrawingModal({onClose,onAdd,initialImage}){
     drawing.current=false;
     if(dragSel.current){
       pushHistory();
-      dragSel.current=null;return;
+      dragSel.current=null;
+      updateCursor(getPos(e));
+      return;
     }
     if(resizeSel.current){
       pushHistory();
@@ -920,8 +962,7 @@ function DrawingModal({onClose,onAdd,initialImage}){
     {label:"Impact",  val:"Impact, sans-serif"},
   ];
 
-  const cursorMap={select:"default",pen:"crosshair",eraser:"cell",text:"text"};
-  const cursor=cursorMap[tool]||"crosshair";
+  // canvasCursor is now set dynamically via updateCursor() on hover
 
   return(
     <div className="draw-modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
@@ -1026,9 +1067,22 @@ function DrawingModal({onClose,onAdd,initialImage}){
           {/* Canvas area */}
           <div className="draw-canvas-wrap" ref={wrapRef}
             onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp}
+            onMouseLeave={()=>setCanvasCursor("crosshair")}
+            onDoubleClick={e=>{
+              // Double-click: edit text layer inline, or quick-select any layer
+              const p=getPos(e);
+              const hit=hitTest(p.x,p.y);
+              if(hit&&hit.type==="text"){
+                const newText=window.prompt("Edit text:",hit.text||"");
+                if(newText!==null) setLayers(ls=>ls.map(l=>l.id===hit.id?{...l,text:newText}:l));
+              } else if(hit) {
+                setSelId(hit.id);
+                setTool("select");
+              }
+            }}
             onTouchStart={onPointerDown} onTouchMove={onPointerMove} onTouchEnd={onPointerUp}>
             <canvas ref={canvasRef} width={DRAW_CW} height={DRAW_CH} className="draw-canvas"
-              style={{maxWidth:"100%",maxHeight:"100%",cursor,userSelect:"none",
+              style={{maxWidth:"100%",maxHeight:"100%",cursor:canvasCursor,userSelect:"none",
                 background:"repeating-conic-gradient(#1a1a1a 0% 25%, #161616 0% 50%) 0 0/20px 20px"}} />
             {/* Polyline indicator */}
             {polyActive&&(
@@ -1137,10 +1191,18 @@ function DrawingModal({onClose,onAdd,initialImage}){
 
         {/* ── Footer ── */}
         <div className="draw-footer">
-          <span style={{fontSize:10,color:"#333",marginRight:"auto"}}>
-            {initialImage?"Editing existing layer — layers stack on top":"Shapes + pen + text · layers panel on right · Del to delete selected layer"}
+          <span style={{fontSize:10,color:"#333",marginRight:"auto",display:"flex",gap:16,alignItems:"center"}}>
+            <span>{initialImage?"Editing existing layer — layers stack on top":"Select tool (↖) to move layers · Double-click to edit text · Del to delete"}</span>
+            {selLayer&&(()=>{
+              const bb=getBoundingBox(selLayer);
+              return <span style={{color:"#555",fontFamily:"'DM Mono',monospace"}}>
+                x:{Math.round(bb.x)} y:{Math.round(bb.y)} · {Math.round(bb.w)}×{Math.round(bb.h)}px
+                {selLayer.rotation?" · "+Math.round(selLayer.rotation)+"°":""}
+              </span>;
+            })()}
           </span>
           <span style={{fontSize:10,color:"#444",marginRight:8}}>Layers: {layers.length}</span>
+          <button className="btn btn-ghost" onClick={()=>{setTool("select");}} style={{fontSize:11,borderColor:tool==="select"?"#f97316":"#333",color:tool==="select"?"#f97316":"#aaa"}}>↖ Select Mode</button>
           <button className="btn btn-ghost" onClick={onClose} style={{fontSize:11}}>Cancel</button>
           <button className="btn btn-primary" onClick={exportAndAdd} style={{fontSize:11}}>
             {initialImage?"💾 Save as New Layer":"✅ Add to Design"}
