@@ -460,7 +460,7 @@ function DrawingModal({onClose,onAdd,initialImage}){
   // ── Redraw canvas when layers change ──
   useEffect(()=>{renderAll();},[layers,selId,showGrid,zoom]);
 
-  function renderAll(){
+  function renderAll(skipSelection){
     const canvas=canvasRef.current; if(!canvas)return;
     const ctx=canvas.getContext("2d");
     const W=DRAW_CW,H=DRAW_CH;
@@ -496,8 +496,8 @@ function DrawingModal({onClose,onAdd,initialImage}){
       ctx.restore();
     }
 
-    // Selection handles
-    if(selId){
+    // Selection handles (skipped during export)
+    if(selId && !skipSelection){
       const layer=layers.find(l=>l.id===selId);
       if(layer&&layer.visible){
         const bb=getBoundingBox(layer);
@@ -846,26 +846,26 @@ function DrawingModal({onClose,onAdd,initialImage}){
 
   // ── Export ──
   function exportAndAdd(){
-    // Flatten all layers onto export canvas
+    if(layers.length===0){
+      alert("Nothing was drawn yet — add some shapes, pen strokes, or text first.");
+      return;
+    }
+    const canvas=canvasRef.current;
+    if(!canvas)return;
+
+    // Render WITHOUT selection handles
+    renderAll(true);
+
+    // Copy to a fresh canvas so we get a clean dataURL
     const expCanvas=document.createElement("canvas");
     expCanvas.width=DRAW_CW;expCanvas.height=DRAW_CH;
-    const ctx=expCanvas.getContext("2d");
-    // Re-render without selection handles
-    const savedSelId=selId; // render without sel
-    for(const layer of layers){
-      if(!layer.visible)continue;
-      ctx.save();
-      ctx.globalAlpha=(layer.opacity??100)/100;
-      const bb=getBoundingBox(layer);
-      const cx=bb.x+bb.w/2,cy=bb.y+bb.h/2;
-      ctx.translate(cx,cy);ctx.rotate(((layer.rotation)||0)*Math.PI/180);ctx.translate(-cx,-cy);
-      if(layer.type==="bitmap"){const img=imageCache.current[layer.src];if(img)ctx.drawImage(img,layer.x,layer.y,layer.w,layer.h);}
-      else if(layer.type==="shape")renderShape(ctx,layer);
-      else if(layer.type==="text")renderText(ctx,layer);
-      else if(layer.type==="pen")renderPenLayer(ctx,layer);
-      ctx.restore();
-    }
-    onAdd(expCanvas.toDataURL("image/png"));
+    expCanvas.getContext("2d").drawImage(canvas,0,0);
+    const dataUrl=expCanvas.toDataURL("image/png");
+
+    // Restore normal render (with selection handles) after export
+    setTimeout(()=>renderAll(false),0);
+
+    onAdd(dataUrl);
     onClose();
   }
 
@@ -1396,13 +1396,18 @@ function Editor({design,onSave,onDuplicate,onBack}){
   function addArtLayer(dataUrl){
     const img=new Image();
     img.onload=()=>{
-      const asp=img.width/img.height;
-      const w=42,h=w/asp;
-      const layer={id:Date.now()+Math.random(),src:dataUrl,x:29,y:22,w,h,opacity:100,rotation:0,locked:false};
+      const asp=img.width>0&&img.height>0 ? img.width/img.height : 1;
+      // Default to 40% width of the zone, preserving aspect ratio
+      const w=40, h=Math.max(5, w/asp);
+      const layer={id:Date.now()+Math.random(),src:dataUrl,x:30,y:20,w,h,opacity:100,rotation:0,locked:false};
       updZone(d.activeZone,{layers:[...zone.layers,layer]});
       setSelectedLayer(layer.id);
     };
+    // Set crossOrigin before src for data URLs (some browsers need this)
+    img.crossOrigin="anonymous";
     img.src=dataUrl;
+    // If already complete (cached), fire onload manually
+    if(img.complete && img.naturalWidth>0) img.onload();
   }
   function handleArtFile(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>addArtLayer(ev.target.result);reader.readAsDataURL(file);e.target.value="";}
   async function removeBg(){
