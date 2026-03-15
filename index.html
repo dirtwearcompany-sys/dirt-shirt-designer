@@ -277,15 +277,38 @@ function ShirtBackground({shirtImage,shirtColor,baseColor,offset}){
         if(isBgPixel){isBg[ni]=1;queue[qTail++]=ni;}
       }
     }
-    const[bR,bG,bB]=hexToRgb(baseColor||"#ffffff");
+    // ── Auto-detect the actual shirt color from the image pixels ──
+    // Sample the median color of all non-background shirt pixels so recoloring
+    // works correctly regardless of what color the source photo actually is.
+    let sampR=0,sampG=0,sampB=0,sampN=0;
+    // Sample every 8th pixel for speed
+    for(let i=0;i<W*H;i+=8){
+      if(isBg[i]||px[i*4+3]<10)continue;
+      sampR+=px[i*4];sampG+=px[i*4+1];sampB+=px[i*4+2];sampN++;
+    }
+    // Fallback to supplied baseColor if no pixels found
+    const[bR,bG,bB]=sampN>0
+      ?[sampR/sampN, sampG/sampN, sampB/sampN]
+      :hexToRgb(baseColor||"#ffffff");
     const baseLum2=(0.299*bR+0.587*bG+0.114*bB)/255||1;
+
     const[tR,tG,tB]=hexToRgb(shirtColor||"#ffffff");
+    const tLum=(0.299*tR+0.587*tG+0.114*tB)/255||1;
+
     for(let i=0;i<W*H;i++){
       if(isBg[i])continue;
       const pi=i*4;if(px[pi+3]<10)continue;
-      const lum=(0.299*px[pi]+0.587*px[pi+1]+0.114*px[pi+2])/255;
-      const norm=Math.min(lum/baseLum2,1.3);
-      px[pi]=Math.min(255,Math.round(tR*norm));
+
+      // Convert pixel to relative luminosity vs the detected shirt color
+      const pLum=(0.299*px[pi]+0.587*px[pi+1]+0.114*px[pi+2])/255;
+      // How light/dark is this pixel relative to the average shirt color?
+      // Values >1 = highlight, <1 = shadow
+      const ratio=pLum/baseLum2;
+
+      // Apply that same ratio to the target color, preserving shadow/highlight depth
+      // Clamp ratio more tightly to avoid oversaturation on very light/dark extremes
+      const norm=Math.max(0.05, Math.min(ratio, 1.8));
+      px[pi]  =Math.min(255,Math.round(tR*norm));
       px[pi+1]=Math.min(255,Math.round(tG*norm));
       px[pi+2]=Math.min(255,Math.round(tB*norm));
     }
@@ -1544,8 +1567,13 @@ function Editor({design,onSave,onDuplicate,onBack}){
             function sp(i){if(!iBg[i]){iBg[i]=1;iq[iqT++]=i;}}
             for(let x=0;x<IW;x++){sp(x);sp((IH-1)*IW+x);}for(let y=1;y<IH-1;y++){sp(y*IW);sp(y*IW+IW-1);}
             while(iqH<iqT){const idx=iq[iqH++],ix=idx%IW,iy=(idx/IW)|0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=ix+dx,ny=iy+dy;if(nx<0||nx>=IW||ny<0||ny>=IH)continue;const ni=ny*IW+nx;if(iBg[ni])continue;const np=ni*4,nr=ipx[np],ng=ipx[np+1],nb3=ipx[np+2];let hit=false;if(isDark){const pl=(0.299*nr+0.587*ng+0.114*nb3)/255;hit=pl<0.06;}else{const dr=nr-ibgR,dg=ng-ibgG,db=nb3-ibgB;hit=Math.sqrt(dr*dr+dg*dg+db*db)<35;}if(hit){iBg[ni]=1;iq[iqT++]=ni;}}}
-            const[bR2,bG2,bB2]=hexToRgb(ZONE_BASE_COLOR[d.activeZone]||"#ffffff");const bLum=(0.299*bR2+0.587*bG2+0.114*bB2)/255||1;const[tR2,tG2,tB2]=hexToRgb(d.shirtColor||"#ffffff");
-            for(let i=0;i<IW*IH;i++){if(iBg[i])continue;const pi=i*4;if(ipx[pi+3]<10)continue;const lm=(0.299*ipx[pi]+0.587*ipx[pi+1]+0.114*ipx[pi+2])/255;const nm=Math.min(lm/bLum,1.3);ipx[pi]=Math.min(255,Math.round(tR2*nm));ipx[pi+1]=Math.min(255,Math.round(tG2*nm));ipx[pi+2]=Math.min(255,Math.round(tB2*nm));}
+            // Auto-detect shirt base color from sampled pixels
+            let sR2=0,sG2=0,sB2=0,sN2=0;
+            for(let i=0;i<IW*IH;i+=8){if(iBg[i]||ipx[i*4+3]<10)continue;sR2+=ipx[i*4];sG2+=ipx[i*4+1];sB2+=ipx[i*4+2];sN2++;}
+            const[bR2,bG2,bB2]=sN2>0?[sR2/sN2,sG2/sN2,sB2/sN2]:hexToRgb(ZONE_BASE_COLOR[d.activeZone]||"#ffffff");
+            const bLum=(0.299*bR2+0.587*bG2+0.114*bB2)/255||1;
+            const[tR2,tG2,tB2]=hexToRgb(d.shirtColor||"#ffffff");
+            for(let i=0;i<IW*IH;i++){if(iBg[i])continue;const pi=i*4;if(ipx[pi+3]<10)continue;const lm=(0.299*ipx[pi]+0.587*ipx[pi+1]+0.114*ipx[pi+2])/255;const nm=Math.max(0.05,Math.min(lm/bLum,1.8));ipx[pi]=Math.min(255,Math.round(tR2*nm));ipx[pi+1]=Math.min(255,Math.round(tG2*nm));ipx[pi+2]=Math.min(255,Math.round(tB2*nm));}
             tctx.putImageData(idata,0,0);const scale=Math.min(w/img.width,h/img.height);const dw=img.width*scale,dh=img.height*scale;ctx.drawImage(tmp,(w-dw)/2,(h-dh)/2,dw,dh);res();
           };img.src=src;
         });
