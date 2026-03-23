@@ -43,7 +43,7 @@
     .bge-cursor { position:fixed; pointer-events:none; border-radius:50%; border:2px solid rgba(255,255,255,0.8); transform:translate(-50%,-50%); z-index:9999; }
     input[type="range"] { accent-color: #f97316; width: 100%; height: 4px; cursor: pointer; }
     input[type="color"] { cursor: pointer; }
-    .resize-handle { position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: #f97316; border-radius: 2px; cursor: se-resize; z-index: 20; }
+    .resize-handle { position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: #ef4444; border-radius: 2px; cursor: se-resize; z-index: 20; }
     .header { background: #141414; border-bottom: 1px solid #222; padding: 11px 24px; display: flex; align-items: center; gap: 14px; height: 53px; flex-shrink: 0; }
     .logo-dirt  { font-family: 'Bebas Neue', cursive; font-size: 26px; color: #f97316; letter-spacing: 3px; }
     .logo-shirt { font-family: 'Bebas Neue', cursive; font-size: 26px; color: #e8e8e8; letter-spacing: 2px; }
@@ -886,6 +886,374 @@ function BgEraserModal({src,onClose,onSave}){
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── MaskEditorModal ──────────────────────────────────────────────────────────
+// Double-click a layer to open. Paint black to hide areas (mask), white to
+// restore. Supports: brush erase, brush restore, lasso selection erase,
+// magic-wand color-select erase, invert mask, clear mask.
+// Non-destructive: original src is preserved; maskSrc stores the composited PNG.
+// ═══════════════════════════════════════════════════════════════════════════════
+function MaskEditorModal({ src, existingMask, onClose, onSave, onClearMask }) {
+  const displayRef = useRef(null); // checkerboard + composite view
+  const maskRef    = useRef(null); // actual mask canvas (white=visible, black=hidden)
+  const origRef    = useRef(null); // original image canvas (never modified)
+  const [tool, setTool]       = useState('brush-erase'); // brush-erase | brush-restore | lasso | wand
+  const [brushSize, setBrushSize] = useState(30);
+  const [wandTol,  setWandTol]    = useState(35);
+  const [hardness, setHardness]   = useState(80);   // 0=soft 100=hard
+  const [cursorPos, setCursorPos] = useState({x:-999,y:-999});
+  const [lassoActive, setLassoActive] = useState(false);
+  const [lassoPoints, setLassoPoints] = useState([]);
+  const painting = useRef(false);
+  const CW = useRef(0), CH = useRef(0);
+
+  // ── Init: load original image → origRef, load existing mask → maskRef ──
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      CW.current = img.width; CH.current = img.height;
+
+      // Original canvas
+      const oc = origRef.current;
+      oc.width = img.width; oc.height = img.height;
+      oc.getContext('2d').drawImage(img, 0, 0);
+
+      // Mask canvas: start all-white (fully visible)
+      const mc = maskRef.current;
+      mc.width = img.width; mc.height = img.height;
+      const mctx = mc.getContext('2d');
+      if (existingMask) {
+        // Re-derive mask from the existing composited PNG
+        const em = new Image();
+        em.onload = () => {
+          // Existing mask = alpha channel of composited image
+          mctx.fillStyle = '#ffffff'; mctx.fillRect(0, 0, mc.width, mc.height);
+          const tmp = document.createElement('canvas');
+          tmp.width = mc.width; tmp.height = mc.height;
+          const tctx = tmp.getContext('2d');
+          tctx.drawImage(em, 0, 0);
+          const emData = tctx.getImageData(0, 0, mc.width, mc.height);
+          const maskData = mctx.getImageData(0, 0, mc.width, mc.height);
+          for (let i = 0; i < emData.data.length; i += 4) {
+            const a = emData.data[i+3];
+            maskData.data[i] = maskData.data[i+1] = maskData.data[i+2] = a;
+            maskData.data[i+3] = 255;
+          }
+          mctx.putImageData(maskData, 0, 0);
+          renderDisplay();
+        };
+        em.src = existingMask;
+      } else {
+        mctx.fillStyle = '#ffffff';
+        mctx.fillRect(0, 0, img.width, img.height);
+        renderDisplay();
+      }
+    };
+    img.src = src;
+  }, []);
+
+  // ── Composite: apply mask to original → display ──
+  function renderDisplay() {
+    const dc = displayRef.current;
+    const mc = maskRef.current;
+    const oc = origRef.current;
+    if (!dc || !mc || !oc || !CW.current) return;
+    const W = CW.current, H = CH.current;
+    dc.width = W; dc.height = H;
+    const dctx = dc.getContext('2d');
+
+    // Checkerboard background
+    const sz = Math.max(6, Math.floor(W / 40));
+    for (let y = 0; y < H; y += sz) for (let x = 0; x < W; x += sz) {
+      dctx.fillStyle = ((Math.floor(x/sz)+Math.floor(y/sz))%2===0) ? '#d0d0d0' : '#999';
+      dctx.fillRect(x, y, sz, sz);
+    }
+
+    // Draw original with mask as alpha
+    const origData = oc.getContext('2d').getImageData(0, 0, W, H);
+    const maskData = mc.getContext('2d').getImageData(0, 0, W, H);
+    const composite = dctx.createImageData(W, H);
+    for (let i = 0; i < origData.data.length; i += 4) {
+      composite.data[i]   = origData.data[i];
+      composite.data[i+1] = origData.data[i+1];
+      composite.data[i+2] = origData.data[i+2];
+      // Mask luminance drives alpha
+      const maskLum = (0.299*maskData.data[i] + 0.587*maskData.data[i+1] + 0.114*maskData.data[i+2]) / 255;
+      composite.data[i+3] = Math.round(origData.data[i+3] * maskLum);
+    }
+    dctx.putImageData(composite, 0, 0);
+
+    // Lasso preview
+    if (lassoPoints.length > 1) {
+      dctx.save();
+      dctx.strokeStyle = '#ef4444'; dctx.lineWidth = 1.5;
+      dctx.setLineDash([5, 3]);
+      dctx.beginPath();
+      dctx.moveTo(lassoPoints[0].x, lassoPoints[0].y);
+      lassoPoints.forEach(p => dctx.lineTo(p.x, p.y));
+      dctx.stroke();
+      dctx.restore();
+    }
+  }
+
+  useEffect(() => { renderDisplay(); }, [lassoPoints]);
+
+  // ── Canvas coordinate ──
+  function getPos(e) {
+    const rect = displayRef.current.getBoundingClientRect();
+    const scaleX = CW.current / rect.width, scaleY = CH.current / rect.height;
+    const cl = e.touches ? e.touches[0] : e;
+    return { x: Math.round((cl.clientX - rect.left) * scaleX), y: Math.round((cl.clientY - rect.top) * scaleY) };
+  }
+
+  // ── Brush paint on mask ──
+  function paintMask(x, y, erase) {
+    const mc = maskRef.current;
+    const mctx = mc.getContext('2d');
+    const r = brushSize / 2;
+    const hardRatio = hardness / 100;
+
+    if (erase) {
+      // Soft erase: draw black radial gradient
+      const grad = mctx.createRadialGradient(x, y, r*hardRatio, x, y, r);
+      grad.addColorStop(0, 'rgba(0,0,0,1)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      mctx.globalCompositeOperation = 'source-over';
+      mctx.fillStyle = grad;
+      mctx.beginPath(); mctx.arc(x, y, r, 0, Math.PI*2); mctx.fill();
+    } else {
+      // Restore: draw white
+      const grad = mctx.createRadialGradient(x, y, r*hardRatio, x, y, r);
+      grad.addColorStop(0, 'rgba(255,255,255,1)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      mctx.globalCompositeOperation = 'source-over';
+      mctx.fillStyle = grad;
+      mctx.beginPath(); mctx.arc(x, y, r, 0, Math.PI*2); mctx.fill();
+    }
+    renderDisplay();
+  }
+
+  // ── Magic wand: flood-fill erase by color similarity ──
+  function wandErase(x, y) {
+    const oc = origRef.current;
+    const mc = maskRef.current;
+    const W = CW.current, H = CH.current;
+    const origData = oc.getContext('2d').getImageData(0, 0, W, H);
+    const maskData = mc.getContext('2d').getImageData(0, 0, W, H);
+    const px = origData.data;
+    const idx0 = (y * W + x) * 4;
+    const seedR = px[idx0], seedG = px[idx0+1], seedB = px[idx0+2];
+
+    const visited = new Uint8Array(W * H);
+    const queue = [y * W + x];
+    visited[y * W + x] = 1;
+
+    while (queue.length) {
+      const idx = queue.pop();
+      const xi = idx % W, yi = (idx / W) | 0;
+      const pi = idx * 4;
+      const dr = px[pi]-seedR, dg = px[pi+1]-seedG, db = px[pi+2]-seedB;
+      if (Math.sqrt(dr*dr+dg*dg+db*db) > wandTol) continue;
+      // Erase in mask
+      maskData.data[pi] = maskData.data[pi+1] = maskData.data[pi+2] = 0;
+      for (const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx=xi+dx, ny=yi+dy;
+        if (nx<0||nx>=W||ny<0||ny>=H) continue;
+        const ni = ny*W+nx;
+        if (!visited[ni]) { visited[ni]=1; queue.push(ni); }
+      }
+    }
+    mc.getContext('2d').putImageData(maskData, 0, 0);
+    renderDisplay();
+  }
+
+  // ── Lasso fill erase ──
+  function applyLasso(pts, erase) {
+    if (pts.length < 3) return;
+    const mc = maskRef.current;
+    const mctx = mc.getContext('2d');
+    mctx.save();
+    mctx.beginPath();
+    mctx.moveTo(pts[0].x, pts[0].y);
+    pts.forEach(p => mctx.lineTo(p.x, p.y));
+    mctx.closePath();
+    mctx.clip();
+    mctx.fillStyle = erase ? '#000' : '#fff';
+    mctx.fillRect(0, 0, CW.current, CH.current);
+    mctx.restore();
+    renderDisplay();
+  }
+
+  // ── Pointer events ──
+  function onMouseDown(e) {
+    e.preventDefault();
+    const p = getPos(e);
+    if (tool === 'lasso') {
+      if (!lassoActive) {
+        setLassoActive(true);
+        setLassoPoints([p]);
+      }
+      return;
+    }
+    if (tool === 'wand') {
+      wandErase(p.x, p.y);
+      return;
+    }
+    painting.current = true;
+    paintMask(p.x, p.y, tool === 'brush-erase');
+  }
+  function onMouseMove(e) {
+    const p = getPos(e);
+    setCursorPos({ x: e.clientX, y: e.clientY });
+    if (tool === 'lasso' && lassoActive) {
+      setLassoPoints(prev => [...prev, p]);
+      return;
+    }
+    if (!painting.current) return;
+    paintMask(p.x, p.y, tool === 'brush-erase');
+  }
+  function onMouseUp(e) {
+    painting.current = false;
+    if (tool === 'lasso' && lassoActive) {
+      applyLasso(lassoPoints, true);
+      setLassoActive(false);
+      setLassoPoints([]);
+    }
+  }
+
+  // ── Export: apply mask → composited PNG with real transparency ──
+  function exportMasked() {
+    const oc = origRef.current;
+    const mc = maskRef.current;
+    const W = CW.current, H = CH.current;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const origData = oc.getContext('2d').getImageData(0, 0, W, H);
+    const maskData = mc.getContext('2d').getImageData(0, 0, W, H);
+    const out = ctx.createImageData(W, H);
+    for (let i = 0; i < origData.data.length; i += 4) {
+      out.data[i]   = origData.data[i];
+      out.data[i+1] = origData.data[i+1];
+      out.data[i+2] = origData.data[i+2];
+      const ml = (0.299*maskData.data[i]+0.587*maskData.data[i+1]+0.114*maskData.data[i+2])/255;
+      out.data[i+3] = Math.round(origData.data[i+3] * ml);
+    }
+    ctx.putImageData(out, 0, 0);
+    return cv.toDataURL('image/png');
+  }
+
+  const displayBrushPx = displayRef.current
+    ? brushSize * (displayRef.current.getBoundingClientRect().width / (CW.current || 1))
+    : brushSize;
+
+  const TOOLS = [
+    { id:'brush-erase',   label:'🖌 Erase Brush',   tip:'Paint to hide areas' },
+    { id:'brush-restore', label:'✏️ Restore Brush', tip:'Paint to show hidden areas' },
+    { id:'lasso',         label:'🔲 Lasso Erase',   tip:'Draw a shape to erase inside it' },
+    { id:'wand',          label:'🪄 Magic Wand',     tip:'Click a color to erase matching pixels' },
+  ];
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.92)',zIndex:300,display:'flex',flexDirection:'column'}}>
+      {/* Brush cursor */}
+      {(tool==='brush-erase'||tool==='brush-restore') && (
+        <div style={{position:'fixed',left:cursorPos.x,top:cursorPos.y,width:displayBrushPx,height:displayBrushPx,borderRadius:'50%',
+          border:`2px solid ${tool==='brush-erase'?'rgba(239,68,68,0.9)':'rgba(34,197,94,0.9)'}`,
+          transform:'translate(-50%,-50%)',zIndex:9999,pointerEvents:'none'}} />
+      )}
+
+      {/* Header */}
+      <div style={{background:'#141414',borderBottom:'1px solid #222',padding:'10px 18px',display:'flex',alignItems:'center',gap:12,flexShrink:0,flexWrap:'wrap'}}>
+        <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:18,color:'#ef4444',letterSpacing:2}}>🎭 MASK EDITOR</span>
+        <span style={{fontSize:10,color:'#444',fontFamily:"'DM Mono',monospace"}}>Double-click returns to stage · Painted black = hidden · White = visible</span>
+
+        {/* Tools */}
+        <div style={{display:'flex',gap:4,marginLeft:8}}>
+          {TOOLS.map(t=>(
+            <button key={t.id} title={t.tip}
+              style={{padding:'5px 10px',borderRadius:6,border:`1px solid ${tool===t.id?'#ef4444':'#333'}`,
+                background:tool===t.id?'#ef4444':'transparent',color:tool===t.id?'#000':'#888',
+                cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace",transition:'all 0.15s'}}
+              onClick={()=>{setTool(t.id);setLassoActive(false);setLassoPoints([]);}}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{width:1,height:22,background:'#2a2a2a'}} />
+
+        {/* Brush controls */}
+        {(tool==='brush-erase'||tool==='brush-restore') && (
+          <>
+            <div style={{display:'flex',alignItems:'center',gap:6,minWidth:130}}>
+              <span style={{fontSize:10,color:'#555',whiteSpace:'nowrap'}}>Size {brushSize}px</span>
+              <input type="range" min={4} max={200} value={brushSize} onChange={e=>setBrushSize(+e.target.value)} style={{width:80,accentColor:'#ef4444'}} />
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:6,minWidth:130}}>
+              <span style={{fontSize:10,color:'#555',whiteSpace:'nowrap'}}>Hardness {hardness}%</span>
+              <input type="range" min={0} max={100} value={hardness} onChange={e=>setHardness(+e.target.value)} style={{width:80,accentColor:'#ef4444'}} />
+            </div>
+          </>
+        )}
+        {tool==='wand' && (
+          <div style={{display:'flex',alignItems:'center',gap:6,minWidth:150}}>
+            <span style={{fontSize:10,color:'#555',whiteSpace:'nowrap'}}>Tolerance {wandTol}</span>
+            <input type="range" min={5} max={120} value={wandTol} onChange={e=>setWandTol(+e.target.value)} style={{width:90,accentColor:'#ef4444'}} />
+          </div>
+        )}
+        {tool==='lasso' && lassoActive && (
+          <div style={{background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.4)',borderRadius:6,padding:'4px 12px',fontSize:11,color:'#ef4444',fontFamily:"'DM Mono',monospace"}}>
+            Drawing lasso… release mouse to erase
+          </div>
+        )}
+
+        <div style={{marginLeft:'auto',display:'flex',gap:6}}>
+          {/* Invert mask */}
+          <button title="Invert mask (swap visible/hidden)" onClick={()=>{
+            const mc=maskRef.current;const mctx=mc.getContext('2d');
+            const md=mctx.getImageData(0,0,CW.current,CH.current);
+            for(let i=0;i<md.data.length;i+=4){md.data[i]=255-md.data[i];md.data[i+1]=255-md.data[i+1];md.data[i+2]=255-md.data[i+2];}
+            mctx.putImageData(md,0,0);renderDisplay();
+          }} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #333',background:'transparent',color:'#888',cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace"}}>⇄ Invert</button>
+          {/* Reset mask */}
+          <button title="Clear mask — restore full image" onClick={()=>{
+            const mc=maskRef.current;const mctx=mc.getContext('2d');
+            mctx.fillStyle='#fff';mctx.fillRect(0,0,CW.current,CH.current);renderDisplay();
+          }} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #333',background:'transparent',color:'#888',cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace"}}>↺ Reset</button>
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',background:'#0a0a0a',overflow:'hidden',cursor:'none',position:'relative'}}
+        onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp}
+        onMouseLeave={()=>{painting.current=false;}}>
+        <canvas ref={displayRef}
+          style={{maxWidth:'90%',maxHeight:'90%',imageRendering:'pixelated',
+            boxShadow:'0 0 60px rgba(0,0,0,0.8), 0 0 0 1px #222',
+            cursor: tool==='wand'?'crosshair':tool==='lasso'?'crosshair':'none'}} />
+        <canvas ref={maskRef}   style={{display:'none'}} />
+        <canvas ref={origRef}   style={{display:'none'}} />
+
+        {/* Hint overlay when no changes yet */}
+      </div>
+
+      {/* Footer */}
+      <div style={{background:'#141414',borderTop:'1px solid #222',padding:'10px 18px',display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+        <span style={{fontSize:10,color:'#444',marginRight:'auto',fontFamily:"'DM Mono',monospace"}}>
+          🖌 Brush · 🪄 Wand · 🔲 Lasso to erase sections · ✏️ Restore brush to bring areas back · Checkerboard = transparent
+        </span>
+        <button onClick={onClearMask} style={{padding:'7px 14px',borderRadius:6,border:'1px solid #333',background:'transparent',color:'#888',cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace"}}>🗑 Remove All Masking</button>
+        <button onClick={onClose} style={{padding:'7px 14px',borderRadius:6,border:'1px solid #333',background:'transparent',color:'#aaa',cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace"}}>Cancel</button>
+        <button onClick={()=>onSave(exportMasked())}
+          style={{padding:'7px 16px',borderRadius:6,border:'none',background:'#ef4444',color:'#fff',cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:500}}>
+          ✅ Apply Mask
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── App ─────────────────────────────────────────────────────────────────────
 function App(){
   const[designs,setDesigns]=useState([]);const[activeId,setActiveId]=useState(null);const[view,setView]=useState("editor");
@@ -944,6 +1312,8 @@ function Editor({design,onSave,onDuplicate,onBack}){
   const[showDrawing,setShowDrawing]=useState(false);
   const[editingLayerId,setEditingLayerId]=useState(null);
   const[showAI,setShowAI]=useState(false);
+  const[showMaskEditor,setShowMaskEditor]=useState(false);
+  const[maskLayerId,setMaskLayerId]=useState(null);
   const stageRef=useRef(null),isDragging=useRef(false),dragStart=useRef({}),artFileRef=useRef(null);
 
   const zone=d.zones[d.activeZone];
@@ -1052,8 +1422,10 @@ function Editor({design,onSave,onDuplicate,onBack}){
             <div className="print-guide" />
             {zone.layers.map(layer=>{
               const lx=(layer.x/100)*STAGE_W,ly=(layer.y/100)*STAGE_H,lw=(layer.w/100)*STAGE_W,lh=(layer.h/100)*STAGE_H;const isSel=layer.id===selectedLayer;
-              return(<div key={layer.id} style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:10,opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",outline:isSel?"2px solid #f97316":"none",cursor:layer.locked?"not-allowed":"move"}}>
-                <img src={layer.src} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",pointerEvents:"none"}} alt="" draggable={false} />
+              return(<div key={layer.id}
+                style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:10,opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",outline:isSel?"2px solid #ef4444":"none",cursor:layer.locked?"not-allowed":"move"}}
+                onDoubleClick={e=>{e.stopPropagation();if(!layer.locked){setMaskLayerId(layer.id);setShowMaskEditor(true);}}}>
+                <img src={layer.maskSrc||layer.src} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",pointerEvents:"none"}} alt="" draggable={false} />
                 {isSel&&<div className="resize-handle" onMouseDown={e=>{e.stopPropagation();const sx=e.clientX,sy=e.clientY,sw=layer.w,sh=layer.h;const mv=ev=>updLayer(layer.id,{w:Math.max(5,sw+((ev.clientX-sx)/STAGE_W)*100),h:Math.max(5,sh+((ev.clientY-sy)/STAGE_H)*100)});const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);}} />}
               </div>);
             })}
@@ -1099,6 +1471,24 @@ function Editor({design,onSave,onDuplicate,onBack}){
           />
         )}
         {showAI && <AIGeneratorModal onClose={()=>setShowAI(false)} onAdd={addArtLayer} />}
+        {showMaskEditor && maskLayerId && (() => {
+          const ml = zone.layers.find(l=>l.id===maskLayerId);
+          return ml ? (
+            <MaskEditorModal
+              src={ml.src}
+              existingMask={ml.maskSrc||null}
+              onClose={()=>{setShowMaskEditor(false);setMaskLayerId(null);}}
+              onSave={maskedDataUrl=>{
+                updLayer(maskLayerId,{maskSrc:maskedDataUrl});
+                setShowMaskEditor(false);setMaskLayerId(null);
+              }}
+              onClearMask={()=>{
+                updLayer(maskLayerId,{maskSrc:null});
+                setShowMaskEditor(false);setMaskLayerId(null);
+              }}
+            />
+          ) : null;
+        })()}
 
         {selLayer ? (
           <div className="scrollable">
