@@ -1357,26 +1357,106 @@ function Editor({design,onSave,onDuplicate,onBack}){
   function onMU(){isDragging.current=false;}
 
   async function download(withShirt){
-    const sc=2.5,w=STAGE_W*sc,h=STAGE_H*sc;const cv=document.createElement("canvas");cv.width=w;cv.height=h;const ctx=cv.getContext("2d");ctx.clearRect(0,0,w,h);
-    if(withShirt){const src=d.shirtImages?.[d.activeZone];if(src){await new Promise(res=>{const img=new Image();img.crossOrigin="anonymous";img.onload=()=>{const tmp=document.createElement("canvas");tmp.width=img.width;tmp.height=img.height;const tctx=tmp.getContext("2d");tctx.drawImage(img,0,0);const idata=tctx.getImageData(0,0,tmp.width,tmp.height);const ipx=idata.data,IW=tmp.width,IH=tmp.height;let sr2=0,sg2=0,sb2=0,sc3=0;for(let x=0;x<IW;x++){for(const y of[0,IH-1]){const i=(y*IW+x)*4;sr2+=ipx[i];sg2+=ipx[i+1];sb2+=ipx[i+2];sc3++;}}for(let y=1;y<IH-1;y++){for(const x of[0,IW-1]){const i=(y*IW+x)*4;sr2+=ipx[i];sg2+=ipx[i+1];sb2+=ipx[i+2];sc3++;}}const ibgR=Math.round(sr2/sc3),ibgG=Math.round(sg2/sc3),ibgB=Math.round(sb2/sc3);const ibgLum=(0.299*ibgR+0.587*ibgG+0.114*ibgB)/255;const isDark=ibgLum<0.12;const iBg=new Uint8Array(IW*IH),iq=new Int32Array(IW*IH*2);let iqH=0,iqT=0;function sp(i){if(!iBg[i]){iBg[i]=1;iq[iqT++]=i;}}for(let x=0;x<IW;x++){sp(x);sp((IH-1)*IW+x);}for(let y=1;y<IH-1;y++){sp(y*IW);sp(y*IW+IW-1);}while(iqH<iqT){const idx=iq[iqH++],ix=idx%IW,iy=(idx/IW)|0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=ix+dx,ny=iy+dy;if(nx<0||nx>=IW||ny<0||ny>=IH)continue;const ni=ny*IW+nx;if(iBg[ni])continue;const np=ni*4,nr=ipx[np],ng=ipx[np+1],nb3=ipx[np+2];let hit=false;if(isDark){const pl=(0.299*nr+0.587*ng+0.114*nb3)/255;hit=pl<0.06;}else{const dr=nr-ibgR,dg=ng-ibgG,db=nb3-ibgB;hit=Math.sqrt(dr*dr+dg*dg+db*db)<35;}if(hit){iBg[ni]=1;iq[iqT++]=ni;}}}const[bR2,bG2,bB2]=hexToRgb(ZONE_BASE_COLOR[d.activeZone]||"#ffffff");const bLum=(0.299*bR2+0.587*bG2+0.114*bB2)/255||1;const[tR2,tG2,tB2]=hexToRgb(d.shirtColor||"#ffffff");for(let i=0;i<IW*IH;i++){if(iBg[i])continue;const pi=i*4;if(ipx[pi+3]<10)continue;const lm=(0.299*ipx[pi]+0.587*ipx[pi+1]+0.114*ipx[pi+2])/255;const nm=Math.min(lm/bLum,1.3);ipx[pi]=Math.min(255,Math.round(tR2*nm));ipx[pi+1]=Math.min(255,Math.round(tG2*nm));ipx[pi+2]=Math.min(255,Math.round(tB2*nm));}tctx.putImageData(idata,0,0);const scale=Math.min(w/img.width,h/img.height);const dw=img.width*scale,dh=img.height*scale;ctx.drawImage(tmp,(w-dw)/2,(h-dh)/2,dw,dh);res();};img.src=src;});}else{ctx.fillStyle="#555";ctx.fillRect(0,0,w,h);}}
-    for(const layer of zone.layers){await new Promise(res=>{const img=new Image();img.onload=()=>{
-      ctx.globalAlpha=layer.opacity/100;
-      const lx=(layer.x/100)*w, ly=(layer.y/100)*h;
-      const lw=(layer.w/100)*w, lh=(layer.h/100)*h;
-      const natW=img.naturalWidth||img.width, natH=img.naturalHeight||img.height;
-      const imgAsp=natW/natH, boxAsp=lw/lh;
-      let drawW, drawH;
-      if(imgAsp>boxAsp){ drawW=lw; drawH=lw/imgAsp; }
-      else             { drawH=lh; drawW=lh*imgAsp; }
-      const offX=(lw-drawW)/2, offY=(lh-drawH)/2;
-      ctx.save();
-      ctx.translate(lx+lw/2, ly+lh/2);
-      ctx.rotate((layer.rotation||0)*Math.PI/180);
-      ctx.drawImage(img, -lw/2+offX, -lh/2+offY, drawW, drawH);
-      ctx.restore();
-      ctx.globalAlpha=1;res();
-    };img.src=layer.maskSrc||layer.src;});}
-    const a=document.createElement("a");a.href=cv.toDataURL("image/png");a.download=`${d.name.replace(/\s+/g,"-")}-${d.activeZone}${withShirt?"-with-shirt":"-logo"}.png`;a.click();
+    // Step 1: render at STAGE_W x STAGE_H (same coordinate space as the screen preview)
+    // This guarantees art layers are pixel-exact relative to what you see on screen.
+    const SW=STAGE_W, SH=STAGE_H;
+    const stage=document.createElement("canvas");stage.width=SW;stage.height=SH;
+    const sctx=stage.getContext("2d");sctx.clearRect(0,0,SW,SH);
+
+    // Draw shirt background using same logic as ShirtBackground component
+    if(withShirt){
+      const src=d.shirtImages?.[d.activeZone];
+      if(src){
+        await new Promise(res=>{
+          const img=new Image();img.crossOrigin="anonymous";
+          img.onload=()=>{
+            // Replicate ShirtBackground: crop to shirt, fit with 0.96 scale, center
+            const tmp=document.createElement("canvas");tmp.width=img.width;tmp.height=img.height;
+            const tctx=tmp.getContext("2d");tctx.drawImage(img,0,0);
+            const raw=tctx.getImageData(0,0,img.width,img.height);
+            const rp=raw.data,RW=img.width,RH=img.height;
+            let minX=RW,maxX=0,minY=RH,maxY=0;
+            const cornerLum=(0.299*rp[0]+0.587*rp[1]+0.114*rp[2])/255;
+            const isLightBg=cornerLum>=0.12;
+            const LUM_THRESH=cornerLum<0.12?0.06:0.94;
+            for(let y=0;y<RH;y++)for(let x=0;x<RW;x++){
+              const i=(y*RW+x)*4;const lum=(0.299*rp[i]+0.587*rp[i+1]+0.114*rp[i+2])/255;
+              const isShirt=isLightBg?lum<LUM_THRESH:lum>LUM_THRESH;
+              if(isShirt){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;}
+            }
+            const padX=Math.floor(RW*0.02),padY=Math.floor(RH*0.02);
+            minX=Math.max(0,minX-padX);maxX=Math.min(RW-1,maxX+padX);
+            minY=Math.max(0,minY-padY);maxY=Math.min(RH-1,maxY+padY);
+            const cropW=maxX-minX+1,cropH=maxY-minY+1;
+            const scale=Math.min(SW/cropW,SH/cropH)*0.96;
+            const dw=cropW*scale,dh=cropH*scale;
+            const dx=(SW-dw)/2,dy=(SH-dh)/2;
+            // Color-recolor shirt
+            const coloredTmp=document.createElement("canvas");coloredTmp.width=img.width;coloredTmp.height=img.height;
+            const cctx=coloredTmp.getContext("2d");cctx.drawImage(img,0,0);
+            const cdata=cctx.getImageData(0,0,img.width,img.height);const cpx=cdata.data;
+            let sr2=0,sg2=0,sb2=0,sc3=0;
+            // sample edges for bg color
+            for(let x=0;x<RW;x++){for(const y of[0,RH-1]){const i=(y*RW+x)*4;sr2+=cpx[i];sg2+=cpx[i+1];sb2+=cpx[i+2];sc3++;}}
+            for(let y=1;y<RH-1;y++){for(const x of[0,RW-1]){const i=(y*RW+x)*4;sr2+=cpx[i];sg2+=cpx[i+1];sb2+=cpx[i+2];sc3++;}}
+            const bgR2=Math.round(sr2/sc3),bgG2=Math.round(sg2/sc3),bgB2=Math.round(sb2/sc3);
+            const bgLum2=(0.299*bgR2+0.587*bgG2+0.114*bgB2)/255;const isDark2=bgLum2<0.12;
+            const iBg2=new Uint8Array(RW*RH),iq2=new Int32Array(RW*RH*2);let iqH2=0,iqT2=0;
+            function sp2(i){if(!iBg2[i]){iBg2[i]=1;iq2[iqT2++]=i;}}
+            for(let x=0;x<RW;x++){sp2(x);sp2((RH-1)*RW+x);}
+            for(let y=1;y<RH-1;y++){sp2(y*RW);sp2(y*RW+RW-1);}
+            while(iqH2<iqT2){const idx=iq2[iqH2++],ix=idx%RW,iy=(idx/RW)|0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=ix+dx,ny=iy+dy;if(nx<0||nx>=RW||ny<0||ny>=RH)continue;const ni=ny*RW+nx;if(iBg2[ni])continue;const np=ni*4,nr=cpx[np],ng=cpx[np+1],nb3=cpx[np+2];let hit=false;if(isDark2){const pl=(0.299*nr+0.587*ng+0.114*nb3)/255;hit=pl<0.06;}else{const dr=nr-bgR2,dg=ng-bgG2,db=nb3-bgB2;hit=Math.sqrt(dr*dr+dg*dg+db*db)<35;}if(hit){iBg2[ni]=1;iq2[iqT2++]=ni;}}}
+            const[bR2,bG2,bB2]=hexToRgb(ZONE_BASE_COLOR[d.activeZone]||"#ffffff");
+            const bLum=(0.299*bR2+0.587*bG2+0.114*bB2)/255||1;
+            const[tR2,tG2,tB2]=hexToRgb(d.shirtColor||"#ffffff");
+            for(let i=0;i<RW*RH;i++){if(iBg2[i])continue;const pi=i*4;if(cpx[pi+3]<10)continue;const lm=(0.299*cpx[pi]+0.587*cpx[pi+1]+0.114*cpx[pi+2])/255;const nm=Math.min(lm/bLum,1.3);cpx[pi]=Math.min(255,Math.round(tR2*nm));cpx[pi+1]=Math.min(255,Math.round(tG2*nm));cpx[pi+2]=Math.min(255,Math.round(tB2*nm));}
+            cctx.putImageData(cdata,0,0);
+            sctx.drawImage(cctx.canvas,minX,minY,cropW,cropH,dx,dy,dw,dh);
+            res();
+          };
+          img.src=src;
+        });
+      } else {
+        sctx.fillStyle="#555";sctx.fillRect(0,0,SW,SH);
+      }
+    }
+
+    // Draw art layers at exact STAGE pixel positions (same as screen)
+    for(const layer of zone.layers){
+      await new Promise(res=>{
+        const img=new Image();
+        img.onload=()=>{
+          sctx.globalAlpha=layer.opacity/100;
+          const lx=(layer.x/100)*SW, ly=(layer.y/100)*SH;
+          const lw=(layer.w/100)*SW, lh=(layer.h/100)*SH;
+          // object-fit:contain — same calc as screen
+          const natW=img.naturalWidth||img.width, natH=img.naturalHeight||img.height;
+          const imgAsp=natW/natH, boxAsp=lw/lh;
+          let drawW,drawH;
+          if(imgAsp>boxAsp){drawW=lw;drawH=lw/imgAsp;}
+          else{drawH=lh;drawW=lh*imgAsp;}
+          const offX=(lw-drawW)/2,offY=(lh-drawH)/2;
+          sctx.save();
+          sctx.translate(lx+lw/2,ly+lh/2);
+          sctx.rotate((layer.rotation||0)*Math.PI/180);
+          sctx.drawImage(img,-lw/2+offX,-lh/2+offY,drawW,drawH);
+          sctx.restore();
+          sctx.globalAlpha=1;res();
+        };
+        img.src=layer.maskSrc||layer.src;
+      });
+    }
+
+    // Step 2: upscale the perfectly-matched stage canvas for high-res output
+    const sc=2.5;
+    const cv=document.createElement("canvas");cv.width=SW*sc;cv.height=SH*sc;
+    const ctx=cv.getContext("2d");
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+    ctx.drawImage(stage,0,0,SW*sc,SH*sc);
+
+    const a=document.createElement("a");a.href=cv.toDataURL("image/png");
+    a.download=`${d.name.replace(/\s+/g,"-")}-${d.activeZone}${withShirt?"-with-shirt":"-logo"}.png`;
+    a.click();
   }
 
   return(
@@ -1532,7 +1612,30 @@ function Editor({design,onSave,onDuplicate,onBack}){
             <Slider label="Y Position" value={selLayer.y} min={-50} max={150} onChange={v=>updLayer(selLayer.id,{y:v})} />
             <Slider label="Opacity" value={selLayer.opacity} min={0} max={100} onChange={v=>updLayer(selLayer.id,{opacity:v})} />
             <Slider label="Rotation °" value={selLayer.rotation||0} min={-180} max={180} onChange={v=>updLayer(selLayer.id,{rotation:v})} />
-            <div style={{marginTop:10,display:"flex",gap:5,flexWrap:"wrap"}}>
+            {/* Center button */}
+            <button className="btn btn-ghost" style={{width:"100%",fontSize:11,padding:"8px 0",marginTop:10,borderColor:"rgba(249,115,22,0.4)",color:"#f97316"}}
+              onClick={()=>{
+                // Center the layer on the stage, accounting for object-fit:contain rendered size
+                const img=new Image();
+                img.onload=()=>{
+                  const natW=img.naturalWidth||img.width,natH=img.naturalHeight||img.height;
+                  const imgAsp=natW/natH;
+                  const lw=selLayer.w,lh=selLayer.h;
+                  const boxAsp=lw/lh;
+                  let drawW,drawH;
+                  if(imgAsp>boxAsp){drawW=lw;drawH=lw/imgAsp;}
+                  else{drawH=lh;drawW=lh*imgAsp;}
+                  // Center the bounding box so the rendered image lands at 50%,50%
+                  // x,y are top-left of the bounding box in % of stage
+                  const newX=50-lw/2;
+                  const newY=50-lh/2;
+                  updLayer(selLayer.id,{x:newX,y:newY});
+                };
+                img.src=selLayer.maskSrc||selLayer.src;
+              }}>
+              ⊕ Center on Shirt
+            </button>
+            <div style={{marginTop:6,display:"flex",gap:5,flexWrap:"wrap"}}>
               <button className="btn btn-ghost" style={{fontSize:10,flex:1}} onClick={()=>reorderLayer(selLayer.id,-1)}>⬆ Fwd</button>
               <button className="btn btn-ghost" style={{fontSize:10,flex:1}} onClick={()=>reorderLayer(selLayer.id,1)}>⬇ Back</button>
               <button className="btn btn-ghost" style={{fontSize:10,flex:1}} onClick={()=>updLayer(selLayer.id,{locked:!selLayer.locked})}>{selLayer.locked?"🔓":"🔒"}</button>
