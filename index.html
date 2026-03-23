@@ -33,8 +33,9 @@
     .layer-row.selected { background: rgba(249,115,22,0.09); border-color: rgba(249,115,22,0.27); }
     .design-card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 16px; transition: border-color 0.2s; }
     .design-card:hover { border-color: #f97316; }
-    .shirt-stage { position: relative; width: 420px; height: 520px; border-radius: 10px; overflow: hidden; background: transparent; box-shadow: 0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56); }
-    .shirt-bg { position: absolute; inset: 0; z-index: 0; display: flex; align-items: center; justify-content: center; background: transparent; }
+    .shirt-stage { position: relative; width: 420px; height: 520px; border-radius: 10px; overflow: visible; background: transparent; box-shadow: 0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56); }
+    .shirt-clip { position: absolute; inset: 0; border-radius: 10px; overflow: hidden; pointer-events: none; z-index: 0; }
+    .shirt-bg { position: absolute; inset: 0; z-index: 0; display: flex; align-items: center; justify-content: center; background: transparent; border-radius: 10px; overflow: hidden; }
     .shirt-bg img { width: 100%; height: 100%; object-fit: contain; object-position: center center; display: block; transition: opacity 0.18s ease; }
     .bge-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:200; display:flex; flex-direction:column; }
     .bge-toolbar { background:#141414; border-bottom:1px solid #222; padding:10px 16px; display:flex; align-items:center; gap:12px; flex-shrink:0; flex-wrap:wrap; }
@@ -1352,7 +1353,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
   function reorderLayer(id,dir){const layers=[...zone.layers],idx=layers.findIndex(l=>l.id===id),ni=idx+dir;if(ni<0||ni>=layers.length)return;[layers[idx],layers[ni]]=[layers[ni],layers[idx]];updZone(d.activeZone,{layers});}
   function layerAt(cx,cy){for(let i=zone.layers.length-1;i>=0;i--){const l=zone.layers[i];const lx=(l.x/100)*STAGE_W,ly=(l.y/100)*STAGE_H,lw=(l.w/100)*STAGE_W,lh=(l.h/100)*STAGE_H;if(cx>=lx&&cx<=lx+lw&&cy>=ly&&cy<=ly+lh)return l;}return null;}
   function onMD(e){const rect=stageRef.current.getBoundingClientRect();const cx=e.clientX-rect.left,cy=e.clientY-rect.top;const layer=layerAt(cx,cy);if(layer&&!layer.locked){setSelectedLayer(layer.id);isDragging.current=true;dragStart.current={cx,cy,ox:layer.x,oy:layer.y};}else if(!layer)setSelectedLayer(null);}
-  function onMM(e){if(!isDragging.current||!selectedLayer)return;const rect=stageRef.current.getBoundingClientRect();const cx=e.clientX-rect.left,cy=e.clientY-rect.top;const dx=((cx-dragStart.current.cx)/STAGE_W)*100,dy=((cy-dragStart.current.cy)/STAGE_H)*100;updLayer(selectedLayer,{x:Math.max(0,dragStart.current.ox+dx),y:Math.max(0,dragStart.current.oy+dy)});}
+  function onMM(e){if(!isDragging.current||!selectedLayer)return;const rect=stageRef.current.getBoundingClientRect();const cx=e.clientX-rect.left,cy=e.clientY-rect.top;const dx=((cx-dragStart.current.cx)/STAGE_W)*100,dy=((cy-dragStart.current.cy)/STAGE_H)*100;updLayer(selectedLayer,{x:dragStart.current.ox+dx,y:dragStart.current.oy+dy});}
   function onMU(){isDragging.current=false;}
 
   async function download(withShirt){
@@ -1434,8 +1435,10 @@ function Editor({design,onSave,onDuplicate,onBack}){
         {allImagesSet&&(<>
           <div className="zone-badge">{zoneInfo?.label} · max print {zoneInfo?.maxW}" × {zoneInfo?.maxH}"</div>
           <div ref={stageRef} className="shirt-stage" style={{cursor:zone.layers.length>0?"crosshair":"default"}} onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
-            <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} />
-            <div className="print-guide" />
+            <div className="shirt-clip">
+              <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} />
+              <div className="print-guide" />
+            </div>
             {zone.layers.map(layer=>{
               const lx=(layer.x/100)*STAGE_W,ly=(layer.y/100)*STAGE_H,lw=(layer.w/100)*STAGE_W,lh=(layer.h/100)*STAGE_H;const isSel=layer.id===selectedLayer;
               return(<div key={layer.id}
@@ -1523,10 +1526,10 @@ function Editor({design,onSave,onDuplicate,onBack}){
               <button className="btn btn-ghost" style={{width:"100%",fontSize:10,padding:"6px 0",borderColor:"rgba(249,115,22,0.3)",color:"#888"}} onClick={()=>setShowBgEraser(true)}>🖌️ Manual Brush Eraser</button>
             </div>
 
-            <Slider label="Width %" value={selLayer.w} min={5} max={100} onChange={v=>updLayer(selLayer.id,{w:v})} />
-            <Slider label="Height %" value={selLayer.h} min={5} max={100} onChange={v=>updLayer(selLayer.id,{h:v})} />
-            <Slider label="X Position" value={selLayer.x} min={0} max={90} onChange={v=>updLayer(selLayer.id,{x:v})} />
-            <Slider label="Y Position" value={selLayer.y} min={0} max={90} onChange={v=>updLayer(selLayer.id,{y:v})} />
+            <Slider label="Width %" value={selLayer.w} min={5} max={200} onChange={v=>updLayer(selLayer.id,{w:v})} />
+            <Slider label="Height %" value={selLayer.h} min={5} max={200} onChange={v=>updLayer(selLayer.id,{h:v})} />
+            <Slider label="X Position" value={selLayer.x} min={-50} max={150} onChange={v=>updLayer(selLayer.id,{x:v})} />
+            <Slider label="Y Position" value={selLayer.y} min={-50} max={150} onChange={v=>updLayer(selLayer.id,{y:v})} />
             <Slider label="Opacity" value={selLayer.opacity} min={0} max={100} onChange={v=>updLayer(selLayer.id,{opacity:v})} />
             <Slider label="Rotation °" value={selLayer.rotation||0} min={-180} max={180} onChange={v=>updLayer(selLayer.id,{rotation:v})} />
             <div style={{marginTop:10,display:"flex",gap:5,flexWrap:"wrap"}}>
