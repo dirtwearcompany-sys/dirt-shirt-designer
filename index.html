@@ -1285,8 +1285,10 @@ function App(){
         const parsed=JSON.parse(raw);
         if(Array.isArray(parsed)&&parsed.length>0){
           // Strip any bare filename shirt images (not data URLs) — they can't load in browser
+          // Also ensure shirtSize is always set
           return parsed.map(d=>({
             ...d,
+            shirtSize: d.shirtSize||"M",
             shirtImages:Object.fromEntries(
               Object.entries(d.shirtImages||{}).map(([k,v])=>[k, (v&&v.startsWith('data:'))?v:null])
             )
@@ -1535,42 +1537,60 @@ function Editor({design,onSave,onDuplicate,onBack}){
       });
     }
 
-    // Step 2: draw art layers again at 4x native resolution directly onto a high-res canvas
-    // This avoids upscaling blurriness — each art image is drawn from its raw pixels.
-    const sc=4;
-    const cv=document.createElement("canvas");cv.width=SW*sc;cv.height=SH*sc;
-    const ctx=cv.getContext("2d");
-    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
-    // Draw the shirt background (already composited in stage) scaled up
-    ctx.drawImage(stage,0,0,SW*sc,SH*sc);
+    // Step 2: build high-res output canvas
+    // Output size: 300 DPI equivalent at ~14"x17" = 4200x5100. Cap at 4x stage for sanity.
+    const sc = 4;
+    const OW = SW * sc, OH = SH * sc;
+    const cv = document.createElement("canvas"); cv.width = OW; cv.height = OH;
+    const ctx = cv.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
-    // Re-draw art layers at full 4x resolution from raw source — crisp pixels
+    // Draw shirt background upscaled from stage canvas
+    ctx.drawImage(stage, 0, 0, OW, OH);
+
+    // Re-draw each art layer at maximum quality:
+    // We render each image into its exact output-space bounding box using the
+    // image's own native pixels — no intermediate downscale.
     for(const layer of zone.layers){
       await new Promise(res=>{
-        const img=new Image();
-        img.onload=()=>{
-          ctx.globalAlpha=layer.opacity/100;
-          const lx=(layer.x/100)*SW*sc, ly=(layer.y/100)*SH*sc;
-          const lw=(layer.w/100)*SW*sc, lh=(layer.h/100)*SH*sc;
-          const natW=img.naturalWidth||img.width, natH=img.naturalHeight||img.height;
-          const imgAsp=natW/natH, boxAsp=lw/lh;
-          let drawW,drawH;
-          if(imgAsp>boxAsp){drawW=lw;drawH=lw/imgAsp;}
-          else{drawH=lh;drawW=lh*imgAsp;}
-          const offX=(lw-drawW)/2, offY=(lh-drawH)/2;
+        const img = new Image();
+        img.onload = () => {
+          const natW = img.naturalWidth  || img.width;
+          const natH = img.naturalHeight || img.height;
+
+          // Bounding box in output pixels
+          const lx = (layer.x/100)*OW;
+          const ly = (layer.y/100)*OH;
+          const lw = (layer.w/100)*OW;
+          const lh = (layer.h/100)*OH;
+
+          // object-fit:contain inside the bounding box
+          const imgAsp = natW/natH;
+          const boxAsp = lw/lh;
+          let drawW, drawH;
+          if(imgAsp > boxAsp){ drawW=lw; drawH=lw/imgAsp; }
+          else               { drawH=lh; drawW=lh*imgAsp; }
+          const offX = (lw-drawW)/2;
+          const offY = (lh-drawH)/2;
+
           ctx.save();
-          ctx.translate(lx+lw/2, ly+lh/2);
-          ctx.rotate((layer.rotation||0)*Math.PI/180);
-          ctx.drawImage(img,-lw/2+offX,-lh/2+offY,drawW,drawH);
+          ctx.globalAlpha = layer.opacity/100;
+          ctx.translate(lx + lw/2, ly + lh/2);
+          ctx.rotate((layer.rotation||0) * Math.PI/180);
+          // Draw image at full output resolution — browser uses native pixels directly
+          ctx.drawImage(img, -lw/2+offX, -lh/2+offY, drawW, drawH);
           ctx.restore();
-          ctx.globalAlpha=1;res();
+          ctx.globalAlpha = 1;
+          res();
         };
-        img.src=layer.maskSrc||layer.src;
+        img.src = layer.maskSrc || layer.src;
       });
     }
 
-    const a=document.createElement("a");a.href=cv.toDataURL("image/png");
-    a.download=`${d.name.replace(/\s+/g,"-")}-${d.activeZone}${withShirt?"-with-shirt":"-logo"}.png`;
+    const a = document.createElement("a");
+    a.href = cv.toDataURL("image/png");
+    a.download = `${d.name.replace(/\s+/g,"-")}-${d.activeZone}${withShirt?"-with-shirt":"-logo"}.png`;
     a.click();
   }
 
@@ -1733,6 +1753,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
       {/* CENTER */}
       <div className="center-area" style={{flexDirection:"column"}}>
         {(()=>{
+          // key: d.shirtSize ensures overlay recalculates fresh on every size change
           // Calibrated to actual shirt image pixel positions in the 420x520 stage.
           // Collar seam sits ~110px from top; shirt hem ~478px from top.
           const COLLAR_PX = 63;   // y-px of collar seam on stage (calibrated to shirt image)
@@ -1751,7 +1772,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
           const printW_px    = sizeSpec.maxW        * pxPerInW;
           const topPx  = COLLAR_PX + collarGapPx;
           const leftPx = BODY_LEFT_PX + (BODY_W_PX - printW_px) / 2;
-          const usedH  = Math.min(printH_px, BODY_H_PX - collarGapPx - bottomGapPx);
+          const usedH  = printH_px; // full print height — bottom gap shown separately below it
           function fmtIn(v){return v%1===0.5?v.toString().replace(".5"," ½"):String(v);}
 
           // dtfOverlay — labels only shown in DTF Guide view, not shirt view
