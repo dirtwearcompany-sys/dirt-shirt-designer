@@ -185,6 +185,18 @@ const SHIRT_COLORS = [
   {name:"Purple",hex:"#7C3AED"},{name:"Pink",hex:"#EC4899"},{name:"Orange",hex:"#EA580C"},
   {name:"Teal",hex:"#0D9488"},{name:"Gray",hex:"#9CA3AF"},{name:"Tan",hex:"#D4A574"},{name:"Lt Blue",hex:"#93C5FD"},
 ];
+// Per-size print area specs (all measurements in inches)
+// collarGap = distance from collar seam to top of print area
+// bottomGap = distance from bottom of shirt to bottom of print area
+const SIZE_SPECS = {
+  S:   { maxW:11,   maxH:17,   collarGap:1.5, bottomGap:4 },
+  M:   { maxW:11.5, maxH:17.5, collarGap:2,   bottomGap:4 },
+  L:   { maxW:12,   maxH:18,   collarGap:3,   bottomGap:4 },
+  XL:  { maxW:12.5, maxH:18.5, collarGap:3,   bottomGap:4 },
+  XXL: { maxW:13,   maxH:19,   collarGap:3,   bottomGap:4 },
+};
+const SHIRT_SIZES = ["S","M","L","XL","XXL"];
+
 const SHIRT_ZONES = {
   short:[
     {id:"short_front",label:"Short Sleeve – Front",maxW:12,maxH:14},
@@ -207,7 +219,7 @@ function hexToRgb(hex){const h=hex.replace('#','');return[parseInt(h.slice(0,2),
 function blankDesign(name="New Design"){
   function srcOrNull(key){const s=SHIRT_IMAGE_SRCS[key];return(s&&s!=="#")?s:null;}
   return{
-    id:Date.now()+Math.random(),name,shirtColor:"#bc5924",shirtType:"short",activeZone:"short_front",
+    id:Date.now()+Math.random(),name,shirtColor:"#bc5924",shirtSize:"M",shirtType:"short",activeZone:"short_front",
     shirtImages:{short_front:srcOrNull("short_front"),short_back:srcOrNull("short_back"),short_sleeve:srcOrNull("short_sleeve"),long_front:srcOrNull("long_front"),long_back:srcOrNull("long_back"),long_sleeve:srcOrNull("long_sleeve")},
     zones:{short_front:{layers:[]},short_back:{layers:[]},short_sleeve:{layers:[]},long_front:{layers:[]},long_back:{layers:[]},long_sleeve:{layers:[]}},
   };
@@ -546,7 +558,12 @@ function AIBgRemovalModal({ src, onClose, onSave }) {
 function ShirtBackground({shirtImage,shirtColor,baseColor,offset}){
   const canvasRef=useRef(null);
   const [naturalImg,setNaturalImg]=useState(null);
-  useEffect(()=>{if(!shirtImage)return;const img=new Image();img.onload=()=>setNaturalImg(img);img.src=shirtImage;},[shirtImage]);
+  useEffect(()=>{
+    if(!shirtImage)return;
+    const img=new Image();
+    img.onload=()=>setNaturalImg(img);
+    img.src=shirtImage;
+  },[shirtImage]);
   useEffect(()=>{
     if(!naturalImg||!canvasRef.current)return;
     const canvas=canvasRef.current;const ctx=canvas.getContext("2d");const W=420,H=520;
@@ -1261,7 +1278,18 @@ function App(){
   function loadSaved(){
     try{
       const raw=localStorage.getItem("dirtshirt_designs");
-      if(raw){const parsed=JSON.parse(raw);if(Array.isArray(parsed)&&parsed.length>0)return parsed;}
+      if(raw){
+        const parsed=JSON.parse(raw);
+        if(Array.isArray(parsed)&&parsed.length>0){
+          // Strip any bare filename shirt images (not data URLs) — they can't load in browser
+          return parsed.map(d=>({
+            ...d,
+            shirtImages:Object.fromEntries(
+              Object.entries(d.shirtImages||{}).map(([k,v])=>[k, (v&&v.startsWith('data:'))?v:null])
+            )
+          }));
+        }
+      }
     }catch(e){}
     return null;
   }
@@ -1339,14 +1367,21 @@ function Editor({design,onSave,onDuplicate,onBack}){
   const[showAI,setShowAI]=useState(false);
   const[showMaskEditor,setShowMaskEditor]=useState(false);
   const[maskLayerId,setMaskLayerId]=useState(null);
+  const[stageMode,setStageMode]=useState('shirt'); // 'shirt' | 'dtf'
   const stageRef=useRef(null),isDragging=useRef(false),dragStart=useRef({}),artFileRef=useRef(null);
 
   const zone=d.zones[d.activeZone];
   const allZones=[...SHIRT_ZONES.short,...SHIRT_ZONES.long];
   const zoneInfo=allZones.find(z=>z.id===d.activeZone);
+  const sizeSpec=SIZE_SPECS[d.shirtSize||"M"];
+  // Use per-size maxW/maxH for front/back zones; sleeve stays fixed
+  const isSleeveZone=d.activeZone.includes("sleeve");
+  const activeMaxW=isSleeveZone?(zoneInfo?.maxW||4):sizeSpec.maxW;
+  const activeMaxH=isSleeveZone?(zoneInfo?.maxH||14):sizeSpec.maxH;
   const selLayer=zone.layers.find(l=>l.id===selectedLayer);
-  const dtfInfo=selLayer?calcDTF(selLayer.w,selLayer.h,zoneInfo?.maxW||12,zoneInfo?.maxH||14):null;
-  const allImagesSet=Object.values(d.shirtImages).every(Boolean);
+  const dtfInfo=selLayer?calcDTF(selLayer.w,selLayer.h,activeMaxW,activeMaxH):null;
+  // Show the editor as long as at least one shirt image is set (don't require all 6)
+  const allImagesSet=Object.values(d.shirtImages).some(Boolean)||true;
   const currentShirtImg=d.shirtImages?.[d.activeZone];
 
   const upd=useCallback(patch=>setD(p=>({...p,...patch})),[]);
@@ -1588,9 +1623,46 @@ function Editor({design,onSave,onDuplicate,onBack}){
           <div style={{display:"flex",gap:6,marginBottom:12}}>
             {["short","long"].map(t=>(<button key={t} className="btn-type" style={{background:d.shirtType===t?"#f97316":"#222",color:d.shirtType===t?"#000":"#888"}} onClick={()=>{upd({shirtType:t,activeZone:t==="short"?"short_front":"long_front"});setSelectedLayer(null);}}>{t==="short"?"Short Sleeve":"Long Sleeve"}</button>))}
           </div>
-          <div className="panel-label">Zones</div>
-          <div style={{display:"flex",flexDirection:"column",gap:4}}>
-            {SHIRT_ZONES[d.shirtType].map(z=>(<button key={z.id} className={`zone-tab${d.activeZone===z.id?" active":""}`} onClick={()=>{upd({activeZone:z.id});setSelectedLayer(null);}}>{z.label.split("–")[1]?.trim()}{d.shirtImages?.[z.id]&&<span className="dot-indicator" style={{background:d.activeZone===z.id?"#000":"#f97316"}} />}</button>))}
+          <div className="panel-label" style={{marginTop:8}}>Shirt Size</div>
+          <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
+            {SHIRT_SIZES.map(sz=>(
+              <button key={sz} onClick={()=>upd({shirtSize:sz})}
+                style={{flex:1,padding:"4px 0",fontSize:11,border:"none",borderRadius:6,cursor:"pointer",fontFamily:"'DM Mono',monospace",transition:"all 0.15s",
+                  background:d.shirtSize===sz?"#f97316":"#222",color:d.shirtSize===sz?"#000":"#888",fontWeight:d.shirtSize===sz?700:400}}>
+                {sz}
+              </button>
+            ))}
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div className="panel-label" style={{margin:0}}>Zones</div>
+            <span style={{fontSize:9,color:"#444",fontFamily:"'DM Mono',monospace"}}>click 📁 to upload shirt</span>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:6}}>
+            {SHIRT_ZONES[d.shirtType].map(z=>{
+              const zoneFileRef=React.createRef();
+              return(
+                <div key={z.id} style={{display:"flex",gap:4,alignItems:"center"}}>
+                  <button className={`zone-tab${d.activeZone===z.id?" active":""}`} style={{flex:1}}
+                    onClick={()=>{upd({activeZone:z.id});setSelectedLayer(null);}}>
+                    {z.label.split("–")[1]?.trim()}
+                    {d.shirtImages?.[z.id]
+                      ? <span className="dot-indicator" style={{background:d.activeZone===z.id?"#000":"#22c55e"}} />
+                      : <span className="dot-indicator" style={{background:"#ef4444"}} />
+                    }
+                  </button>
+                  <input type="file" accept="image/*" style={{display:"none"}} ref={zoneFileRef}
+                    onChange={e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>setShirtImg(z.id,ev.target.result);r.readAsDataURL(f);e.target.value="";}} />
+                  <button title={d.shirtImages?.[z.id]?"Replace shirt image":"Upload shirt image"}
+                    onClick={()=>zoneFileRef.current.click()}
+                    style={{flexShrink:0,width:24,height:24,display:"flex",alignItems:"center",justifyContent:"center",
+                      background:d.shirtImages?.[z.id]?"#1a3a1a":"#2a1a1a",border:"1px solid",
+                      borderColor:d.shirtImages?.[z.id]?"#22c55e44":"#ef444444",
+                      borderRadius:5,cursor:"pointer",fontSize:11,lineHeight:1}}>
+                    📁
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
         <div className="panel-section" style={{paddingBottom:showNudge?10:12}}>
@@ -1631,26 +1703,163 @@ function Editor({design,onSave,onDuplicate,onBack}){
 
       {/* CENTER */}
       <div className="center-area" style={{flexDirection:"column"}}>
-        {!allImagesSet&&<ImgSrcPanel shirtImages={d.shirtImages} onUpload={(zid,src)=>setShirtImg(zid,src)} />}
-        {allImagesSet&&(<>
-          <div className="zone-badge">{zoneInfo?.label} · max print {zoneInfo?.maxW}" × {zoneInfo?.maxH}"</div>
-          <div ref={stageRef} className="shirt-stage" style={{cursor:zone.layers.length>0?"crosshair":"default"}} onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
-            <div className="shirt-clip">
-              <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} />
-              <div className="print-guide" />
+        {(()=>{
+          // Shared overlay calculations used by both views
+          const BODY_TOP_PX=80,BODY_BOT_PX=488,BODY_H_PX=408,BODY_W_PX=340;
+          const BODY_LEFT_PX=(STAGE_W-BODY_W_PX)/2;
+          const REF_BODY_H_IN=23,REF_BODY_W_IN=22;
+          const pxPerInH=BODY_H_PX/REF_BODY_H_IN,pxPerInW=BODY_W_PX/REF_BODY_W_IN;
+          const collarGapPx=sizeSpec.collarGap*pxPerInH;
+          const bottomGapPx=sizeSpec.bottomGap*pxPerInH;
+          const printH_px=sizeSpec.maxH*pxPerInH;
+          const printW_px=sizeSpec.maxW*pxPerInW;
+          const topPx=BODY_TOP_PX+collarGapPx;
+          const leftPx=BODY_LEFT_PX+(BODY_W_PX-printW_px)/2;
+          const usedH=Math.min(printH_px,BODY_H_PX-collarGapPx-bottomGapPx);
+          function fmtIn(v){return v%1===0.5?v.toString().replace(".5"," ½"):String(v);}
+
+          const dtfOverlay=(
+            <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:2}}>
+              {/* Collar gap */}
+              <div style={{position:"absolute",left:leftPx,top:BODY_TOP_PX,width:printW_px,height:collarGapPx,
+                borderLeft:"1px dashed rgba(255,180,0,0.4)",borderRight:"1px dashed rgba(255,180,0,0.4)",
+                borderBottom:"1px dashed rgba(255,180,0,0.7)",background:"rgba(255,180,0,0.05)"}}>
+                <div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",
+                  fontSize:8,color:"rgba(255,200,0,0.9)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
+                  background:"rgba(0,0,0,0.65)",padding:"1px 5px",borderRadius:3}}>
+                  {fmtIn(sizeSpec.collarGap)}" from collar seam
+                </div>
+              </div>
+              {/* Print area */}
+              <div style={{position:"absolute",left:leftPx,top:topPx,width:printW_px,height:usedH,
+                border:"1.5px dashed rgba(249,115,22,0.75)",borderRadius:3,background:"rgba(249,115,22,0.05)"}}>
+                <div style={{position:"absolute",top:-17,left:"50%",transform:"translateX(-50%)",
+                  fontSize:8,color:"rgba(249,115,22,0.95)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
+                  background:"rgba(0,0,0,0.7)",padding:"1px 5px",borderRadius:3}}>
+                  ←  {fmtIn(sizeSpec.maxW)}" wide  →
+                </div>
+                <div style={{position:"absolute",top:"50%",right:-58,transform:"translateY(-50%)",
+                  fontSize:8,color:"rgba(249,115,22,0.95)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
+                  background:"rgba(0,0,0,0.7)",padding:"1px 5px",borderRadius:3}}>
+                  ↕ {fmtIn(sizeSpec.maxH)}" tall
+                </div>
+              </div>
+              {/* Bottom gap */}
+              <div style={{position:"absolute",left:leftPx,top:topPx+usedH,width:printW_px,height:bottomGapPx,
+                borderLeft:"1px dashed rgba(100,180,255,0.4)",borderRight:"1px dashed rgba(100,180,255,0.4)",
+                borderTop:"1px dashed rgba(100,180,255,0.7)",background:"rgba(100,180,255,0.05)"}}>
+                <div style={{position:"absolute",top:3,left:"50%",transform:"translateX(-50%)",
+                  fontSize:8,color:"rgba(130,200,255,0.9)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
+                  background:"rgba(0,0,0,0.65)",padding:"1px 5px",borderRadius:3}}>
+                  {fmtIn(sizeSpec.bottomGap)}" from bottom of shirt
+                </div>
+              </div>
             </div>
-            {zone.layers.map(layer=>{
-              const lx=(layer.x/100)*STAGE_W,ly=(layer.y/100)*STAGE_H,lw=(layer.w/100)*STAGE_W,lh=(layer.h/100)*STAGE_H;const isSel=layer.id===selectedLayer;
-              return(<div key={layer.id}
-                style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:10,opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",outline:isSel?"2px solid #ef4444":"none",cursor:layer.locked?"not-allowed":"move"}}
-                onDoubleClick={e=>{e.stopPropagation();if(!layer.locked){setMaskLayerId(layer.id);setShowMaskEditor(true);}}}>
-                <img src={layer.maskSrc||layer.src} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",pointerEvents:"none"}} alt="" draggable={false} />
-                {isSel&&<div className="resize-handle" onMouseDown={e=>{e.stopPropagation();const sx=e.clientX,sy=e.clientY,sw=layer.w,sh=layer.h;const mv=ev=>updLayer(layer.id,{w:Math.max(5,sw+((ev.clientX-sx)/STAGE_W)*100),h:Math.max(5,sh+((ev.clientY-sy)/STAGE_H)*100)});const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);}} />}
-              </div>);
-            })}
-          </div>
-          {dtfInfo&&selLayer&&(<div className="dtf-badge"><span className="dtf-label">DTF Transfer Size</span><span className="dtf-value">{dtfInfo.w}" × {dtfInfo.h}"</span></div>)}
-        </>)}
+          );
+
+          return(<>
+            {/* ── Toggle bar ── */}
+            <div style={{display:"flex",alignItems:"center",gap:0,marginBottom:10,background:"#111",border:"1px solid #222",borderRadius:8,overflow:"hidden"}}>
+              <button onClick={()=>setStageMode('shirt')}
+                style={{flex:1,padding:"7px 0",fontSize:11,border:"none",cursor:"pointer",fontFamily:"'DM Mono',monospace",transition:"all 0.15s",
+                  background:stageMode==='shirt'?"#f97316":"transparent",color:stageMode==='shirt'?"#000":"#666",fontWeight:stageMode==='shirt'?600:400}}>
+                👕 Shirt View
+              </button>
+              <div style={{width:1,height:28,background:"#222"}} />
+              <button onClick={()=>setStageMode('dtf')}
+                style={{flex:1,padding:"7px 0",fontSize:11,border:"none",cursor:"pointer",fontFamily:"'DM Mono',monospace",transition:"all 0.15s",
+                  background:stageMode==='dtf'?"#f97316":"transparent",color:stageMode==='dtf'?"#000":"#666",fontWeight:stageMode==='dtf'?600:400}}>
+                📐 DTF Guide
+              </button>
+            </div>
+
+            <div className="zone-badge" style={{top:stageMode==='dtf'?-6:14}}>
+              {zoneInfo?.label} · {d.shirtSize} · max {activeMaxW}" × {activeMaxH}"
+            </div>
+
+            {/* ── Shirt View ── */}
+            {stageMode==='shirt'&&(
+              <div ref={stageRef} className="shirt-stage" style={{cursor:zone.layers.length>0?"crosshair":"default"}} onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
+                <div className="shirt-clip">
+                  <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} />
+                  {!isSleeveZone && dtfOverlay}
+                  {isSleeveZone && <div className="print-guide" />}
+                </div>
+                {zone.layers.map(layer=>{
+                  const lx=(layer.x/100)*STAGE_W,ly=(layer.y/100)*STAGE_H,lw=(layer.w/100)*STAGE_W,lh=(layer.h/100)*STAGE_H;const isSel=layer.id===selectedLayer;
+                  return(<div key={layer.id}
+                    style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:10,opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",outline:isSel?"2px solid #ef4444":"none",cursor:layer.locked?"not-allowed":"move"}}
+                    onDoubleClick={e=>{e.stopPropagation();if(!layer.locked){setMaskLayerId(layer.id);setShowMaskEditor(true);}}}>
+                    <img src={layer.maskSrc||layer.src} style={{width:"100%",height:"100%",objectFit:"contain",display:"block",pointerEvents:"none"}} alt="" draggable={false} />
+                    {isSel&&<div className="resize-handle" onMouseDown={e=>{e.stopPropagation();const sx=e.clientX,sy=e.clientY,sw=layer.w,sh=layer.h;const mv=ev=>updLayer(layer.id,{w:Math.max(5,sw+((ev.clientX-sx)/STAGE_W)*100),h:Math.max(5,sh+((ev.clientY-sy)/STAGE_H)*100)});const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);}} />}
+                  </div>);
+                })}
+              </div>
+            )}
+
+            {/* ── DTF Guide View ── */}
+            {stageMode==='dtf'&&(
+              <div style={{position:"relative",width:STAGE_W,height:STAGE_H,borderRadius:10,
+                background:"#0d0d0d",boxShadow:"0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56)",overflow:"visible"}}>
+                {/* Grid background */}
+                <svg width={STAGE_W} height={STAGE_H} style={{position:"absolute",inset:0,borderRadius:10,overflow:"hidden"}}>
+                  <defs>
+                    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="0.5"/>
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#grid)" rx="10"/>
+                </svg>
+
+                {/* Art layers composited on top of the DTF guide */}
+                {zone.layers.map(layer=>{
+                  const lx=(layer.x/100)*STAGE_W,ly=(layer.y/100)*STAGE_H,lw=(layer.w/100)*STAGE_W,lh=(layer.h/100)*STAGE_H;
+                  return(<div key={layer.id}
+                    style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:5,opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",pointerEvents:"none"}}>
+                    <img src={layer.maskSrc||layer.src} style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}} alt="" draggable={false} />
+                  </div>);
+                })}
+
+                {/* DTF overlay always visible in DTF mode */}
+                {!isSleeveZone && dtfOverlay}
+                {isSleeveZone && <div className="print-guide" />}
+
+                {/* Spec table at bottom */}
+                {!isSleeveZone&&(
+                  <div style={{position:"absolute",bottom:-90,left:"50%",transform:"translateX(-50%)",
+                    display:"flex",gap:12,alignItems:"center",whiteSpace:"nowrap",
+                    background:"#111",border:"1px solid #1e1e1e",borderRadius:8,padding:"8px 16px"}}>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:8,color:"#444",textTransform:"uppercase",letterSpacing:1,fontFamily:"'DM Mono',monospace"}}>Size</div>
+                      <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:20,color:"#f97316",letterSpacing:1}}>{d.shirtSize}</div>
+                    </div>
+                    <div style={{width:1,height:32,background:"#222"}}/>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:8,color:"#444",textTransform:"uppercase",letterSpacing:1,fontFamily:"'DM Mono',monospace"}}>Max Print</div>
+                      <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:18,color:"#e8e8e8",letterSpacing:1}}>{fmtIn(sizeSpec.maxW)}" × {fmtIn(sizeSpec.maxH)}"</div>
+                    </div>
+                    <div style={{width:1,height:32,background:"#222"}}/>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:8,color:"rgba(255,200,0,0.7)",textTransform:"uppercase",letterSpacing:1,fontFamily:"'DM Mono',monospace"}}>From Collar</div>
+                      <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:18,color:"rgba(255,200,0,0.9)",letterSpacing:1}}>{fmtIn(sizeSpec.collarGap)}"</div>
+                    </div>
+                    <div style={{width:1,height:32,background:"#222"}}/>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:8,color:"rgba(130,200,255,0.7)",textTransform:"uppercase",letterSpacing:1,fontFamily:"'DM Mono',monospace"}}>From Bottom</div>
+                      <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:18,color:"rgba(130,200,255,0.9)",letterSpacing:1}}>{fmtIn(sizeSpec.bottomGap)}"</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {dtfInfo&&selLayer&&(<div className="dtf-badge" style={{marginTop:stageMode==='dtf'?104:14}}>
+              <span className="dtf-label">DTF · {d.shirtSize}</span>
+              <span className="dtf-value">{dtfInfo.w}" × {dtfInfo.h}"</span>
+              {!isSleeveZone&&<span style={{fontSize:9,color:"#555",fontFamily:"'DM Mono',monospace",marginLeft:4}}>collar ↕ {fmtIn(sizeSpec.collarGap)}" · bottom ↕ {fmtIn(sizeSpec.bottomGap)}"</span>}
+            </div>)}
+          </>);
+        })()}
       </div>
 
       {/* RIGHT */}
@@ -1761,7 +1970,18 @@ function Editor({design,onSave,onDuplicate,onBack}){
               <button className="btn btn-ghost" style={{fontSize:10,flex:1}} onClick={()=>updLayer(selLayer.id,{locked:!selLayer.locked})}>{selLayer.locked?"🔓":"🔒"}</button>
               <button className="btn btn-danger" style={{fontSize:10,flex:1}} onClick={()=>deleteLayer(selLayer.id)}>🗑</button>
             </div>
-            {dtfInfo&&(<div className="dtf-box"><div className="dtf-box-label">DTF Transfer Size</div><div className="dtf-box-val">{dtfInfo.w}" × {dtfInfo.h}"</div><div className="dtf-box-sub">relative to {zoneInfo?.maxW}"×{zoneInfo?.maxH}" max area</div></div>)}
+            {dtfInfo&&(<div className="dtf-box">
+              <div className="dtf-box-label">DTF Transfer Size · {d.shirtSize}</div>
+              <div className="dtf-box-val">{dtfInfo.w}" × {dtfInfo.h}"</div>
+              <div className="dtf-box-sub">max area: {activeMaxW}" × {activeMaxH}"</div>
+              {!isSleeveZone&&<>
+                <div style={{marginTop:6,height:1,background:"#1e1e1e"}} />
+                <div style={{marginTop:5,display:"flex",flexDirection:"column",gap:2}}>
+                  <div style={{fontSize:9,color:"rgba(255,180,0,0.7)",fontFamily:"'DM Mono',monospace"}}>↕ {sizeSpec.collarGap % 1 === 0.5 ? sizeSpec.collarGap.toString().replace(".5"," ½") : sizeSpec.collarGap}" from collar seam</div>
+                  <div style={{fontSize:9,color:"rgba(100,180,255,0.7)",fontFamily:"'DM Mono',monospace"}}>↕ {sizeSpec.bottomGap}" from bottom of shirt</div>
+                </div>
+              </>}
+            </div>)}
           </div>
         ):(
           <div style={{flex:1,padding:12}}>
