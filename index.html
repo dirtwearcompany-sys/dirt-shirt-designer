@@ -179,7 +179,7 @@ const ZONE_LOGICAL = {
   long_front:[380,510],  long_back:[380,510],  long_sleeve:[250,510],
 };
 const SHIRT_COLORS = [
-  {name:"White",hex:"#FFFFFF"},{name:"Black",hex:"#1a1a1a"},{name:"Navy",hex:"#1B2A4A"},
+  {name:"Dirt Orange",hex:"#bc5924"},{name:"White",hex:"#FFFFFF"},{name:"Black",hex:"#1a1a1a"},{name:"Navy",hex:"#1B2A4A"},
   {name:"Royal Blue",hex:"#2563EB"},{name:"Red",hex:"#DC2626"},{name:"Forest",hex:"#166534"},
   {name:"Charcoal",hex:"#374151"},{name:"Maroon",hex:"#7F1D1D"},{name:"Gold",hex:"#D97706"},
   {name:"Purple",hex:"#7C3AED"},{name:"Pink",hex:"#EC4899"},{name:"Orange",hex:"#EA580C"},
@@ -207,7 +207,7 @@ function hexToRgb(hex){const h=hex.replace('#','');return[parseInt(h.slice(0,2),
 function blankDesign(name="New Design"){
   function srcOrNull(key){const s=SHIRT_IMAGE_SRCS[key];return(s&&s!=="#")?s:null;}
   return{
-    id:Date.now()+Math.random(),name,shirtColor:"#FFFFFF",shirtType:"short",activeZone:"short_front",
+    id:Date.now()+Math.random(),name,shirtColor:"#bc5924",shirtType:"short",activeZone:"short_front",
     shirtImages:{short_front:srcOrNull("short_front"),short_back:srcOrNull("short_back"),short_sleeve:srcOrNull("short_sleeve"),long_front:srcOrNull("long_front"),long_back:srcOrNull("long_back"),long_sleeve:srcOrNull("long_sleeve")},
     zones:{short_front:{layers:[]},short_back:{layers:[]},short_sleeve:{layers:[]},long_front:{layers:[]},long_back:{layers:[]},long_sleeve:{layers:[]}},
   };
