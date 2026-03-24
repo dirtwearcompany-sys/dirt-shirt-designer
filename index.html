@@ -1293,7 +1293,7 @@ function Library({designs,onOpen,onDuplicate,onDelete,onNew}){
     <div className="lib-wrap">
       <div className="lib-header"><h2 className="lib-title">MY DESIGNS</h2><button className="btn btn-primary" style={{marginLeft:"auto"}} onClick={onNew}>+ New Design</button></div>
       {designs.length===0?<div className="empty-state"><div className="empty-icon">👕</div><p style={{marginBottom:16}}>No designs yet</p><button className="btn btn-primary" onClick={onNew}>Create Your First Design</button></div>
-        :<div className="lib-grid">{designs.map(d=>{const previewImg=Object.values(d.shirtImages||{}).find(Boolean);const totalLayers=Object.values(d.zones||{}).reduce((s,z)=>s+(z.layers?.length||0),0);return(<div key={d.id} className="design-card"><div style={{background:"#111",borderRadius:8,height:130,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,cursor:"pointer",overflow:"hidden"}} onClick={()=>onOpen(d)}>{previewImg?<img src={previewImg} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} />:<div style={{fontSize:42,opacity:0.18}}>👕</div>}</div><div style={{fontWeight:500,fontSize:13,marginBottom:3}}>{d.name}</div><div style={{fontSize:11,color:"#555",marginBottom:10}}>{d.shirtType==="short"?"Short Sleeve":"Long Sleeve"} · {totalLayers} art layer{totalLayers!==1?"s":""}</div><div style={{display:"flex",gap:6}}><button className="btn btn-primary" style={{flex:1,padding:"5px 8px",fontSize:11}} onClick={()=>onOpen(d)}>Edit</button><button className="btn btn-ghost" style={{padding:"5px 10px"}} onClick={()=>onDuplicate(d)}>⧉</button><button className="btn btn-danger" style={{padding:"5px 10px"}} onClick={()=>onDelete(d.id)}>✕</button></div></div>);})}</div>
+        :<div className="lib-grid">{designs.map(d=>{const totalLayers=Object.values(d.zones||{}).reduce((s,z)=>s+(z.layers?.length||0),0);return(<div key={d.id} className="design-card"><div style={{background:"#111",borderRadius:8,height:130,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,cursor:"pointer",overflow:"hidden",position:"relative"}} onClick={()=>onOpen(d)}>{d.thumbnail?<img src={d.thumbnail} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} />:<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><div style={{fontSize:42,opacity:0.18}}>👕</div><div style={{fontSize:9,color:"#333",fontFamily:"'DM Mono',monospace"}}>Save to generate preview</div></div>}</div><div style={{fontWeight:500,fontSize:13,marginBottom:3}}>{d.name}</div><div style={{fontSize:11,color:"#555",marginBottom:10}}>{d.shirtType==="short"?"Short Sleeve":"Long Sleeve"} · {totalLayers} art layer{totalLayers!==1?"s":""}</div><div style={{display:"flex",gap:6}}><button className="btn btn-primary" style={{flex:1,padding:"5px 8px",fontSize:11}} onClick={()=>onOpen(d)}>Edit</button><button className="btn btn-ghost" style={{padding:"5px 10px"}} onClick={()=>onDuplicate(d)}>⧉</button><button className="btn btn-danger" style={{padding:"5px 10px"}} onClick={()=>onDelete(d.id)}>✕</button></div></div>);})}</div>
       }
     </div>
   );
@@ -1459,6 +1459,75 @@ function Editor({design,onSave,onDuplicate,onBack}){
     a.click();
   }
 
+  // Generate a small thumbnail of the current zone (shirt + art layers)
+  async function generateThumbnail(){
+    const TW=210,TH=260;
+    const stage=document.createElement("canvas");stage.width=TW;stage.height=TH;
+    const sctx=stage.getContext("2d");sctx.clearRect(0,0,TW,TH);
+    const src=d.shirtImages?.[d.activeZone];
+    if(src){
+      await new Promise(res=>{
+        const img=new Image();img.crossOrigin="anonymous";
+        img.onload=()=>{
+          const tmp=document.createElement("canvas");tmp.width=img.width;tmp.height=img.height;
+          const tctx=tmp.getContext("2d");tctx.drawImage(img,0,0);
+          const raw=tctx.getImageData(0,0,img.width,img.height);
+          const rp=raw.data,RW=img.width,RH=img.height;
+          let minX=RW,maxX=0,minY=RH,maxY=0;
+          const cornerLum=(0.299*rp[0]+0.587*rp[1]+0.114*rp[2])/255;
+          const isLightBg=cornerLum>=0.12,LUM_THRESH=cornerLum<0.12?0.06:0.94;
+          for(let y=0;y<RH;y++)for(let x=0;x<RW;x++){const i=(y*RW+x)*4;const lum=(0.299*rp[i]+0.587*rp[i+1]+0.114*rp[i+2])/255;const isShirt=isLightBg?lum<LUM_THRESH:lum>LUM_THRESH;if(isShirt){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;}}
+          const padX=Math.floor(RW*0.02),padY=Math.floor(RH*0.02);
+          minX=Math.max(0,minX-padX);maxX=Math.min(RW-1,maxX+padX);minY=Math.max(0,minY-padY);maxY=Math.min(RH-1,maxY+padY);
+          const cropW=maxX-minX+1,cropH=maxY-minY+1;
+          const scale=Math.min(TW/cropW,TH/cropH)*0.96;
+          const dw=cropW*scale,dh=cropH*scale,dx=(TW-dw)/2,dy=(TH-dh)/2;
+          const coloredTmp=document.createElement("canvas");coloredTmp.width=RW;coloredTmp.height=RH;
+          const cctx=coloredTmp.getContext("2d");cctx.drawImage(img,0,0);
+          const cdata=cctx.getImageData(0,0,RW,RH);const cpx=cdata.data;
+          let sr2=0,sg2=0,sb2=0,sc3=0;
+          for(let x=0;x<RW;x++){for(const yy of[0,RH-1]){const i=(yy*RW+x)*4;sr2+=cpx[i];sg2+=cpx[i+1];sb2+=cpx[i+2];sc3++;}}
+          for(let y=1;y<RH-1;y++){for(const x of[0,RW-1]){const i=(y*RW+x)*4;sr2+=cpx[i];sg2+=cpx[i+1];sb2+=cpx[i+2];sc3++;}}
+          const bgR2=Math.round(sr2/sc3),bgG2=Math.round(sg2/sc3),bgB2=Math.round(sb2/sc3);
+          const bgLum2=(0.299*bgR2+0.587*bgG2+0.114*bgB2)/255;const isDark2=bgLum2<0.12;
+          const iBg2=new Uint8Array(RW*RH),iq2=new Int32Array(RW*RH*2);let iqH2=0,iqT2=0;
+          function sp2(i){if(!iBg2[i]){iBg2[i]=1;iq2[iqT2++]=i;}}
+          for(let x=0;x<RW;x++){sp2(x);sp2((RH-1)*RW+x);}for(let y=1;y<RH-1;y++){sp2(y*RW);sp2(y*RW+RW-1);}
+          while(iqH2<iqT2){const idx=iq2[iqH2++],ix=idx%RW,iy=(idx/RW)|0;for(let dy2=-1;dy2<=1;dy2++)for(let dx2=-1;dx2<=1;dx2++){if(!dx2&&!dy2)continue;const nx=ix+dx2,ny=iy+dy2;if(nx<0||nx>=RW||ny<0||ny>=RH)continue;const ni=ny*RW+nx;if(iBg2[ni])continue;const np=ni*4,nr=cpx[np],ng=cpx[np+1],nb3=cpx[np+2];let hit=false;if(isDark2){const pl=(0.299*nr+0.587*ng+0.114*nb3)/255;hit=pl<0.06;}else{const dr=nr-bgR2,dg=ng-bgG2,db=nb3-bgB2;hit=Math.sqrt(dr*dr+dg*dg+db*db)<35;}if(hit){iBg2[ni]=1;iq2[iqT2++]=ni;}}}
+          const[bR2,bG2,bB2]=hexToRgb(ZONE_BASE_COLOR[d.activeZone]||"#ffffff");
+          const bLum=(0.299*bR2+0.587*bG2+0.114*bB2)/255||1;
+          const[tR2,tG2,tB2]=hexToRgb(d.shirtColor||"#ffffff");
+          for(let i=0;i<RW*RH;i++){if(iBg2[i])continue;const pi=i*4;if(cpx[pi+3]<10)continue;const lm=(0.299*cpx[pi]+0.587*cpx[pi+1]+0.114*cpx[pi+2])/255;const nm=Math.min(lm/bLum,1.3);cpx[pi]=Math.min(255,Math.round(tR2*nm));cpx[pi+1]=Math.min(255,Math.round(tG2*nm));cpx[pi+2]=Math.min(255,Math.round(tB2*nm));}
+          cctx.putImageData(cdata,0,0);
+          sctx.drawImage(cctx.canvas,minX,minY,cropW,cropH,dx,dy,dw,dh);
+          res();
+        };
+        img.src=src;
+      });
+    }
+    // Draw art layers
+    for(const layer of zone.layers){
+      await new Promise(res=>{
+        const img=new Image();
+        img.onload=()=>{
+          sctx.globalAlpha=layer.opacity/100;
+          const lx=(layer.x/100)*TW,ly=(layer.y/100)*TH;
+          const lw=(layer.w/100)*TW,lh=(layer.h/100)*TH;
+          const natW=img.naturalWidth||img.width,natH=img.naturalHeight||img.height;
+          const imgAsp=natW/natH,boxAsp=lw/lh;
+          let drawW,drawH;
+          if(imgAsp>boxAsp){drawW=lw;drawH=lw/imgAsp;}else{drawH=lh;drawW=lh*imgAsp;}
+          const offX=(lw-drawW)/2,offY=(lh-drawH)/2;
+          sctx.save();sctx.translate(lx+lw/2,ly+lh/2);sctx.rotate((layer.rotation||0)*Math.PI/180);
+          sctx.drawImage(img,-lw/2+offX,-lh/2+offY,drawW,drawH);
+          sctx.restore();sctx.globalAlpha=1;res();
+        };
+        img.src=layer.maskSrc||layer.src;
+      });
+    }
+    return stage.toDataURL("image/jpeg",0.85);
+  }
+
   return(
     <div style={{display:"flex",height:"calc(100vh - 53px)",overflow:"hidden"}} className="editor-wrap">
       {/* LEFT */}
@@ -1538,7 +1607,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
         <div className="panel-section">
           {editingName?<input className="name-input" autoFocus value={nameVal} onChange={e=>setNameVal(e.target.value)} onBlur={()=>{upd({name:nameVal});setEditingName(false);}} onKeyDown={e=>e.key==="Enter"&&(upd({name:nameVal}),setEditingName(false))} />:<div className="name-display" onClick={()=>setEditingName(true)}>{d.name} <span style={{color:"#444",fontSize:11}}>✏️</span></div>}
           <div style={{display:"flex",gap:6,marginTop:8}}>
-            <button className="btn btn-primary" style={{flex:1,fontSize:10,padding:"6px 0"}} onClick={()=>onSave(d)}>💾 Save</button>
+            <button className="btn btn-primary" style={{flex:1,fontSize:10,padding:"6px 0"}} onClick={async()=>{const thumb=await generateThumbnail();onSave({...d,thumbnail:thumb});}}>💾 Save</button>
             <button className="btn btn-ghost" style={{fontSize:10,padding:"6px 8px"}} onClick={onDuplicate}>⧉</button>
             <button className="btn btn-ghost" style={{fontSize:10,padding:"6px 8px"}} onClick={onBack}>← Back</button>
           </div>
