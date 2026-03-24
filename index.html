@@ -1707,12 +1707,12 @@ function Editor({design,onSave,onDuplicate,onBack}){
         {(()=>{
           // Calibrated to actual shirt image pixel positions in the 420x520 stage.
           // Collar seam sits ~110px from top; shirt hem ~478px from top.
-          const COLLAR_PX = 110;  // y-px of collar seam on stage
-          const HEM_PX    = 478;  // y-px of shirt hem on stage
+          const COLLAR_PX = 63;   // y-px of collar seam on stage (calibrated to shirt image)
+          const HEM_PX    = 500;  // y-px of shirt hem on stage
           const BODY_H_PX = HEM_PX - COLLAR_PX;   // total body height in px
           const BODY_W_PX = 310;                   // printable chest width in px
           const BODY_LEFT_PX = (STAGE_W - BODY_W_PX) / 2;
-          // Reference shirt body dimensions in real inches (XL body ~ 20" long, 22" wide chest)
+          // Reference shirt body dimensions in real inches
           const REF_BODY_H_IN = 20;
           const REF_BODY_W_IN = 22;
           const pxPerInH = BODY_H_PX / REF_BODY_H_IN;
