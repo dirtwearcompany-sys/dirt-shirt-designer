@@ -1447,12 +1447,39 @@ function Editor({design,onSave,onDuplicate,onBack}){
       });
     }
 
-    // Step 2: upscale the perfectly-matched stage canvas for high-res output
-    const sc=2.5;
+    // Step 2: draw art layers again at 4x native resolution directly onto a high-res canvas
+    // This avoids upscaling blurriness — each art image is drawn from its raw pixels.
+    const sc=4;
     const cv=document.createElement("canvas");cv.width=SW*sc;cv.height=SH*sc;
     const ctx=cv.getContext("2d");
     ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+    // Draw the shirt background (already composited in stage) scaled up
     ctx.drawImage(stage,0,0,SW*sc,SH*sc);
+
+    // Re-draw art layers at full 4x resolution from raw source — crisp pixels
+    for(const layer of zone.layers){
+      await new Promise(res=>{
+        const img=new Image();
+        img.onload=()=>{
+          ctx.globalAlpha=layer.opacity/100;
+          const lx=(layer.x/100)*SW*sc, ly=(layer.y/100)*SH*sc;
+          const lw=(layer.w/100)*SW*sc, lh=(layer.h/100)*SH*sc;
+          const natW=img.naturalWidth||img.width, natH=img.naturalHeight||img.height;
+          const imgAsp=natW/natH, boxAsp=lw/lh;
+          let drawW,drawH;
+          if(imgAsp>boxAsp){drawW=lw;drawH=lw/imgAsp;}
+          else{drawH=lh;drawW=lh*imgAsp;}
+          const offX=(lw-drawW)/2, offY=(lh-drawH)/2;
+          ctx.save();
+          ctx.translate(lx+lw/2, ly+lh/2);
+          ctx.rotate((layer.rotation||0)*Math.PI/180);
+          ctx.drawImage(img,-lw/2+offX,-lh/2+offY,drawW,drawH);
+          ctx.restore();
+          ctx.globalAlpha=1;res();
+        };
+        img.src=layer.maskSrc||layer.src;
+      });
+    }
 
     const a=document.createElement("a");a.href=cv.toDataURL("image/png");
     a.download=`${d.name.replace(/\s+/g,"-")}-${d.activeZone}${withShirt?"-with-shirt":"-logo"}.png`;
