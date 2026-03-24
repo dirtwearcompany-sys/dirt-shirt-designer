@@ -31,8 +31,11 @@
     .layer-row { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; margin-bottom: 3px; cursor: pointer; border: 1px solid transparent; transition: background 0.1s; }
     .layer-row:hover { background: rgba(255,255,255,0.04); }
     .layer-row.selected { background: rgba(249,115,22,0.09); border-color: rgba(249,115,22,0.27); }
-    .design-card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 16px; transition: border-color 0.2s; }
-    .design-card:hover { border-color: #f97316; }
+    .design-card { background: #141414; border: 1px solid #222; border-radius: 10px; overflow: hidden; transition: all 0.18s; cursor:pointer; }
+    .design-card:hover { border-color: #f97316; transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    .design-card-thumb { width:100%; aspect-ratio:3/4; background:#0d0d0d; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+    .design-card-thumb img { width:100%; height:100%; object-fit:contain; }
+    .design-card-info { padding: 8px 10px 10px; }
     .shirt-stage { position: relative; width: 420px; height: 520px; border-radius: 10px; overflow: visible; background: transparent; box-shadow: 0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56); }
     .shirt-clip { position: absolute; inset: 0; border-radius: 10px; overflow: hidden; pointer-events: none; z-index: 0; }
     .shirt-bg { position: absolute; inset: 0; z-index: 0; display: flex; align-items: center; justify-content: center; background: transparent; border-radius: 10px; overflow: hidden; }
@@ -63,8 +66,8 @@
     .dtf-badge { margin-top: 14px; background: #161616; border: 1px solid rgba(249,115,22,0.2); border-radius: 8px; padding: 8px 20px; display: flex; gap: 16px; align-items: center; }
     .dtf-label { font-size: 10px; color: #f97316; text-transform: uppercase; letter-spacing: 1px; }
     .dtf-value { font-family: 'Bebas Neue', cursive; font-size: 22px; color: #fff; letter-spacing: 1px; }
-    .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 16px; }
-    .lib-wrap { padding: 32px; max-width: 1100px; margin: 0 auto; overflow-y: auto; height: 100%; }
+    .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 12px; }
+    .lib-wrap { padding: 24px; margin: 0 auto; overflow-y: auto; height: 100%; }
     .lib-header { display: flex; align-items: center; margin-bottom: 24px; }
     .lib-title { font-family: 'Bebas Neue', cursive; font-size: 28px; color: #f97316; letter-spacing: 1px; margin: 0; }
     .empty-state { text-align: center; color: #555; padding-top: 80px; }
@@ -1345,7 +1348,32 @@ function Library({designs,onOpen,onDuplicate,onDelete,onNew}){
     <div className="lib-wrap">
       <div className="lib-header"><h2 className="lib-title">MY DESIGNS</h2><button className="btn btn-primary" style={{marginLeft:"auto"}} onClick={onNew}>+ New Design</button></div>
       {designs.length===0?<div className="empty-state"><div className="empty-icon">👕</div><p style={{marginBottom:16}}>No designs yet</p><button className="btn btn-primary" onClick={onNew}>Create Your First Design</button></div>
-        :<div className="lib-grid">{designs.map(d=>{const totalLayers=Object.values(d.zones||{}).reduce((s,z)=>s+(z.layers?.length||0),0);return(<div key={d.id} className="design-card"><div style={{background:"#111",borderRadius:8,height:130,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:12,cursor:"pointer",overflow:"hidden",position:"relative"}} onClick={()=>onOpen(d)}>{d.thumbnail?<img src={d.thumbnail} alt="" style={{width:"100%",height:"100%",objectFit:"contain"}} />:<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><div style={{fontSize:42,opacity:0.18}}>👕</div><div style={{fontSize:9,color:"#333",fontFamily:"'DM Mono',monospace"}}>Save to generate preview</div></div>}</div><div style={{fontWeight:500,fontSize:13,marginBottom:3}}>{d.name}</div><div style={{fontSize:11,color:"#555",marginBottom:10}}>{d.shirtType==="short"?"Short Sleeve":"Long Sleeve"} · {totalLayers} art layer{totalLayers!==1?"s":""}</div><div style={{display:"flex",gap:6}}><button className="btn btn-primary" style={{flex:1,padding:"5px 8px",fontSize:11}} onClick={()=>onOpen(d)}>Edit</button><button className="btn btn-ghost" style={{padding:"5px 10px"}} onClick={()=>onDuplicate(d)}>⧉</button><button className="btn btn-danger" style={{padding:"5px 10px"}} onClick={()=>onDelete(d.id)}>✕</button></div></div>);})}</div>
+        :<div className="lib-grid">{designs.map(d=>{const totalLayers=Object.values(d.zones||{}).reduce((s,z)=>s+(z.layers?.length||0),0);return(
+          <div key={d.id} className="design-card" onClick={()=>onOpen(d)}>
+            <div className="design-card-thumb">
+              {d.thumbnail
+                ?<img src={d.thumbnail} alt="" />
+                :<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                  <div style={{fontSize:36,opacity:0.12}}>👕</div>
+                  <div style={{fontSize:8,color:"#2a2a2a",fontFamily:"'DM Mono',monospace",textAlign:"center",padding:"0 8px"}}>save to preview</div>
+                </div>
+              }
+              {/* Hover action overlay */}
+              <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                opacity:0,transition:"opacity 0.15s"}}
+                onMouseEnter={e=>e.currentTarget.style.opacity=1}
+                onMouseLeave={e=>e.currentTarget.style.opacity=0}>
+                <button className="btn btn-primary" style={{fontSize:10,padding:"4px 10px"}} onClick={e=>{e.stopPropagation();onOpen(d);}}>Edit</button>
+                <button className="btn btn-ghost" style={{fontSize:10,padding:"4px 8px"}} onClick={e=>{e.stopPropagation();onDuplicate(d);}}>⧉</button>
+                <button className="btn btn-danger" style={{fontSize:10,padding:"4px 8px"}} onClick={e=>{e.stopPropagation();onDelete(d.id);}}>✕</button>
+              </div>
+            </div>
+            <div className="design-card-info">
+              <div style={{fontWeight:500,fontSize:11,color:"#d0d0d0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:2}}>{d.name}</div>
+              <div style={{fontSize:9,color:"#444",fontFamily:"'DM Mono',monospace"}}>{d.shirtType==="short"?"S/S":"L/S"} · {d.shirtSize||"M"} · {totalLayers} layer{totalLayers!==1?"s":""}</div>
+            </div>
+          </div>
+        );})}</div>
       }
     </div>
   );
