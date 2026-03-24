@@ -1368,6 +1368,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
   const[showMaskEditor,setShowMaskEditor]=useState(false);
   const[maskLayerId,setMaskLayerId]=useState(null);
   const[stageMode,setStageMode]=useState('shirt'); // 'shirt' | 'dtf'
+  const[showDTFOnShirt,setShowDTFOnShirt]=useState(false);
   const stageRef=useRef(null),isDragging=useRef(false),dragStart=useRef({}),artFileRef=useRef(null);
 
   const zone=d.zones[d.activeZone];
@@ -1704,58 +1705,70 @@ function Editor({design,onSave,onDuplicate,onBack}){
       {/* CENTER */}
       <div className="center-area" style={{flexDirection:"column"}}>
         {(()=>{
-          // Shared overlay calculations used by both views
-          const BODY_TOP_PX=80,BODY_BOT_PX=488,BODY_H_PX=408,BODY_W_PX=340;
-          const BODY_LEFT_PX=(STAGE_W-BODY_W_PX)/2;
-          const REF_BODY_H_IN=23,REF_BODY_W_IN=22;
-          const pxPerInH=BODY_H_PX/REF_BODY_H_IN,pxPerInW=BODY_W_PX/REF_BODY_W_IN;
-          const collarGapPx=sizeSpec.collarGap*pxPerInH;
-          const bottomGapPx=sizeSpec.bottomGap*pxPerInH;
-          const printH_px=sizeSpec.maxH*pxPerInH;
-          const printW_px=sizeSpec.maxW*pxPerInW;
-          const topPx=BODY_TOP_PX+collarGapPx;
-          const leftPx=BODY_LEFT_PX+(BODY_W_PX-printW_px)/2;
-          const usedH=Math.min(printH_px,BODY_H_PX-collarGapPx-bottomGapPx);
+          // Calibrated to actual shirt image pixel positions in the 420x520 stage.
+          // Collar seam sits ~110px from top; shirt hem ~478px from top.
+          const COLLAR_PX = 110;  // y-px of collar seam on stage
+          const HEM_PX    = 478;  // y-px of shirt hem on stage
+          const BODY_H_PX = HEM_PX - COLLAR_PX;   // total body height in px
+          const BODY_W_PX = 310;                   // printable chest width in px
+          const BODY_LEFT_PX = (STAGE_W - BODY_W_PX) / 2;
+          // Reference shirt body dimensions in real inches (XL body ~ 20" long, 22" wide chest)
+          const REF_BODY_H_IN = 20;
+          const REF_BODY_W_IN = 22;
+          const pxPerInH = BODY_H_PX / REF_BODY_H_IN;
+          const pxPerInW = BODY_W_PX / REF_BODY_W_IN;
+          const collarGapPx  = sizeSpec.collarGap  * pxPerInH;
+          const bottomGapPx  = sizeSpec.bottomGap  * pxPerInH;
+          const printH_px    = sizeSpec.maxH        * pxPerInH;
+          const printW_px    = sizeSpec.maxW        * pxPerInW;
+          const topPx  = COLLAR_PX + collarGapPx;
+          const leftPx = BODY_LEFT_PX + (BODY_W_PX - printW_px) / 2;
+          const usedH  = Math.min(printH_px, BODY_H_PX - collarGapPx - bottomGapPx);
           function fmtIn(v){return v%1===0.5?v.toString().replace(".5"," ½"):String(v);}
 
-          const dtfOverlay=(
-            <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:2}}>
-              {/* Collar gap */}
-              <div style={{position:"absolute",left:leftPx,top:BODY_TOP_PX,width:printW_px,height:collarGapPx,
-                borderLeft:"1px dashed rgba(255,180,0,0.4)",borderRight:"1px dashed rgba(255,180,0,0.4)",
-                borderBottom:"1px dashed rgba(255,180,0,0.7)",background:"rgba(255,180,0,0.05)"}}>
-                <div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",
-                  fontSize:8,color:"rgba(255,200,0,0.9)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
-                  background:"rgba(0,0,0,0.65)",padding:"1px 5px",borderRadius:3}}>
-                  {fmtIn(sizeSpec.collarGap)}" from collar seam
+          // dtfOverlay — labels only shown in DTF Guide view, not shirt view
+          function makeDtfOverlay(showLabels){
+            return(
+              <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:2}}>
+                {/* Collar gap zone */}
+                <div style={{position:"absolute",left:leftPx,top:COLLAR_PX,width:printW_px,height:collarGapPx,
+                  borderLeft:"1px dashed rgba(255,180,0,0.4)",borderRight:"1px dashed rgba(255,180,0,0.4)",
+                  borderBottom:"1px dashed rgba(255,180,0,0.7)",background:"rgba(255,180,0,0.05)"}}>
+                  {showLabels&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",
+                    fontSize:8,color:"rgba(255,200,0,0.9)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
+                    background:"rgba(0,0,0,0.65)",padding:"1px 5px",borderRadius:3}}>
+                    {fmtIn(sizeSpec.collarGap)}" from collar seam
+                  </div>}
+                </div>
+                {/* Print area */}
+                <div style={{position:"absolute",left:leftPx,top:topPx,width:printW_px,height:usedH,
+                  border:"1.5px dashed rgba(249,115,22,0.75)",borderRadius:3,background:"rgba(249,115,22,0.05)"}}>
+                  {showLabels&&<>
+                    <div style={{position:"absolute",top:-17,left:"50%",transform:"translateX(-50%)",
+                      fontSize:8,color:"rgba(249,115,22,0.95)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
+                      background:"rgba(0,0,0,0.7)",padding:"1px 5px",borderRadius:3}}>
+                      ← {fmtIn(sizeSpec.maxW)}" wide →
+                    </div>
+                    <div style={{position:"absolute",top:"50%",right:-58,transform:"translateY(-50%)",
+                      fontSize:8,color:"rgba(249,115,22,0.95)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
+                      background:"rgba(0,0,0,0.7)",padding:"1px 5px",borderRadius:3}}>
+                      ↕ {fmtIn(sizeSpec.maxH)}" tall
+                    </div>
+                  </>}
+                </div>
+                {/* Bottom gap zone */}
+                <div style={{position:"absolute",left:leftPx,top:topPx+usedH,width:printW_px,height:bottomGapPx,
+                  borderLeft:"1px dashed rgba(100,180,255,0.4)",borderRight:"1px dashed rgba(100,180,255,0.4)",
+                  borderTop:"1px dashed rgba(100,180,255,0.7)",background:"rgba(100,180,255,0.05)"}}>
+                  {showLabels&&<div style={{position:"absolute",top:3,left:"50%",transform:"translateX(-50%)",
+                    fontSize:8,color:"rgba(130,200,255,0.9)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
+                    background:"rgba(0,0,0,0.65)",padding:"1px 5px",borderRadius:3}}>
+                    {fmtIn(sizeSpec.bottomGap)}" from bottom of shirt
+                  </div>}
                 </div>
               </div>
-              {/* Print area */}
-              <div style={{position:"absolute",left:leftPx,top:topPx,width:printW_px,height:usedH,
-                border:"1.5px dashed rgba(249,115,22,0.75)",borderRadius:3,background:"rgba(249,115,22,0.05)"}}>
-                <div style={{position:"absolute",top:-17,left:"50%",transform:"translateX(-50%)",
-                  fontSize:8,color:"rgba(249,115,22,0.95)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
-                  background:"rgba(0,0,0,0.7)",padding:"1px 5px",borderRadius:3}}>
-                  ←  {fmtIn(sizeSpec.maxW)}" wide  →
-                </div>
-                <div style={{position:"absolute",top:"50%",right:-58,transform:"translateY(-50%)",
-                  fontSize:8,color:"rgba(249,115,22,0.95)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
-                  background:"rgba(0,0,0,0.7)",padding:"1px 5px",borderRadius:3}}>
-                  ↕ {fmtIn(sizeSpec.maxH)}" tall
-                </div>
-              </div>
-              {/* Bottom gap */}
-              <div style={{position:"absolute",left:leftPx,top:topPx+usedH,width:printW_px,height:bottomGapPx,
-                borderLeft:"1px dashed rgba(100,180,255,0.4)",borderRight:"1px dashed rgba(100,180,255,0.4)",
-                borderTop:"1px dashed rgba(100,180,255,0.7)",background:"rgba(100,180,255,0.05)"}}>
-                <div style={{position:"absolute",top:3,left:"50%",transform:"translateX(-50%)",
-                  fontSize:8,color:"rgba(130,200,255,0.9)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",
-                  background:"rgba(0,0,0,0.65)",padding:"1px 5px",borderRadius:3}}>
-                  {fmtIn(sizeSpec.bottomGap)}" from bottom of shirt
-                </div>
-              </div>
-            </div>
-          );
+            );
+          }
 
           return(<>
             {/* ── Toggle bar ── */}
@@ -1771,6 +1784,15 @@ function Editor({design,onSave,onDuplicate,onBack}){
                   background:stageMode==='dtf'?"#f97316":"transparent",color:stageMode==='dtf'?"#000":"#666",fontWeight:stageMode==='dtf'?600:400}}>
                 📐 DTF Guide
               </button>
+              {stageMode==='shirt'&&!isSleeveZone&&(<>
+                <div style={{width:1,height:28,background:"#222"}} />
+                <button onClick={()=>setShowDTFOnShirt(v=>!v)}
+                  title={showDTFOnShirt?"Hide DTF guide box":"Show DTF guide box on shirt"}
+                  style={{padding:"7px 12px",fontSize:11,border:"none",cursor:"pointer",fontFamily:"'DM Mono',monospace",transition:"all 0.15s",
+                    background:showDTFOnShirt?"rgba(249,115,22,0.2)":"transparent",color:showDTFOnShirt?"#f97316":"#555",whiteSpace:"nowrap"}}>
+                  {showDTFOnShirt?"▣ Guide On":"□ Guide Off"}
+                </button>
+              </>)}
             </div>
 
             <div className="zone-badge" style={{top:stageMode==='dtf'?-6:14}}>
@@ -1782,7 +1804,8 @@ function Editor({design,onSave,onDuplicate,onBack}){
               <div ref={stageRef} className="shirt-stage" style={{cursor:zone.layers.length>0?"crosshair":"default"}} onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
                 <div className="shirt-clip">
                   <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} />
-                  {!isSleeveZone && dtfOverlay}
+                  {/* Shirt view: show guide box only if toggled on, never show labels */}
+                  {!isSleeveZone && showDTFOnShirt && makeDtfOverlay(false)}
                   {isSleeveZone && <div className="print-guide" />}
                 </div>
                 {zone.layers.map(layer=>{
@@ -1821,7 +1844,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
                 })}
 
                 {/* DTF overlay always visible in DTF mode */}
-                {!isSleeveZone && dtfOverlay}
+                {!isSleeveZone && makeDtfOverlay(true)}
                 {isSleeveZone && <div className="print-guide" />}
 
                 {/* Spec table at bottom */}
