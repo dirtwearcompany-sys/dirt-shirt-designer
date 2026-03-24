@@ -1257,12 +1257,36 @@ function MaskEditorModal({ src, existingMask, onClose, onSave, onClearMask }) {
 
 // ─── App ─────────────────────────────────────────────────────────────────────
 function App(){
-  const[designs,setDesigns]=useState([]);const[activeId,setActiveId]=useState(null);const[view,setView]=useState("editor");
+  // ── Persist designs to localStorage so they survive page reloads / code updates ──
+  function loadSaved(){
+    try{
+      const raw=localStorage.getItem("dirtshirt_designs");
+      if(raw){const parsed=JSON.parse(raw);if(Array.isArray(parsed)&&parsed.length>0)return parsed;}
+    }catch(e){}
+    return null;
+  }
+  function loadSavedId(){
+    try{return localStorage.getItem("dirtshirt_activeId")||null;}catch(e){return null;}
+  }
+
+  const[designs,setDesigns]=useState(()=>loadSaved()||[]);
+  const[activeId,setActiveId]=useState(()=>loadSavedId());
+  const[view,setView]=useState(()=>loadSavedId()?"editor":"editor");
+
+  // Save to localStorage whenever designs change
+  useEffect(()=>{
+    try{localStorage.setItem("dirtshirt_designs",JSON.stringify(designs));}catch(e){}
+  },[designs]);
+  useEffect(()=>{
+    try{if(activeId)localStorage.setItem("dirtshirt_activeId",activeId);else localStorage.removeItem("dirtshirt_activeId");}catch(e){}
+  },[activeId]);
+
   function createDesign(name){const d=blankDesign(name||"New Design");setDesigns(prev=>[d,...prev]);setActiveId(d.id);setView("editor");return d;}
   function saveDesign(updated){setDesigns(prev=>prev.map(d=>d.id===updated.id?updated:d));setActiveId(updated.id);}
   function duplicateDesign(d){const copy=JSON.parse(JSON.stringify(d));copy.id=Date.now()+Math.random();copy.name=d.name+" (Copy)";setDesigns(prev=>[copy,...prev]);setActiveId(copy.id);setView("editor");}
   function deleteDesign(id){setDesigns(prev=>prev.filter(d=>d.id!==id));if(activeId===id){setActiveId(null);setView("library");}}
-  useEffect(()=>{createDesign("My First Design");},[]);
+  // Only create a starter design if nothing was saved
+  useEffect(()=>{if(designs.length===0){createDesign("My First Design");}},[]);
   const activeDesign=designs.find(d=>d.id===activeId)||null;
   return(
     <div style={{display:"flex",flexDirection:"column",height:"100vh",overflow:"hidden"}}>
