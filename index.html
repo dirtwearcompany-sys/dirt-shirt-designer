@@ -66,9 +66,9 @@
     .dtf-badge { margin-top: 14px; background: #161616; border: 1px solid rgba(249,115,22,0.2); border-radius: 8px; padding: 8px 20px; display: flex; gap: 16px; align-items: center; }
     .dtf-label { font-size: 10px; color: #f97316; text-transform: uppercase; letter-spacing: 1px; }
     .dtf-value { font-family: 'Bebas Neue', cursive; font-size: 22px; color: #fff; letter-spacing: 1px; }
-    .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 12px; }
-    .lib-wrap { padding: 24px; margin: 0 auto; overflow-y: auto; height: 100%; }
-    .lib-header { display: flex; align-items: center; margin-bottom: 24px; }
+    .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; }
+    .lib-wrap { padding: 16px 20px; margin: 0 auto; overflow-y: auto; height: 100%; }
+    .lib-header { display: flex; align-items: center; margin-bottom: 12px; }
     .lib-title { font-family: 'Bebas Neue', cursive; font-size: 28px; color: #f97316; letter-spacing: 1px; margin: 0; }
     .empty-state { text-align: center; color: #555; padding-top: 80px; }
     .empty-icon { font-size: 48px; margin-bottom: 12px; }
@@ -1836,11 +1836,18 @@ function Editor({design,onSave,onDuplicate,onBack}){
               </div>
             )}
 
-            {dtfInfo&&selLayer&&(<div className="dtf-badge" style={{marginTop:stageMode==='dtf'?104:14}}>
-              <span className="dtf-label">DTF · {d.shirtSize}</span>
-              <span className="dtf-value">{dtfInfo.w}" × {dtfInfo.h}"</span>
-              {!isSleeveZone&&<span style={{fontSize:9,color:"#555",fontFamily:"'DM Mono',monospace",marginLeft:4}}>collar ↕ {fmtIn(sizeSpec.collarGap)}" · bottom ↕ {fmtIn(sizeSpec.bottomGap)}"</span>}
-            </div>)}
+          {/* DTF badge — absolute overlay, never affects layout */}
+          {dtfInfo&&selLayer&&(
+            <div style={{position:"absolute",bottom:12,left:"50%",transform:"translateX(-50%)",
+              background:"#161616",border:"1px solid rgba(249,115,22,0.2)",borderRadius:8,
+              padding:"6px 16px",display:"flex",gap:14,alignItems:"center",
+              zIndex:30,pointerEvents:"none",whiteSpace:"nowrap",
+              boxShadow:"0 4px 20px rgba(0,0,0,0.6)"}}>
+              <span style={{fontSize:10,color:"#f97316",textTransform:"uppercase",letterSpacing:1,fontFamily:"'DM Mono',monospace"}}>DTF · {d.shirtSize}</span>
+              <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:20,color:"#fff",letterSpacing:1}}>{dtfInfo.w}" × {dtfInfo.h}"</span>
+              {!isSleeveZone&&<span style={{fontSize:9,color:"#555",fontFamily:"'DM Mono',monospace"}}>collar ↕ {fmtIn(sizeSpec.collarGap)}" · bottom ↕ {fmtIn(sizeSpec.bottomGap)}"</span>}
+            </div>
+          )}
           </>);
         })()}
       </div>
