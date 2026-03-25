@@ -66,9 +66,9 @@
     .dtf-badge { margin-top: 14px; background: #161616; border: 1px solid rgba(249,115,22,0.2); border-radius: 8px; padding: 8px 20px; display: flex; gap: 16px; align-items: center; }
     .dtf-label { font-size: 10px; color: #f97316; text-transform: uppercase; letter-spacing: 1px; }
     .dtf-value { font-family: 'Bebas Neue', cursive; font-size: 22px; color: #fff; letter-spacing: 1px; }
-    .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 10px; }
-    .lib-wrap { padding: 16px 20px; margin: 0 auto; overflow-y: auto; height: 100%; }
-    .lib-header { display: flex; align-items: center; margin-bottom: 12px; }
+    .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 14px; width: 100%; }
+    .lib-wrap { padding: 20px 24px; overflow-y: auto; height: 100%; width: 100%; box-sizing: border-box; }
+    .lib-header { display: flex; align-items: center; margin-bottom: 16px; }
     .lib-title { font-family: 'Bebas Neue', cursive; font-size: 28px; color: #f97316; letter-spacing: 1px; margin: 0; }
     .empty-state { text-align: center; color: #555; padding-top: 80px; }
     .empty-icon { font-size: 48px; margin-bottom: 12px; }
@@ -99,6 +99,7 @@
     .ai-status-text { font-size:11px; color:#888; font-family:'DM Mono',monospace; text-align:center; min-height:18px; }
     .ai-spinner-ring { width:36px; height:36px; border:3px solid #222; border-top-color:#f97316; border-radius:50%; animation:spin 0.7s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
     /* ── Drawing Modal ── */
     .draw-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; }
@@ -147,6 +148,76 @@
     /* ── Threshold slider UI ── */
     .threshold-pill { display:inline-flex; align-items:center; gap:6px; background:#111; border:1px solid #2a2a2a; border-radius:20px; padding:3px 10px; font-size:10px; color:#666; }
   </style>
+  <!-- ═══════════════════════════════════════════════════════════
+       FIREBASE — replace the placeholder config below with your
+       real config from Firebase Console > Project Settings > Your Apps
+       ═══════════════════════════════════════════════════════════ -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // ─── PASTE YOUR FIREBASE CONFIG HERE ────────────────────────────────────
+    const firebaseConfig = {
+      apiKey:            "PASTE_YOUR_API_KEY",
+      authDomain:        "PASTE_YOUR_AUTH_DOMAIN",
+      projectId:         "PASTE_YOUR_PROJECT_ID",
+      storageBucket:     "PASTE_YOUR_STORAGE_BUCKET",
+      messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID",
+      appId:             "PASTE_YOUR_APP_ID"
+    };
+    // ────────────────────────────────────────────────────────────────────────
+
+    // Check if config is still placeholder
+    const isConfigured = firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY";
+
+    if (isConfigured) {
+      try {
+        const app = initializeApp(firebaseConfig);
+        const db  = getFirestore(app);
+        const col = collection(db, "designs");
+
+        // Expose Firebase helpers on window so the React app can call them
+        window.__firebase = {
+          // Load all designs from Firestore
+          async loadAll() {
+            const snap = await getDocs(col);
+            return snap.docs.map(d => d.data()).sort((a,b)=>
+              (b.updatedAt||0) - (a.updatedAt||0)
+            );
+          },
+
+          // Save / update a single design
+          async save(design) {
+            const id = String(design.id);
+            await setDoc(doc(col, id), { ...design, updatedAt: Date.now() });
+          },
+
+          // Delete a design
+          async remove(id) {
+            await deleteDoc(doc(col, String(id)));
+          },
+
+          // Listen for real-time changes
+          listen(callback) {
+            return onSnapshot(col, snap => {
+              const designs = snap.docs.map(d => d.data())
+                .sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0));
+              callback(designs);
+            });
+          }
+        };
+
+        console.log("✅ Firebase connected to project:", firebaseConfig.projectId);
+      } catch(e) {
+        console.warn("Firebase init failed, falling back to localStorage:", e);
+        window.__firebase = null;
+      }
+    } else {
+      console.log("ℹ️ Firebase not configured — using localStorage. Paste your config to enable cloud sync.");
+      window.__firebase = null;
+    }
+  </script>
 </head>
 <body>
 <div id="root"></div>
@@ -1278,59 +1349,125 @@ function MaskEditorModal({ src, existingMask, onClose, onSave, onClearMask }) {
 
 // ─── App ─────────────────────────────────────────────────────────────────────
 function App(){
-  // ── Persist designs to localStorage so they survive page reloads / code updates ──
-  function loadSaved(){
+  // ── Storage: Firebase (if configured) with localStorage fallback ────────────
+
+  function sanitize(designs){
+    return designs.map(d=>({
+      ...d,
+      shirtSize:d.shirtSize||"M",
+      shirtImages:Object.fromEntries(
+        Object.entries(d.shirtImages||{}).map(([k,v])=>[k,(v&&v.startsWith("data:"))?v:null])
+      )
+    }));
+  }
+
+  // localStorage helpers (always available as fallback)
+  function lsLoad(){
     try{
       const raw=localStorage.getItem("dirtshirt_designs");
-      if(raw){
-        const parsed=JSON.parse(raw);
-        if(Array.isArray(parsed)&&parsed.length>0){
-          // Strip any bare filename shirt images (not data URLs) — they can't load in browser
-          // Also ensure shirtSize is always set
-          return parsed.map(d=>({
-            ...d,
-            shirtSize: d.shirtSize||"M",
-            shirtImages:Object.fromEntries(
-              Object.entries(d.shirtImages||{}).map(([k,v])=>[k, (v&&v.startsWith('data:'))?v:null])
-            )
-          }));
-        }
-      }
+      if(raw){const p=JSON.parse(raw);if(Array.isArray(p)&&p.length>0)return sanitize(p);}
     }catch(e){}
     return null;
   }
-  function loadSavedId(){
-    try{return localStorage.getItem("dirtshirt_activeId")||null;}catch(e){return null;}
+  function lsSave(designs){
+    try{if(designs.length>0)localStorage.setItem("dirtshirt_designs",JSON.stringify(designs));}catch(e){}
+  }
+  function lsSaveOne(design){
+    try{
+      const raw=localStorage.getItem("dirtshirt_designs");
+      const all=raw?JSON.parse(raw):[];
+      const next=all.some(d=>String(d.id)===String(design.id))
+        ?all.map(d=>String(d.id)===String(design.id)?design:d)
+        :[design,...all];
+      if(next.length>0)localStorage.setItem("dirtshirt_designs",JSON.stringify(next));
+    }catch(e){}
+  }
+  function lsDelete(id){
+    try{
+      const raw=localStorage.getItem("dirtshirt_designs");
+      if(!raw)return;
+      const next=JSON.parse(raw).filter(d=>String(d.id)!==String(id));
+      if(next.length>0)localStorage.setItem("dirtshirt_designs",JSON.stringify(next));
+      else localStorage.removeItem("dirtshirt_designs");
+    }catch(e){}
   }
 
-  const[designs,setDesigns]=useState(()=>loadSaved()||[]);
-  const[activeId,setActiveId]=useState(()=>loadSavedId());
+  const[designs,setDesigns]=useState(()=>lsLoad()||[]);
+  const[activeId,setActiveId]=useState(()=>{try{return localStorage.getItem("dirtshirt_activeId")||null;}catch(e){return null;}});
   const[view,setView]=useState("editor");
+  const[syncStatus,setSyncStatus]=useState("local"); // "local" | "syncing" | "cloud" | "error"
+  const fbUnsub=useRef(null);
 
-  // Track whether we have loaded from storage (skip saving on first render)
-  const hasLoaded=useRef(false);
+  // On mount: if Firebase is ready, load from cloud and set up live listener
   useEffect(()=>{
-    if(!hasLoaded.current){hasLoaded.current=true;return;} // skip initial mount
-    if(designs.length===0)return; // never wipe saved designs with empty array
-    try{localStorage.setItem("dirtshirt_designs",JSON.stringify(designs));}catch(e){}
-  },[designs]);
-  useEffect(()=>{
-    if(!hasLoaded.current)return;
-    try{if(activeId)localStorage.setItem("dirtshirt_activeId",activeId);else localStorage.removeItem("dirtshirt_activeId");}catch(e){}
-  },[activeId]);
+    const fb=window.__firebase;
+    if(!fb){setSyncStatus("local");return;}
+    setSyncStatus("syncing");
+    fb.loadAll().then(cloudDesigns=>{
+      if(cloudDesigns&&cloudDesigns.length>0){
+        // Merge: cloud wins, but migrate any localStorage-only designs up
+        const localDesigns=lsLoad()||[];
+        const cloudIds=new Set(cloudDesigns.map(d=>String(d.id)));
+        const localOnly=localDesigns.filter(d=>!cloudIds.has(String(d.id)));
+        const merged=sanitize([...cloudDesigns,...localOnly]);
+        setDesigns(merged);
+        // Push any local-only designs up to cloud
+        localOnly.forEach(d=>fb.save(d).catch(()=>{}));
+      } else {
+        // Nothing in cloud yet — migrate localStorage up
+        const local=lsLoad();
+        if(local&&local.length>0){
+          setDesigns(local);
+          local.forEach(d=>fb.save(d).catch(()=>{}));
+        }
+      }
+      setSyncStatus("cloud");
+    }).catch(err=>{
+      console.warn("Firebase load failed, using localStorage:",err);
+      setSyncStatus("error");
+    });
+    // Clean up listener on unmount
+    return()=>{if(fbUnsub.current)fbUnsub.current();};
+  },[]);
 
-  function createDesign(name){const d=blankDesign(name||"New Design");setDesigns(prev=>[d,...prev]);setActiveId(d.id);setView("editor");return d;}
+  function createDesign(name){
+    const d=blankDesign(name||"New Design");
+    setDesigns(prev=>[d,...prev]);
+    setActiveId(d.id);
+    setView("editor");
+    lsSaveOne(d);
+    if(window.__firebase)window.__firebase.save(d).catch(()=>{});
+    return d;
+  }
   function saveDesign(updated){
     setDesigns(prev=>{
       const next=prev.map(d=>d.id===updated.id?updated:d);
-      try{localStorage.setItem("dirtshirt_designs",JSON.stringify(next));}catch(e){}
+      lsSave(next);
       return next;
     });
     setActiveId(updated.id);
+    lsSaveOne(updated);
+    if(window.__firebase)window.__firebase.save(updated).catch(()=>{});
   }
-  function duplicateDesign(d){const copy=JSON.parse(JSON.stringify(d));copy.id=Date.now()+Math.random();copy.name=d.name+" (Copy)";setDesigns(prev=>[copy,...prev]);setActiveId(copy.id);setView("editor");}
-  function deleteDesign(id){setDesigns(prev=>prev.filter(d=>d.id!==id));if(activeId===id){setActiveId(null);setView("library");}}
-  // Only create a starter design if truly nothing saved
+  function duplicateDesign(d){
+    const copy={...JSON.parse(JSON.stringify(d)),id:Date.now()+Math.random(),name:d.name+" (Copy)"};
+    setDesigns(prev=>[copy,...prev]);
+    setActiveId(copy.id);
+    setView("editor");
+    lsSaveOne(copy);
+    if(window.__firebase)window.__firebase.save(copy).catch(()=>{});
+  }
+  function deleteDesign(id){
+    setDesigns(prev=>{
+      const next=prev.filter(d=>d.id!==id);
+      if(next.length>0)lsSave(next);else lsDelete(id);
+      return next;
+    });
+    if(activeId===id){setActiveId(null);setView("library");}
+    lsDelete(id);
+    if(window.__firebase)window.__firebase.remove(id).catch(()=>{});
+  }
+  // Only create starter design if truly nothing anywhere
   useEffect(()=>{if(designs.length===0){createDesign("My First Design");}},[]);
   const activeDesign=designs.find(d=>d.id===activeId)||null;
   return(
@@ -1339,7 +1476,11 @@ function App(){
         <span className="logo-dirt">DIRT</span><span className="logo-shirt">SHIRT</span><span className="logo-des">DESIGNER</span>
         <span style={{color:"#2a2a2a",fontSize:20,lineHeight:1,margin:"0 4px"}}>|</span>
         <span className="logo-sub">DTF Transfer Studio</span>
-        <div style={{marginLeft:"auto",display:"flex",gap:8}}>
+        <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}}>
+          {syncStatus==="cloud"&&<span style={{fontSize:9,color:"#22c55e",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:"50%",background:"#22c55e",display:"inline-block"}}/>Cloud Sync</span>}
+          {syncStatus==="syncing"&&<span style={{fontSize:9,color:"#f97316",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:"50%",background:"#f97316",display:"inline-block",animation:"pulse 1s infinite"}}/>Syncing…</span>}
+          {syncStatus==="local"&&<span style={{fontSize:9,color:"#555",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:"50%",background:"#555",display:"inline-block"}}/>Local Only</span>}
+          {syncStatus==="error"&&<span style={{fontSize:9,color:"#ef4444",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:"50%",background:"#ef4444",display:"inline-block"}}/>Sync Error</span>}
           <button className="btn btn-ghost" onClick={()=>setView("library")}>📂 My Designs ({designs.length})</button>
           <button className="btn btn-primary" onClick={()=>createDesign()}>+ New Design</button>
         </div>
@@ -1518,7 +1659,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
 
   // Generate a small thumbnail of the current zone (shirt + art layers)
   async function generateThumbnail(){
-    const TW=210,TH=260;
+    const TW=420,TH=520; // Full stage resolution for crisp thumbnails
     const stage=document.createElement("canvas");stage.width=TW;stage.height=TH;
     const sctx=stage.getContext("2d");sctx.clearRect(0,0,TW,TH);
     const src=d.shirtImages?.[d.activeZone];
@@ -1582,7 +1723,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
         img.src=layer.maskSrc||layer.src;
       });
     }
-    return stage.toDataURL("image/jpeg",0.85);
+    return stage.toDataURL("image/png");
   }
 
   return(
