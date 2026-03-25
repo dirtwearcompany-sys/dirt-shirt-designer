@@ -1305,21 +1305,32 @@ function App(){
 
   const[designs,setDesigns]=useState(()=>loadSaved()||[]);
   const[activeId,setActiveId]=useState(()=>loadSavedId());
-  const[view,setView]=useState(()=>loadSavedId()?"editor":"editor");
+  const[view,setView]=useState("editor");
 
-  // Save to localStorage whenever designs change
+  // Track whether we have loaded from storage (skip saving on first render)
+  const hasLoaded=useRef(false);
   useEffect(()=>{
+    if(!hasLoaded.current){hasLoaded.current=true;return;} // skip initial mount
+    if(designs.length===0)return; // never wipe saved designs with empty array
     try{localStorage.setItem("dirtshirt_designs",JSON.stringify(designs));}catch(e){}
   },[designs]);
   useEffect(()=>{
+    if(!hasLoaded.current)return;
     try{if(activeId)localStorage.setItem("dirtshirt_activeId",activeId);else localStorage.removeItem("dirtshirt_activeId");}catch(e){}
   },[activeId]);
 
   function createDesign(name){const d=blankDesign(name||"New Design");setDesigns(prev=>[d,...prev]);setActiveId(d.id);setView("editor");return d;}
-  function saveDesign(updated){setDesigns(prev=>prev.map(d=>d.id===updated.id?updated:d));setActiveId(updated.id);}
+  function saveDesign(updated){
+    setDesigns(prev=>{
+      const next=prev.map(d=>d.id===updated.id?updated:d);
+      try{localStorage.setItem("dirtshirt_designs",JSON.stringify(next));}catch(e){}
+      return next;
+    });
+    setActiveId(updated.id);
+  }
   function duplicateDesign(d){const copy=JSON.parse(JSON.stringify(d));copy.id=Date.now()+Math.random();copy.name=d.name+" (Copy)";setDesigns(prev=>[copy,...prev]);setActiveId(copy.id);setView("editor");}
   function deleteDesign(id){setDesigns(prev=>prev.filter(d=>d.id!==id));if(activeId===id){setActiveId(null);setView("library");}}
-  // Only create a starter design if nothing was saved
+  // Only create a starter design if truly nothing saved
   useEffect(()=>{if(designs.length===0){createDesign("My First Design");}},[]);
   const activeDesign=designs.find(d=>d.id===activeId)||null;
   return(
