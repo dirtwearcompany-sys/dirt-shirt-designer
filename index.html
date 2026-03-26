@@ -1640,11 +1640,29 @@ function App(){
 
   // On mount: check if Firebase config has been filled in, then connect
   useEffect(()=>{
-    const cfg = window.__firebaseConfig;
-    const isConfigured = cfg && cfg.apiKey && cfg.apiKey !== "PASTE_YOUR_API_KEY";
-    if(!isConfigured){ setSyncStatus("local"); return; }
-
-    setSyncStatus("syncing");
+  if(!isConfigured){setUser(null);return;}
+  Promise.all([
+    import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),
+  ]).then(([{initializeApp},{getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signInWithPopup,GoogleAuthProvider,signOut,sendPasswordResetEmail,updateProfile}])=>{
+    const app=initializeApp(window.__firebaseConfig);
+    const auth=getAuth(app);
+    const provider=new GoogleAuthProvider();
+    window.__auth={
+      signIn:(email,pw)=>signInWithEmailAndPassword(auth,email,pw).then(r=>r.user),
+      createUser:(email,pw,name)=>createUserWithEmailAndPassword(auth,email,pw).then(async r=>{
+        if(name)await updateProfile(r.user,{displayName:name});
+        return r.user;
+      }),
+      signInWithGoogle:()=>signInWithPopup(auth,provider).then(r=>r.user),
+      signOut:()=>signOut(auth),
+      sendPasswordReset:(email)=>sendPasswordResetEmail(auth,email),
+    };
+    onAuthStateChanged(auth,u=>{
+      setUser(u||null);
+    });
+  }).catch(()=>{setUser(null);});
+},[]);
 
     // Dynamically import Firebase only when real config exists
     Promise.all([
