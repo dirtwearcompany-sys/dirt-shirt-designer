@@ -147,6 +147,97 @@
 
     /* ── Threshold slider UI ── */
     .threshold-pill { display:inline-flex; align-items:center; gap:6px; background:#111; border:1px solid #2a2a2a; border-radius:20px; padding:3px 10px; font-size:10px; color:#666; }
+
+    /* ══════════════════════════════════════════════════════
+       AUTH SCREEN
+    ══════════════════════════════════════════════════════ */
+    .auth-overlay {
+      position:fixed; inset:0; z-index:9999;
+      background:#080808;
+      display:flex; align-items:center; justify-content:center;
+      overflow:hidden;
+    }
+    /* Animated background blobs */
+    .auth-blob {
+      position:absolute; border-radius:50%; filter:blur(80px); opacity:0.18; pointer-events:none;
+      animation:blob-drift 8s ease-in-out infinite alternate;
+    }
+    @keyframes blob-drift {
+      from { transform:translate(0,0) scale(1); }
+      to   { transform:translate(20px,30px) scale(1.08); }
+    }
+    .auth-card {
+      position:relative; z-index:1;
+      width:min(400px,92vw);
+      background:rgba(16,16,16,0.92);
+      border:1px solid rgba(249,115,22,0.15);
+      border-radius:20px;
+      box-shadow:0 0 0 1px rgba(249,115,22,0.06), 0 40px 100px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04);
+      backdrop-filter:blur(20px);
+      overflow:hidden;
+    }
+    /* Orange glow stripe at top */
+    .auth-card::before {
+      content:'';
+      position:absolute; top:0; left:10%; right:10%; height:1px;
+      background:linear-gradient(90deg,transparent,rgba(249,115,22,0.6),transparent);
+    }
+    .auth-logo-section {
+      padding:36px 36px 24px;
+      text-align:center;
+      background:linear-gradient(180deg,rgba(249,115,22,0.04) 0%,transparent 100%);
+    }
+    .auth-wordmark { display:flex; align-items:baseline; justify-content:center; gap:0; margin-bottom:6px; }
+    .auth-tagline { font-size:10px; color:#3a3a3a; font-family:'DM Mono',monospace; letter-spacing:3px; text-transform:uppercase; }
+    .auth-body { padding:0 32px 32px; display:flex; flex-direction:column; gap:12px; }
+    .auth-tab-row { display:flex; background:#0f0f0f; border:1px solid #1e1e1e; border-radius:10px; padding:3px; margin-bottom:4px; }
+    .auth-tab {
+      flex:1; padding:8px 0; border:none; background:transparent; border-radius:8px;
+      font-family:'DM Mono',monospace; font-size:12px; color:#555; cursor:pointer; transition:all 0.2s;
+    }
+    .auth-tab.active { background:#f97316; color:#000; font-weight:600; box-shadow:0 2px 8px rgba(249,115,22,0.3); }
+    .auth-field {
+      position:relative; display:flex; flex-direction:column; gap:5px;
+    }
+    .auth-field-label { font-size:10px; color:#555; font-family:'DM Mono',monospace; letter-spacing:0.5px; padding-left:2px; }
+    .auth-input {
+      width:100%; background:#0a0a0a; border:1px solid #1e1e1e; border-radius:10px;
+      padding:12px 14px; color:#e8e8e8; font-family:'DM Mono',monospace; font-size:13px;
+      outline:none; transition:all 0.2s; box-sizing:border-box;
+    }
+    .auth-input:focus { border-color:rgba(249,115,22,0.5); background:#0d0d0d; box-shadow:0 0 0 3px rgba(249,115,22,0.08); }
+    .auth-input::placeholder { color:#2a2a2a; }
+    .auth-submit {
+      width:100%; padding:13px 0; border:none; border-radius:10px; cursor:pointer;
+      font-family:'DM Mono',monospace; font-size:13px; font-weight:600; letter-spacing:0.5px;
+      background:linear-gradient(135deg,#f97316,#ea580c);
+      color:#000; transition:all 0.2s;
+      box-shadow:0 4px 20px rgba(249,115,22,0.25);
+    }
+    .auth-submit:hover:not(:disabled) { background:linear-gradient(135deg,#fb923c,#f97316); box-shadow:0 6px 28px rgba(249,115,22,0.4); transform:translateY(-1px); }
+    .auth-submit:disabled { opacity:0.45; cursor:not-allowed; transform:none; }
+    .auth-divider {
+      display:flex; align-items:center; gap:12px;
+      font-size:10px; color:#2a2a2a; font-family:'DM Mono',monospace;
+    }
+    .auth-divider::before,.auth-divider::after { content:''; flex:1; height:1px; background:#1a1a1a; }
+    .auth-google-btn {
+      width:100%; padding:12px 0; border-radius:10px; border:1px solid #222;
+      background:#111; color:#ccc; font-family:'DM Mono',monospace; font-size:13px;
+      cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;
+      transition:all 0.2s;
+    }
+    .auth-google-btn:hover:not(:disabled) { border-color:#333; background:#181818; color:#fff; transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.4); }
+    .auth-google-btn:disabled { opacity:0.45; cursor:not-allowed; transform:none; }
+    .auth-error { background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.2); border-radius:8px; padding:10px 13px; font-size:11px; color:#ef4444; font-family:'DM Mono',monospace; line-height:1.5; }
+    .auth-success { background:rgba(34,197,94,0.06); border:1px solid rgba(34,197,94,0.2); border-radius:8px; padding:10px 13px; font-size:11px; color:#22c55e; font-family:'DM Mono',monospace; line-height:1.5; }
+    .auth-footer { text-align:center; font-size:11px; color:#333; font-family:'DM Mono',monospace; padding-top:4px; }
+    .auth-footer a { color:#f97316; cursor:pointer; background:none; border:none; font-family:'DM Mono',monospace; font-size:11px; padding:0; }
+    .auth-footer a:hover { text-decoration:underline; }
+    .auth-guest { width:100%; padding:10px 0; border:1px solid #1a1a1a; border-radius:10px; background:transparent; color:#3a3a3a; font-family:'DM Mono',monospace; font-size:11px; cursor:pointer; transition:all 0.2s; }
+    .auth-guest:hover { border-color:#333; color:#666; }
+    .auth-avatar { width:30px; height:30px; border-radius:50%; object-fit:cover; border:2px solid #f97316; }
+    .auth-not-configured { background:rgba(249,115,22,0.05); border:1px solid rgba(249,115,22,0.12); border-radius:10px; padding:12px 14px; font-size:10px; color:#6a3a1a; font-family:'DM Mono',monospace; line-height:1.7; margin-bottom:4px; }
   </style>
   <!-- ═══════════════════════════════════════════════════════════
        FIREBASE — replace the placeholder config below with your
@@ -1320,6 +1411,17 @@ function LoginScreen({onLogin,isConfigured}){
   const[error,setError]=useState("");
   const[message,setMessage]=useState("");
 
+  const ERR_MSGS={
+    "auth/user-not-found":"No account found with that email.",
+    "auth/wrong-password":"Incorrect password. Try again.",
+    "auth/email-already-in-use":"An account with this email already exists.",
+    "auth/weak-password":"Password must be at least 6 characters.",
+    "auth/invalid-email":"Please enter a valid email address.",
+    "auth/too-many-requests":"Too many attempts. Please try again later.",
+    "auth/network-request-failed":"Network error. Check your connection.",
+    "auth/invalid-credential":"Invalid email or password.",
+  };
+
   async function handleEmail(e){
     e.preventDefault();
     setError("");setMessage("");setLoading(true);
@@ -1327,25 +1429,14 @@ function LoginScreen({onLogin,isConfigured}){
       if(!window.__auth) throw new Error("Auth not ready");
       if(mode==="forgot"){
         await window.__auth.sendPasswordReset(email);
-        setMessage("Reset email sent! Check your inbox.");
+        setMessage("✓ Reset email sent — check your inbox.");
         setLoading(false);return;
       }
-      let user;
-      if(mode==="signup") user=await window.__auth.createUser(email,password,name);
-      else user=await window.__auth.signIn(email,password);
+      const user=mode==="signup"
+        ?await window.__auth.createUser(email,password,name)
+        :await window.__auth.signIn(email,password);
       onLogin(user);
-    }catch(err){
-      const msgs={
-        "auth/user-not-found":"No account found with that email.",
-        "auth/wrong-password":"Incorrect password.",
-        "auth/email-already-in-use":"An account with this email already exists.",
-        "auth/weak-password":"Password must be at least 6 characters.",
-        "auth/invalid-email":"Please enter a valid email address.",
-        "auth/too-many-requests":"Too many attempts. Please try again later.",
-        "auth/network-request-failed":"Network error. Check your connection.",
-      };
-      setError(msgs[err.code]||err.message||"Something went wrong.");
-    }
+    }catch(err){setError(ERR_MSGS[err.code]||err.message||"Something went wrong.");}
     setLoading(false);
   }
 
@@ -1353,76 +1444,109 @@ function LoginScreen({onLogin,isConfigured}){
     setError("");setLoading(true);
     try{
       if(!window.__auth) throw new Error("Auth not ready");
-      const user=await window.__auth.signInWithGoogle();
-      onLogin(user);
+      onLogin(await window.__auth.signInWithGoogle());
     }catch(err){
       if(err.code!=="auth/popup-closed-by-user") setError(err.message||"Google sign-in failed.");
+      setLoading(false);
     }
-    setLoading(false);
   }
-
-  const notConfigured=!isConfigured;
 
   return(
     <div className="auth-overlay">
+      {/* Ambient background blobs */}
+      <div className="auth-blob" style={{width:500,height:500,background:"#f97316",top:"-15%",left:"-10%",animationDelay:"0s"}} />
+      <div className="auth-blob" style={{width:400,height:400,background:"#dc2626",bottom:"-10%",right:"-8%",animationDelay:"3s",animationDirection:"alternate-reverse"}} />
+      <div className="auth-blob" style={{width:300,height:300,background:"#7c3aed",top:"40%",right:"15%",animationDelay:"1.5s"}} />
+
       <div className="auth-card">
-        <div className="auth-header">
-          <div style={{marginBottom:10}}>
-            <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:32,color:"#f97316",letterSpacing:3}}>DIRT</span>
-            <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:32,color:"#e8e8e8",letterSpacing:2}}>SHIRT</span>
-            <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:32,color:"#f97316",letterSpacing:2}}>DESIGNER</span>
+        {/* Logo section */}
+        <div className="auth-logo-section">
+          <div className="auth-wordmark">
+            <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:38,color:"#f97316",letterSpacing:"4px"}}>DIRT</span>
+            <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:38,color:"#e8e8e8",letterSpacing:"3px"}}>SHIRT</span>
+            <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:38,color:"#f97316",letterSpacing:"3px"}}>DESIGNER</span>
           </div>
-          <div style={{fontSize:11,color:"#555",fontFamily:"'DM Mono',monospace"}}>DTF Transfer Studio</div>
-          {notConfigured&&(
-            <div style={{marginTop:12,background:"rgba(249,115,22,0.08)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:8,padding:"8px 12px",fontSize:10,color:"#f97316",fontFamily:"'DM Mono',monospace",textAlign:"left"}}>
-              ⚠ Firebase not configured — paste your config to enable login &amp; cloud sync.<br/>
-              <span style={{color:"#666"}}>Or continue without login (local storage only).</span>
-            </div>
-          )}
+          <div className="auth-tagline">DTF Transfer Studio</div>
         </div>
+
         <div className="auth-body">
-          {notConfigured?(
-            <button className="btn btn-primary" style={{width:"100%",padding:"12px 0",fontSize:13}} onClick={()=>onLogin(null)}>
-              Continue without login →
-            </button>
-          ):(
+          {!isConfigured ? (
+            /* ── Not configured ── */
             <>
-              {/* Google */}
-              <button className="auth-google-btn" onClick={handleGoogle} disabled={loading}>
-                <GoogleIcon />
-                {loading?"Signing in…":"Continue with Google"}
+              <div className="auth-not-configured">
+                <div style={{color:"#f97316",marginBottom:4,fontWeight:500}}>⚡ Local Mode</div>
+                Firebase not configured — your designs are saved locally in this browser.
+                Add your Firebase config to enable login &amp; cloud sync across devices.
+              </div>
+              <button className="auth-submit" onClick={()=>onLogin(null)}>
+                Open Designer →
               </button>
+            </>
+          ) : (
+            <>
+              {/* ── Google button ── */}
+              {mode!=="forgot"&&(
+                <button className="auth-google-btn" onClick={handleGoogle} disabled={loading}>
+                  <GoogleIcon />
+                  {loading?"Connecting…":"Continue with Google"}
+                </button>
+              )}
 
-              <div className="auth-divider">or</div>
+              {mode!=="forgot"&&<div className="auth-divider">or with email</div>}
 
-              {/* Email form */}
+              {/* ── Mode tabs (login / signup) ── */}
+              {mode!=="forgot"&&(
+                <div className="auth-tab-row">
+                  <button className={`auth-tab${mode==="login"?" active":""}`} onClick={()=>{setMode("login");setError("");setMessage("");}}>Sign In</button>
+                  <button className={`auth-tab${mode==="signup"?" active":""}`} onClick={()=>{setMode("signup");setError("");setMessage("");}}>Create Account</button>
+                </div>
+              )}
+
+              {/* ── Form ── */}
               <form onSubmit={handleEmail} style={{display:"flex",flexDirection:"column",gap:10}}>
                 {mode==="signup"&&(
-                  <input className="auth-input" type="text" placeholder="Full name" value={name}
-                    onChange={e=>setName(e.target.value)} required />
+                  <div className="auth-field">
+                    <label className="auth-field-label">Full Name</label>
+                    <input className="auth-input" type="text" placeholder="John Smith" value={name}
+                      onChange={e=>setName(e.target.value)} required autoComplete="name" />
+                  </div>
                 )}
-                <input className="auth-input" type="email" placeholder="Email address" value={email}
-                  onChange={e=>setEmail(e.target.value)} required />
+                <div className="auth-field">
+                  <label className="auth-field-label">{mode==="forgot"?"Enter your email to reset":"Email Address"}</label>
+                  <input className="auth-input" type="email" placeholder="you@example.com" value={email}
+                    onChange={e=>setEmail(e.target.value)} required autoComplete="email" />
+                </div>
                 {mode!=="forgot"&&(
-                  <input className="auth-input" type="password" placeholder="Password" value={password}
-                    onChange={e=>setPassword(e.target.value)} required minLength={6} />
+                  <div className="auth-field">
+                    <label className="auth-field-label">Password</label>
+                    <input className="auth-input" type="password"
+                      placeholder={mode==="signup"?"At least 6 characters":"••••••••"}
+                      value={password} onChange={e=>setPassword(e.target.value)}
+                      required minLength={6} autoComplete={mode==="signup"?"new-password":"current-password"} />
+                  </div>
                 )}
-                {error&&<div className="auth-error">{error}</div>}
-                {message&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:8,padding:"9px 12px",fontSize:11,color:"#22c55e",fontFamily:"'DM Mono',monospace"}}>{message}</div>}
-                <button className="btn btn-primary" type="submit" disabled={loading} style={{width:"100%",padding:"11px 0",fontSize:13}}>
-                  {loading?"Please wait…":mode==="signup"?"Create Account":mode==="forgot"?"Send Reset Email":"Sign In"}
+                {error&&<div className="auth-error">⚠ {error}</div>}
+                {message&&<div className="auth-success">{message}</div>}
+                <button className="auth-submit" type="submit" disabled={loading}>
+                  {loading
+                    ?<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span style={{width:14,height:14,border:"2px solid rgba(0,0,0,0.3)",borderTopColor:"#000",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>Please wait…</span>
+                    :mode==="signup"?"Create Account →"
+                    :mode==="forgot"?"Send Reset Email"
+                    :"Sign In →"
+                  }
                 </button>
               </form>
 
-              <div className="auth-toggle">
-                {mode==="login"&&<>Don't have an account? <span onClick={()=>{setMode("signup");setError("");}}>Sign up</span> · <span onClick={()=>{setMode("forgot");setError("");}}>Forgot password?</span></>}
-                {mode==="signup"&&<>Already have an account? <span onClick={()=>{setMode("login");setError("");}}>Sign in</span></>}
-                {mode==="forgot"&&<><span onClick={()=>{setMode("login");setError("");}}>← Back to sign in</span></>}
+              {/* ── Footer links ── */}
+              <div className="auth-footer">
+                {mode==="login"&&<>Forgot your password? <button className="auth-footer a" onClick={()=>{setMode("forgot");setError("");setMessage("");}}>Reset it</button></>}
+                {mode==="signup"&&<>Already have an account? <button className="auth-footer a" style={{background:"none",border:"none",color:"#f97316",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:11,padding:0}} onClick={()=>{setMode("login");setError("");setMessage("");}}>Sign in</button></>}
+                {mode==="forgot"&&<><button className="auth-footer a" style={{background:"none",border:"none",color:"#555",cursor:"pointer",fontFamily:"'DM Mono',monospace",fontSize:11,padding:0}} onClick={()=>{setMode("login");setError("");setMessage("");}}>← Back to sign in</button></>}
               </div>
 
-              <div className="auth-toggle" style={{marginTop:4,paddingTop:12,borderTop:"1px solid #1e1e1e"}}>
-                <span onClick={()=>onLogin(null)} style={{color:"#444"}}>Continue without login →</span>
-              </div>
+              <button className="auth-guest" onClick={()=>onLogin(null)}>
+                Continue without account
+              </button>
             </>
           )}
         </div>
