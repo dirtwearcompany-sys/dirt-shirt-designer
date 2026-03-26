@@ -1619,7 +1619,7 @@ function App(){
     ]).then(([{initializeApp},{getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signInWithPopup,GoogleAuthProvider,signOut,sendPasswordResetEmail,updateProfile}])=>{
       let app;
       try{app=initializeApp(window.__firebaseConfig);}
-      catch(e){try{const{getApp}=require("firebase/app");app=getApp();}catch(e2){setUser(null);return;}}
+      catch(e){setUser(null);return;}
       const auth=getAuth(app);
       const provider=new GoogleAuthProvider();
       window.__auth={
