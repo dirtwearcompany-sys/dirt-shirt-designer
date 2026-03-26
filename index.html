@@ -152,13 +152,11 @@
        FIREBASE — replace the placeholder config below with your
        real config from Firebase Console > Project Settings > Your Apps
        ═══════════════════════════════════════════════════════════ -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-    // ─── PASTE YOUR FIREBASE CONFIG HERE ────────────────────────────────────
-    const firebaseConfig = {
+  <script>
+    // ═══════════════════════════════════════════════════════════════
+    // FIREBASE CONFIG — paste your values from Firebase Console here
+    // ═══════════════════════════════════════════════════════════════
+    window.__firebaseConfig = {
       apiKey: "AIzaSyC7emcD5iDYSLsjOH0NwstwM_0rRhkDpDA",
       authDomain: "dirt-shirt-designer.firebaseapp.com",
       projectId: "dirt-shirt-designer",
@@ -166,57 +164,9 @@
       messagingSenderId: "268887622342",
       appId: "1:268887622342:web:53d7386623156b06494dc7"
     };
-    // ────────────────────────────────────────────────────────────────────────
-
-    // Check if config is still placeholder
-    const isConfigured = firebaseConfig.apiKey !== "PASTE_YOUR_API_KEY";
-
-    if (isConfigured) {
-      try {
-        const app = initializeApp(firebaseConfig);
-        const db  = getFirestore(app);
-        const col = collection(db, "designs");
-
-        // Expose Firebase helpers on window so the React app can call them
-        window.__firebase = {
-          // Load all designs from Firestore
-          async loadAll() {
-            const snap = await getDocs(col);
-            return snap.docs.map(d => d.data()).sort((a,b)=>
-              (b.updatedAt||0) - (a.updatedAt||0)
-            );
-          },
-
-          // Save / update a single design
-          async save(design) {
-            const id = String(design.id);
-            await setDoc(doc(col, id), { ...design, updatedAt: Date.now() });
-          },
-
-          // Delete a design
-          async remove(id) {
-            await deleteDoc(doc(col, String(id)));
-          },
-
-          // Listen for real-time changes
-          listen(callback) {
-            return onSnapshot(col, snap => {
-              const designs = snap.docs.map(d => d.data())
-                .sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0));
-              callback(designs);
-            });
-          }
-        };
-
-        console.log("✅ Firebase connected to project:", firebaseConfig.projectId);
-      } catch(e) {
-        console.warn("Firebase init failed, falling back to localStorage:", e);
-        window.__firebase = null;
-      }
-    } else {
-      console.log("ℹ️ Firebase not configured — using localStorage. Paste your config to enable cloud sync.");
-      window.__firebase = null;
-    }
+    // Mark as not configured until real values are pasted
+    window.__firebase = null;
+    window.__firebaseReady = Promise.resolve(null);
   </script>
 </head>
 <body>
@@ -1348,6 +1298,139 @@ function MaskEditorModal({ src, existingMask, onClose, onSave, onClearMask }) {
 }
 
 // ─── App ─────────────────────────────────────────────────────────────────────
+// ─── Google SVG icon ─────────────────────────────────────────────────────────
+function GoogleIcon(){
+  return(
+    <svg width="18" height="18" viewBox="0 0 48 48">
+      <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/>
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.5 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-7.9l-6.6 5.1C9.7 39.7 16.3 44 24 44z"/>
+      <path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.6l6.2 5.2C37.3 39.3 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/>
+    </svg>
+  );
+}
+
+// ─── LoginScreen ──────────────────────────────────────────────────────────────
+function LoginScreen({onLogin,isConfigured}){
+  const[mode,setMode]=useState("login"); // login | signup | forgot
+  const[email,setEmail]=useState("");
+  const[password,setPassword]=useState("");
+  const[name,setName]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState("");
+  const[message,setMessage]=useState("");
+
+  async function handleEmail(e){
+    e.preventDefault();
+    setError("");setMessage("");setLoading(true);
+    try{
+      if(!window.__auth) throw new Error("Auth not ready");
+      if(mode==="forgot"){
+        await window.__auth.sendPasswordReset(email);
+        setMessage("Reset email sent! Check your inbox.");
+        setLoading(false);return;
+      }
+      let user;
+      if(mode==="signup") user=await window.__auth.createUser(email,password,name);
+      else user=await window.__auth.signIn(email,password);
+      onLogin(user);
+    }catch(err){
+      const msgs={
+        "auth/user-not-found":"No account found with that email.",
+        "auth/wrong-password":"Incorrect password.",
+        "auth/email-already-in-use":"An account with this email already exists.",
+        "auth/weak-password":"Password must be at least 6 characters.",
+        "auth/invalid-email":"Please enter a valid email address.",
+        "auth/too-many-requests":"Too many attempts. Please try again later.",
+        "auth/network-request-failed":"Network error. Check your connection.",
+      };
+      setError(msgs[err.code]||err.message||"Something went wrong.");
+    }
+    setLoading(false);
+  }
+
+  async function handleGoogle(){
+    setError("");setLoading(true);
+    try{
+      if(!window.__auth) throw new Error("Auth not ready");
+      const user=await window.__auth.signInWithGoogle();
+      onLogin(user);
+    }catch(err){
+      if(err.code!=="auth/popup-closed-by-user") setError(err.message||"Google sign-in failed.");
+    }
+    setLoading(false);
+  }
+
+  const notConfigured=!isConfigured;
+
+  return(
+    <div className="auth-overlay">
+      <div className="auth-card">
+        <div className="auth-header">
+          <div style={{marginBottom:10}}>
+            <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:32,color:"#f97316",letterSpacing:3}}>DIRT</span>
+            <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:32,color:"#e8e8e8",letterSpacing:2}}>SHIRT</span>
+            <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:32,color:"#f97316",letterSpacing:2}}>DESIGNER</span>
+          </div>
+          <div style={{fontSize:11,color:"#555",fontFamily:"'DM Mono',monospace"}}>DTF Transfer Studio</div>
+          {notConfigured&&(
+            <div style={{marginTop:12,background:"rgba(249,115,22,0.08)",border:"1px solid rgba(249,115,22,0.2)",borderRadius:8,padding:"8px 12px",fontSize:10,color:"#f97316",fontFamily:"'DM Mono',monospace",textAlign:"left"}}>
+              ⚠ Firebase not configured — paste your config to enable login &amp; cloud sync.<br/>
+              <span style={{color:"#666"}}>Or continue without login (local storage only).</span>
+            </div>
+          )}
+        </div>
+        <div className="auth-body">
+          {notConfigured?(
+            <button className="btn btn-primary" style={{width:"100%",padding:"12px 0",fontSize:13}} onClick={()=>onLogin(null)}>
+              Continue without login →
+            </button>
+          ):(
+            <>
+              {/* Google */}
+              <button className="auth-google-btn" onClick={handleGoogle} disabled={loading}>
+                <GoogleIcon />
+                {loading?"Signing in…":"Continue with Google"}
+              </button>
+
+              <div className="auth-divider">or</div>
+
+              {/* Email form */}
+              <form onSubmit={handleEmail} style={{display:"flex",flexDirection:"column",gap:10}}>
+                {mode==="signup"&&(
+                  <input className="auth-input" type="text" placeholder="Full name" value={name}
+                    onChange={e=>setName(e.target.value)} required />
+                )}
+                <input className="auth-input" type="email" placeholder="Email address" value={email}
+                  onChange={e=>setEmail(e.target.value)} required />
+                {mode!=="forgot"&&(
+                  <input className="auth-input" type="password" placeholder="Password" value={password}
+                    onChange={e=>setPassword(e.target.value)} required minLength={6} />
+                )}
+                {error&&<div className="auth-error">{error}</div>}
+                {message&&<div style={{background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:8,padding:"9px 12px",fontSize:11,color:"#22c55e",fontFamily:"'DM Mono',monospace"}}>{message}</div>}
+                <button className="btn btn-primary" type="submit" disabled={loading} style={{width:"100%",padding:"11px 0",fontSize:13}}>
+                  {loading?"Please wait…":mode==="signup"?"Create Account":mode==="forgot"?"Send Reset Email":"Sign In"}
+                </button>
+              </form>
+
+              <div className="auth-toggle">
+                {mode==="login"&&<>Don't have an account? <span onClick={()=>{setMode("signup");setError("");}}>Sign up</span> · <span onClick={()=>{setMode("forgot");setError("");}}>Forgot password?</span></>}
+                {mode==="signup"&&<>Already have an account? <span onClick={()=>{setMode("login");setError("");}}>Sign in</span></>}
+                {mode==="forgot"&&<><span onClick={()=>{setMode("login");setError("");}}>← Back to sign in</span></>}
+              </div>
+
+              <div className="auth-toggle" style={{marginTop:4,paddingTop:12,borderTop:"1px solid #1e1e1e"}}>
+                <span onClick={()=>onLogin(null)} style={{color:"#444"}}>Continue without login →</span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App(){
   // ── Storage: Firebase (if configured) with localStorage fallback ────────────
 
@@ -1392,41 +1475,88 @@ function App(){
     }catch(e){}
   }
 
+  const[user,setUser]=useState(undefined); // undefined=loading, null=logged out/guest, obj=logged in
+  const[isConfigured]=useState(()=>{
+    const cfg=window.__firebaseConfig;
+    return cfg&&cfg.apiKey&&cfg.apiKey!=="PASTE_YOUR_API_KEY";
+  });
   const[designs,setDesigns]=useState(()=>lsLoad()||[]);
   const[activeId,setActiveId]=useState(()=>{try{return localStorage.getItem("dirtshirt_activeId")||null;}catch(e){return null;}});
   const[view,setView]=useState("editor");
   const[syncStatus,setSyncStatus]=useState("local"); // "local" | "syncing" | "cloud" | "error"
   const fbUnsub=useRef(null);
 
-  // On mount: if Firebase is ready, load from cloud and set up live listener
+  // Init Firebase Auth listener on mount
   useEffect(()=>{
-    const fb=window.__firebase;
-    if(!fb){setSyncStatus("local");return;}
+    if(!isConfigured){setUser(null);return;}
+    Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"),
+    ]).then(([{initializeApp},{getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signInWithPopup,GoogleAuthProvider,signOut,sendPasswordResetEmail,updateProfile}])=>{
+      let app;
+      try{app=initializeApp(window.__firebaseConfig);}
+      catch(e){try{const{getApp}=require("firebase/app");app=getApp();}catch(e2){setUser(null);return;}}
+      const auth=getAuth(app);
+      const provider=new GoogleAuthProvider();
+      window.__auth={
+        signIn:(email,pw)=>signInWithEmailAndPassword(auth,email,pw).then(r=>r.user),
+        createUser:(email,pw,name)=>createUserWithEmailAndPassword(auth,email,pw).then(async r=>{
+          if(name)await updateProfile(r.user,{displayName:name});
+          return r.user;
+        }),
+        signInWithGoogle:()=>signInWithPopup(auth,provider).then(r=>r.user),
+        signOut:()=>signOut(auth),
+        sendPasswordReset:(email)=>sendPasswordResetEmail(auth,email),
+      };
+      onAuthStateChanged(auth,u=>{
+        setUser(u||null);
+      });
+    }).catch(()=>{setUser(null);});
+  },[]);
+
+  // On mount: check if Firebase config has been filled in, then connect
+  useEffect(()=>{
+    const cfg = window.__firebaseConfig;
+    const isConfigured = cfg && cfg.apiKey && cfg.apiKey !== "PASTE_YOUR_API_KEY";
+    if(!isConfigured){ setSyncStatus("local"); return; }
+
     setSyncStatus("syncing");
-    fb.loadAll().then(cloudDesigns=>{
+
+    // Dynamically import Firebase only when real config exists
+    Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js")
+    ]).then(([{initializeApp},{getFirestore,collection,doc,setDoc,getDocs,deleteDoc}])=>{
+      const app = initializeApp(cfg);
+      const db  = getFirestore(app);
+      const col = collection(db,"designs");
+      window.__firebase = {
+        async loadAll(){const s=await getDocs(col);return s.docs.map(d=>d.data()).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));},
+        async save(design){await setDoc(doc(col,String(design.id)),{...design,updatedAt:Date.now()});},
+        async remove(id){const{deleteDoc:dd}=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");await dd(doc(col,String(id)));}
+      };
+      return window.__firebase.loadAll();
+    }).then(cloudDesigns=>{
       if(cloudDesigns&&cloudDesigns.length>0){
-        // Merge: cloud wins, but migrate any localStorage-only designs up
         const localDesigns=lsLoad()||[];
         const cloudIds=new Set(cloudDesigns.map(d=>String(d.id)));
         const localOnly=localDesigns.filter(d=>!cloudIds.has(String(d.id)));
         const merged=sanitize([...cloudDesigns,...localOnly]);
         setDesigns(merged);
-        // Push any local-only designs up to cloud
-        localOnly.forEach(d=>fb.save(d).catch(()=>{}));
+        localOnly.forEach(d=>window.__firebase.save(d).catch(()=>{}));
       } else {
-        // Nothing in cloud yet — migrate localStorage up
         const local=lsLoad();
         if(local&&local.length>0){
           setDesigns(local);
-          local.forEach(d=>fb.save(d).catch(()=>{}));
+          local.forEach(d=>window.__firebase.save(d).catch(()=>{}));
         }
       }
       setSyncStatus("cloud");
     }).catch(err=>{
       console.warn("Firebase load failed, using localStorage:",err);
-      setSyncStatus("error");
+      window.__firebase=null;
+      setSyncStatus("local"); // fall back to local gracefully — no scary red error
     });
-    // Clean up listener on unmount
     return()=>{if(fbUnsub.current)fbUnsub.current();};
   },[]);
 
@@ -1470,6 +1600,17 @@ function App(){
   // Only create starter design if truly nothing anywhere
   useEffect(()=>{if(designs.length===0){createDesign("My First Design");}},[]);
   const activeDesign=designs.find(d=>d.id===activeId)||null;
+
+  // Show login screen while auth is loading or user is not logged in
+  if(user===undefined) return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0a0a0a"}}>
+      <div style={{fontFamily:"'Bebas Neue',cursive",fontSize:20,color:"#333",letterSpacing:2}}>LOADING…</div>
+    </div>
+  );
+  if(user===null) return(
+    <LoginScreen isConfigured={isConfigured} onLogin={u=>{setUser(u===undefined?null:u);}} />
+  );
+
   return(
     <div style={{display:"flex",flexDirection:"column",height:"100vh",overflow:"hidden"}}>
       <div className="header">
@@ -1480,14 +1621,34 @@ function App(){
           {syncStatus==="cloud"&&<span style={{fontSize:9,color:"#22c55e",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:"50%",background:"#22c55e",display:"inline-block"}}/>Cloud Sync</span>}
           {syncStatus==="syncing"&&<span style={{fontSize:9,color:"#f97316",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:"50%",background:"#f97316",display:"inline-block",animation:"pulse 1s infinite"}}/>Syncing…</span>}
           {syncStatus==="local"&&<span style={{fontSize:9,color:"#555",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:"50%",background:"#555",display:"inline-block"}}/>Local Only</span>}
-          {syncStatus==="error"&&<span style={{fontSize:9,color:"#ef4444",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:"50%",background:"#ef4444",display:"inline-block"}}/>Sync Error</span>}
+          {/* User avatar / sign out */}
+          {user&&user.email&&(
+            <div style={{display:"flex",alignItems:"center",gap:8,marginLeft:4}}>
+              {user.photoURL
+                ?<img src={user.photoURL} className="auth-avatar" alt="" />
+                :<div style={{width:28,height:28,borderRadius:"50%",background:"#f97316",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#000",fontFamily:"'DM Mono',monospace"}}>
+                  {(user.displayName||user.email||"?")[0].toUpperCase()}
+                </div>
+              }
+              <span style={{fontSize:10,color:"#666",fontFamily:"'DM Mono',monospace",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {user.displayName||user.email}
+              </span>
+              <button className="btn btn-ghost" style={{fontSize:10,padding:"4px 10px"}}
+                onClick={()=>{if(window.__auth)window.__auth.signOut().then(()=>setUser(null)).catch(()=>setUser(null));else setUser(null);}}>
+                Sign Out
+              </button>
+            </div>
+          )}
+          {(!user||!user.email)&&(
+            <button className="btn btn-ghost" style={{fontSize:10,padding:"4px 10px"}} onClick={()=>setUser(null)}>Sign In</button>
+          )}
           <button className="btn btn-ghost" onClick={()=>setView("library")}>📂 My Designs ({designs.length})</button>
           <button className="btn btn-primary" onClick={()=>createDesign()}>+ New Design</button>
         </div>
       </div>
       <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
         {view==="library"
-          ?<Library designs={designs} onOpen={d=>{setActiveId(d.id);setView("editor");}} onDuplicate={duplicateDesign} onDelete={deleteDesign} onNew={()=>createDesign()} />
+          ?<Library designs={designs} onOpen={d=>{if(!d.locked)setActiveId(d.id);setView("editor");}} onDuplicate={duplicateDesign} onDelete={deleteDesign} onLock={id=>setDesigns(prev=>{const next=prev.map(d=>d.id===id?{...d,locked:!d.locked}:d);lsSave(next);if(window.__firebase){const updated=next.find(d=>d.id===id);if(updated)window.__firebase.save(updated).catch(()=>{});}return next;})} onNew={()=>createDesign()} />
           :activeDesign
             ?<Editor key={activeDesign.id} design={activeDesign} onSave={saveDesign} onDuplicate={()=>duplicateDesign(activeDesign)} onBack={()=>setView("library")} />
             :<div style={{display:"flex",justifyContent:"center",alignItems:"center",flex:1,flexDirection:"column",gap:16}}><p style={{color:"#555"}}>No design selected</p><button className="btn btn-primary" onClick={()=>createDesign()}>Create New Design</button></div>
@@ -1498,13 +1659,15 @@ function App(){
 }
 
 // ─── Library ─────────────────────────────────────────────────────────────────
-function Library({designs,onOpen,onDuplicate,onDelete,onNew}){
+function Library({designs,onOpen,onDuplicate,onDelete,onLock,onNew}){
   return(
     <div className="lib-wrap">
       <div className="lib-header"><h2 className="lib-title">MY DESIGNS</h2><button className="btn btn-primary" style={{marginLeft:"auto"}} onClick={onNew}>+ New Design</button></div>
       {designs.length===0?<div className="empty-state"><div className="empty-icon">👕</div><p style={{marginBottom:16}}>No designs yet</p><button className="btn btn-primary" onClick={onNew}>Create Your First Design</button></div>
         :<div className="lib-grid">{designs.map(d=>{const totalLayers=Object.values(d.zones||{}).reduce((s,z)=>s+(z.layers?.length||0),0);return(
-          <div key={d.id} className="design-card" onClick={()=>onOpen(d)}>
+          <div key={d.id} className="design-card"
+            style={{opacity:d.locked?0.85:1,cursor:d.locked?"default":"pointer"}}
+            onClick={()=>!d.locked&&onOpen(d)}>
             <div className="design-card-thumb">
               {d.thumbnail
                 ?<img src={d.thumbnail} alt="" />
@@ -1513,18 +1676,31 @@ function Library({designs,onOpen,onDuplicate,onDelete,onNew}){
                   <div style={{fontSize:8,color:"#2a2a2a",fontFamily:"'DM Mono',monospace",textAlign:"center",padding:"0 8px"}}>save to preview</div>
                 </div>
               }
-              {/* Hover action overlay */}
-              <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+              {/* Lock badge — always visible on locked designs */}
+              {d.locked&&(
+                <div style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,0.7)",borderRadius:5,padding:"3px 6px",fontSize:11,lineHeight:1}}>🔒</div>
+              )}
+              {/* Hover overlay */}
+              <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,
                 opacity:0,transition:"opacity 0.15s"}}
                 onMouseEnter={e=>e.currentTarget.style.opacity=1}
                 onMouseLeave={e=>e.currentTarget.style.opacity=0}>
-                <button className="btn btn-primary" style={{fontSize:10,padding:"4px 10px"}} onClick={e=>{e.stopPropagation();onOpen(d);}}>Edit</button>
-                <button className="btn btn-ghost" style={{fontSize:10,padding:"4px 8px"}} onClick={e=>{e.stopPropagation();onDuplicate(d);}}>⧉</button>
-                <button className="btn btn-danger" style={{fontSize:10,padding:"4px 8px"}} onClick={e=>{e.stopPropagation();onDelete(d.id);}}>✕</button>
+                {!d.locked&&<button className="btn btn-primary" style={{fontSize:10,padding:"5px 14px",width:"80%"}} onClick={e=>{e.stopPropagation();onOpen(d);}}>✏️ Edit</button>}
+                {!d.locked&&<button className="btn btn-ghost" style={{fontSize:10,padding:"5px 14px",width:"80%"}} onClick={e=>{e.stopPropagation();onDuplicate(d);}}>⧉ Duplicate</button>}
+                <button className="btn btn-ghost" style={{fontSize:10,padding:"5px 14px",width:"80%",borderColor:d.locked?"rgba(249,115,22,0.5)":"#333",color:d.locked?"#f97316":"#aaa"}}
+                  onClick={e=>{e.stopPropagation();onLock(d.id);}}>
+                  {d.locked?"🔓 Unlock":"🔒 Lock"}
+                </button>
+                {!d.locked&&<button className="btn btn-danger" style={{fontSize:10,padding:"5px 14px",width:"80%"}}
+                  onClick={e=>{e.stopPropagation();if(window.confirm(`Delete "${d.name}"? This cannot be undone.`))onDelete(d.id);}}>
+                  🗑 Delete
+                </button>}
               </div>
             </div>
             <div className="design-card-info">
-              <div style={{fontWeight:500,fontSize:11,color:"#d0d0d0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:2}}>{d.name}</div>
+              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                <div style={{fontWeight:500,fontSize:11,color:d.locked?"#888":"#d0d0d0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{d.name}</div>
+              </div>
               <div style={{fontSize:9,color:"#444",fontFamily:"'DM Mono',monospace"}}>{d.shirtType==="short"?"S/S":"L/S"} · {d.shirtSize||"M"} · {totalLayers} layer{totalLayers!==1?"s":""}</div>
             </div>
           </div>
