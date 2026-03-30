@@ -533,15 +533,20 @@ function ShirtBackground({shirtImage,shirtColor,baseColor,offset,canvasRef:exter
     function seedPx(idx){if(!isBg[idx]){isBg[idx]=1;queue[qTail++]=idx;}}
     for(let x=0;x<W;x++){seedPx(x);seedPx((H-1)*W+x);}for(let y=1;y<H-1;y++){seedPx(y*W);seedPx(y*W+W-1);}
     while(qHead<qTail){const idx=queue[qHead++],x=idx%W,y=(idx/W)|0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const ni=ny*W+nx;if(isBg[ni])continue;const np=ni*4,nr=px[np],ng=px[np+1],nb2=px[np+2];let isBgPixel=false;if(isDarkBg){const pixLum=(0.299*nr+0.587*ng+0.114*nb2)/255;isBgPixel=pixLum<0.06;}else{const dr=nr-bgR,dg=ng-bgG,db=nb2-bgB;isBgPixel=Math.sqrt(dr*dr+dg*dg+db*db)<35;}if(isBgPixel){isBg[ni]=1;queue[qTail++]=ni;}}}
-    const[bR,bG,bB]=hexToRgb(baseColor||"#ffffff");
     const[tR,tG,tB]=hexToRgb(shirtColor||"#ffffff");
-    // Measure actual average shirt pixel so ratio is exact, not estimated
-    let sumR=0,sumG=0,sumB=0,sumN=0;
-    for(let i=0;i<W*H;i++){if(isBg[i])continue;const pi=i*4;if(px[pi+3]<10)continue;sumR+=px[pi];sumG+=px[pi+1];sumB+=px[pi+2];sumN++;}
-    const avgR=sumN>0?sumR/sumN:bR, avgG=sumN>0?sumG/sumN:bG, avgB=sumN>0?sumB/sumN:bB;
-    // Per-channel ratio: scale each pixel so the average maps to the target color exactly
-    const ratioR=avgR>0?tR/avgR:1, ratioG=avgG>0?tG/avgG:1, ratioB=avgB>0?tB/avgB:1;
-    for(let i=0;i<W*H;i++){if(isBg[i])continue;const pi=i*4;if(px[pi+3]<10)continue;px[pi]=Math.min(255,Math.max(0,Math.round(px[pi]*ratioR)));px[pi+1]=Math.min(255,Math.max(0,Math.round(px[pi+1]*ratioG)));px[pi+2]=Math.min(255,Math.max(0,Math.round(px[pi+2]*ratioB)));}
+    // Luminosity-preserving colorization: extract each pixel's relative brightness
+    // from the original image and reapply it using the target shirt color.
+    // This prevents blown-out highlights (glow) caused by ratio over-multiplication.
+    for(let i=0;i<W*H;i++){
+      if(isBg[i])continue;
+      const pi=i*4;
+      if(px[pi+3]<10)continue;
+      // Relative luminance of this pixel (0..1)
+      const lum=(0.299*px[pi]+0.587*px[pi+1]+0.114*px[pi+2])/255;
+      px[pi]  =Math.min(255,Math.max(0,Math.round(tR*lum)));
+      px[pi+1]=Math.min(255,Math.max(0,Math.round(tG*lum)));
+      px[pi+2]=Math.min(255,Math.max(0,Math.round(tB*lum)));
+    }
     ctx.putImageData(data,0,0);
   },[naturalImg,shirtColor,baseColor]);
   if(!shirtImage)return null;
