@@ -1441,11 +1441,10 @@ function Editor({design,onSave,onDuplicate,onBack}){
           for(let x=0;x<RW;x++){sp2(x);sp2((RH-1)*RW+x);}for(let y=1;y<RH-1;y++){sp2(y*RW);sp2(y*RW+RW-1);}
           while(iqH2<iqT2){const idx=iq2[iqH2++],ix=idx%RW,iy=(idx/RW)|0;for(let dy2=-1;dy2<=1;dy2++)for(let dx2=-1;dx2<=1;dx2++){if(!dx2&&!dy2)continue;const nx=ix+dx2,ny=iy+dy2;if(nx<0||nx>=RW||ny<0||ny>=RH)continue;const ni=ny*RW+nx;if(iBg2[ni])continue;const np=ni*4,nr=cpx[np],ng=cpx[np+1],nb3=cpx[np+2];let hit=false;if(isDark2){const pl=(0.299*nr+0.587*ng+0.114*nb3)/255;hit=pl<0.06;}else{const dr=nr-bgR2,dg=ng-bgG2,db=nb3-bgB2;hit=Math.sqrt(dr*dr+dg*dg+db*db)<35;}if(hit){iBg2[ni]=1;iq2[iqT2++]=ni;}}}
           const[tR2,tG2,tB2]=hexToRgb(d.shirtColor||"#ffffff");
-          let sr3=0,sg3=0,sb3=0,sn3=0;
-          for(let i=0;i<RW*RH;i++){if(iBg2[i])continue;const pi=i*4;if(cpx[pi+3]<10)continue;sr3+=cpx[pi];sg3+=cpx[pi+1];sb3+=cpx[pi+2];sn3++;}
-          const avR=sn3>0?sr3/sn3:1,avG=sn3>0?sg3/sn3:1,avB=sn3>0?sb3/sn3:1;
-          const rtR=avR>0?tR2/avR:1,rtG=avG>0?tG2/avG:1,rtB=avB>0?tB2/avB:1;
-          for(let i=0;i<RW*RH;i++){if(iBg2[i])continue;const pi=i*4;if(cpx[pi+3]<10)continue;cpx[pi]=Math.min(255,Math.max(0,Math.round(cpx[pi]*rtR)));cpx[pi+1]=Math.min(255,Math.max(0,Math.round(cpx[pi+1]*rtG)));cpx[pi+2]=Math.min(255,Math.max(0,Math.round(cpx[pi+2]*rtB)));}
+          let sumLum2=0,lumN2=0;
+          for(let i=0;i<RW*RH;i++){if(iBg2[i])continue;const pi=i*4;if(cpx[pi+3]<10)continue;sumLum2+=(0.299*cpx[pi]+0.587*cpx[pi+1]+0.114*cpx[pi+2])/255;lumN2++;}
+          const avgLum2=lumN2>0?sumLum2/lumN2:0.5;
+          for(let i=0;i<RW*RH;i++){if(iBg2[i])continue;const pi=i*4;if(cpx[pi+3]<10)continue;const lum2=(0.299*cpx[pi]+0.587*cpx[pi+1]+0.114*cpx[pi+2])/255;const norm2=Math.min(1.0,avgLum2>0?lum2/avgLum2:lum2);cpx[pi]=Math.min(255,Math.max(0,Math.round(tR2*norm2)));cpx[pi+1]=Math.min(255,Math.max(0,Math.round(tG2*norm2)));cpx[pi+2]=Math.min(255,Math.max(0,Math.round(tB2*norm2)));}
           cctx.putImageData(cdata,0,0);
           sctx.drawImage(cctx.canvas,minX,minY,cropW,cropH,dx,dy,dw,dh);
           res();
