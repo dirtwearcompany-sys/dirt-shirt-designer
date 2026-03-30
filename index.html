@@ -1098,16 +1098,6 @@ function MaskEditorModal({ src, existingMask, onClose, onSave, onClearMask }) {
   );
 }
 
-// ─── Firebase config — update these values if you change projects ────────────
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyC7emcD5iDYSLsjOH0NwstwM_0rRhkDpDA",
-  authDomain: "dirt-shirt-designer.firebaseapp.com",
-  projectId: "dirt-shirt-designer",
-  storageBucket: "dirt-shirt-designer.firebasestorage.app",
-  messagingSenderId: "268887622342",
-  appId: "1:268887622342:web:53d7386623156b06494dc7"
-};
-
 // ─── App ─────────────────────────────────────────────────────────────────────
 function App(){
   // ── Sanitize: only fix missing shirtSize, never null out image paths ──
@@ -1166,120 +1156,45 @@ function App(){
   const[designs, setDesigns] = useState(() => lsLoad() || []);
   const[activeId, setActiveId] = useState(() => { const s=lsLoad(); return s&&s.length>0?s[0].id:null; });
   const[view, setView] = useState("editor");
-  const[syncStatus, setSyncStatus] = useState("local");
+  const importRef = useRef(null);
   const isInitialized = useRef(false);
-  const fbRef = useRef(null); // holds { col, doc, setDoc, deleteDoc }
 
-  // ── Boot Firebase (Firestore + Storage) on mount ─────────────────────────
-  useEffect(()=>{
-    async function initFb(){
+  // ── Export all designs as a JSON backup file ─────────────────────────────
+  function exportDesigns(){
+    const data = JSON.stringify(designs, null, 2);
+    const blob = new Blob([data], {type:"application/json"});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `dirtshirt-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Import designs from a JSON backup file ────────────────────────────────
+  function importDesigns(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
       try{
-        const [
-          {initializeApp, getApps},
-          {getFirestore, collection, doc, setDoc, getDocs, deleteDoc},
-          {getStorage, ref, uploadString, getDownloadURL, deleteObject}
-        ] = await Promise.all([
-          import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
-          import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),
-          import("https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js"),
-        ]);
-        const app      = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
-        const db       = getFirestore(app);
-        const storage  = getStorage(app);
-        const col      = collection(db, "designs");
-        fbRef.current  = {col, doc, setDoc, deleteDoc, storage, ref, uploadString, getDownloadURL, deleteObject};
-
-        setSyncStatus("syncing");
-        const snap   = await getDocs(col);
-        const cloud  = sanitize(snap.docs.map(d=>d.data()).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)));
-
-        if(cloud.length > 0){
-          const local    = lsLoad() || [];
-          const cloudIds = new Set(cloud.map(d=>String(d.id)));
-          const localOnly= local.filter(d=>!cloudIds.has(String(d.id)));
-          const merged   = [...cloud, ...localOnly];
-          setDesigns(merged);
-          lsSave(merged);
-          setActiveId(prev => merged.find(d=>d.id===prev) ? prev : merged[0].id);
-          // push any local-only designs up to cloud
-          for(const d of localOnly) fbSaveInternal(d).catch(()=>{});
-        } else {
-          // cloud empty — push local designs up
-          const local = lsLoad();
-          if(local && local.length > 0) for(const d of local) fbSaveInternal(d).catch(()=>{});
-        }
-        setSyncStatus("cloud");
+        const imported = JSON.parse(ev.target.result);
+        if(!Array.isArray(imported)) throw new Error("Invalid format");
+        const cleaned = sanitize(imported);
+        // Merge: imported designs win for matching IDs, keep existing unique ones
+        const importedIds = new Set(cleaned.map(d=>String(d.id)));
+        const existing    = designs.filter(d=>!importedIds.has(String(d.id)));
+        const merged      = [...cleaned, ...existing];
+        setDesigns(merged);
+        lsSave(merged);
+        if(merged.length > 0) setActiveId(merged[0].id);
+        alert(`✅ Imported ${cleaned.length} design${cleaned.length!==1?"s":""}!`);
       }catch(err){
-        console.warn("Firebase unavailable, using localStorage:", err);
-        setSyncStatus("local");
+        alert("❌ Could not read backup file: " + err.message);
       }
-    }
-    initFb();
-  },[]);
-
-  // ── Upload a single data: URL to Firebase Storage, return download URL ────
-  // path example: "designs/12345/zones/short_front/layers/67890"
-  async function uploadDataUrl(path, dataUrl){
-    if(!fbRef.current || !dataUrl || !dataUrl.startsWith("data:")) return dataUrl;
-    const {storage, ref, uploadString, getDownloadURL} = fbRef.current;
-    const storageRef = ref(storage, path);
-    await uploadString(storageRef, dataUrl, "data_url");
-    return await getDownloadURL(storageRef);
-  }
-
-  // ── Strip data: URLs from a design, uploading each to Storage ────────────
-  // Returns a "lean" design safe to store in Firestore (<1MB)
-  async function stripAndUpload(design){
-    const lean = JSON.parse(JSON.stringify(design)); // deep clone
-    const did  = String(design.id);
-
-    // Upload thumbnail
-    if(lean.thumbnail && lean.thumbnail.startsWith("data:")){
-      lean.thumbnail = await uploadDataUrl(`designs/${did}/thumbnail`, lean.thumbnail);
-    }
-
-    // Upload shirt images (only data: URLs — plain file paths stay as-is)
-    for(const [zoneId, src] of Object.entries(lean.shirtImages || {})){
-      if(src && src.startsWith("data:")){
-        lean.shirtImages[zoneId] = await uploadDataUrl(`designs/${did}/shirt/${zoneId}`, src);
-      }
-    }
-
-    // Upload art layer images and masks
-    for(const [zoneId, zone] of Object.entries(lean.zones || {})){
-      for(const layer of (zone.layers || [])){
-        if(layer.src && layer.src.startsWith("data:")){
-          layer.src = await uploadDataUrl(`designs/${did}/zones/${zoneId}/layers/${layer.id}/src`, layer.src);
-        }
-        if(layer.maskSrc && layer.maskSrc.startsWith("data:")){
-          layer.maskSrc = await uploadDataUrl(`designs/${did}/zones/${zoneId}/layers/${layer.id}/mask`, layer.maskSrc);
-        }
-      }
-    }
-
-    return lean;
-  }
-
-  // ── Internal: upload images then write lean doc to Firestore ─────────────
-  async function fbSaveInternal(design){
-    if(!fbRef.current) return;
-    const {col, doc, setDoc} = fbRef.current;
-    try{
-      const lean = await stripAndUpload(design);
-      await setDoc(doc(col, String(design.id)), {...lean, updatedAt: Date.now()});
-    }catch(e){
-      console.warn("fbSave failed:", e);
-    }
-  }
-
-  // ── Public helpers ────────────────────────────────────────────────────────
-  function fbSave(design){
-    fbSaveInternal(design); // fire and forget — localStorage is the sync source
-  }
-  function fbDelete(id){
-    if(!fbRef.current) return;
-    const {col, doc, deleteDoc} = fbRef.current;
-    deleteDoc(doc(col, String(id))).catch(e=>console.warn("fbDelete:", e));
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   }
 
   // ── CRUD — writes localStorage AND Firestore in parallel ─────────────────
@@ -1287,27 +1202,23 @@ function App(){
     const d = blankDesign(name||"New Design");
     setDesigns(prev=>{ const next=[d,...prev]; lsSave(next); return next; });
     setActiveId(d.id); setView("editor");
-    fbSave(d);
     return d;
   }
 
   function saveDesign(updated){
     setDesigns(prev=>{ const next=prev.map(d=>d.id===updated.id?updated:d); lsSave(next); return next; });
     setActiveId(updated.id);
-    fbSave(updated);
   }
 
   function duplicateDesign(d){
     const copy={...JSON.parse(JSON.stringify(d)),id:Date.now()+Math.random(),name:d.name+" (Copy)"};
     setDesigns(prev=>{ const next=[copy,...prev]; lsSave(next); return next; });
     setActiveId(copy.id); setView("editor");
-    fbSave(copy);
   }
 
   function deleteDesign(id){
     setDesigns(prev=>{ const next=prev.filter(d=>d.id!==id); lsSave(next); return next; });
     if(activeId===id){ setActiveId(null); setView("library"); }
-    fbDelete(id);
   }
 
   // ── Create starter design only if truly nothing anywhere ──────────────────
@@ -1327,16 +1238,16 @@ function App(){
         <span style={{color:"#2a2a2a",fontSize:20,lineHeight:1,margin:"0 4px"}}>|</span>
         <span className="logo-sub">DTF Transfer Studio</span>
         <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}}>
-          {syncStatus==="cloud"   && <span style={{fontSize:9,color:"#22c55e",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:"50%",background:"#22c55e",display:"inline-block"}}/>Cloud Sync</span>}
-          {syncStatus==="syncing" && <span style={{fontSize:9,color:"#f97316",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:"50%",background:"#f97316",display:"inline-block",animation:"pulse 1s infinite"}}/>Syncing…</span>}
-          {syncStatus==="local"   && <span style={{fontSize:9,color:"#555",fontFamily:"'DM Mono',monospace",display:"flex",alignItems:"center",gap:4}}><span style={{width:6,height:6,borderRadius:"50%",background:"#555",display:"inline-block"}}/>Local Only</span>}
+          <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={importDesigns} />
+          <button className="btn btn-ghost" style={{fontSize:10,padding:"5px 12px"}} onClick={exportDesigns} title="Download all designs as a backup file">⬇ Export Backup</button>
+          <button className="btn btn-ghost" style={{fontSize:10,padding:"5px 12px"}} onClick={()=>importRef.current.click()} title="Restore designs from a backup file">⬆ Import Backup</button>
           <button className="btn btn-ghost" onClick={()=>setView("library")}>📂 My Designs ({designs.length})</button>
           <button className="btn btn-primary" onClick={()=>createDesign()}>+ New Design</button>
         </div>
       </div>
       <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
         {view==="library"
-          ?<Library designs={designs} onOpen={d=>{if(!d.locked)setActiveId(d.id);setView("editor");}} onDuplicate={duplicateDesign} onDelete={deleteDesign} onLock={id=>setDesigns(prev=>{const next=prev.map(d=>d.id===id?{...d,locked:!d.locked}:d);lsSave(next);if(fbRef.current){const upd=next.find(d=>d.id===id);if(upd)fbSave(upd);}return next;})} onNew={()=>createDesign()} />
+          ?<Library designs={designs} onOpen={d=>{if(!d.locked)setActiveId(d.id);setView("editor");}} onDuplicate={duplicateDesign} onDelete={deleteDesign} onLock={id=>setDesigns(prev=>{const next=prev.map(d=>d.id===id?{...d,locked:!d.locked}:d);lsSave(next);return next;})} onNew={()=>createDesign()} />
           :activeDesign
             ?<Editor key={activeDesign.id} design={activeDesign} onSave={saveDesign} onDuplicate={()=>duplicateDesign(activeDesign)} onBack={()=>setView("library")} />
             :<div style={{display:"flex",justifyContent:"center",alignItems:"center",flex:1,flexDirection:"column",gap:16}}><p style={{color:"#555"}}>No design selected</p><button className="btn btn-primary" onClick={()=>createDesign()}>Create New Design</button></div>
