@@ -1170,55 +1170,116 @@ function App(){
   const isInitialized = useRef(false);
   const fbRef = useRef(null); // holds { col, doc, setDoc, deleteDoc }
 
-  // ── Boot Firestore on mount ───────────────────────────────────────────────
+  // ── Boot Firebase (Firestore + Storage) on mount ─────────────────────────
   useEffect(()=>{
     async function initFb(){
       try{
-        const [{initializeApp,getApps},{getFirestore,collection,doc,setDoc,getDocs,deleteDoc}] = await Promise.all([
+        const [
+          {initializeApp, getApps},
+          {getFirestore, collection, doc, setDoc, getDocs, deleteDoc},
+          {getStorage, ref, uploadString, getDownloadURL, deleteObject}
+        ] = await Promise.all([
           import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
           import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"),
+          import("https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js"),
         ]);
-        const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
-        const db  = getFirestore(app);
-        const col = collection(db,"designs");
-        fbRef.current = {col,doc,setDoc,deleteDoc};
+        const app      = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
+        const db       = getFirestore(app);
+        const storage  = getStorage(app);
+        const col      = collection(db, "designs");
+        fbRef.current  = {col, doc, setDoc, deleteDoc, storage, ref, uploadString, getDownloadURL, deleteObject};
 
         setSyncStatus("syncing");
-        const snap = await getDocs(col);
-        const cloud = sanitize(snap.docs.map(d=>d.data()).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)));
+        const snap   = await getDocs(col);
+        const cloud  = sanitize(snap.docs.map(d=>d.data()).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)));
 
         if(cloud.length > 0){
-          const local = lsLoad() || [];
+          const local    = lsLoad() || [];
           const cloudIds = new Set(cloud.map(d=>String(d.id)));
-          const localOnly = local.filter(d=>!cloudIds.has(String(d.id)));
-          const merged = [...cloud,...localOnly];
+          const localOnly= local.filter(d=>!cloudIds.has(String(d.id)));
+          const merged   = [...cloud, ...localOnly];
           setDesigns(merged);
           lsSave(merged);
           setActiveId(prev => merged.find(d=>d.id===prev) ? prev : merged[0].id);
-          for(const d of localOnly) setDoc(doc(col,String(d.id)),{...d,updatedAt:Date.now()}).catch(()=>{});
+          // push any local-only designs up to cloud
+          for(const d of localOnly) fbSaveInternal(d).catch(()=>{});
         } else {
+          // cloud empty — push local designs up
           const local = lsLoad();
-          if(local&&local.length>0) for(const d of local) setDoc(doc(col,String(d.id)),{...d,updatedAt:Date.now()}).catch(()=>{});
+          if(local && local.length > 0) for(const d of local) fbSaveInternal(d).catch(()=>{});
         }
         setSyncStatus("cloud");
       }catch(err){
-        console.warn("Firestore unavailable, using localStorage:",err);
+        console.warn("Firebase unavailable, using localStorage:", err);
         setSyncStatus("local");
       }
     }
     initFb();
   },[]);
 
-  // ── Firestore write helpers ───────────────────────────────────────────────
-  function fbSave(design){
+  // ── Upload a single data: URL to Firebase Storage, return download URL ────
+  // path example: "designs/12345/zones/short_front/layers/67890"
+  async function uploadDataUrl(path, dataUrl){
+    if(!fbRef.current || !dataUrl || !dataUrl.startsWith("data:")) return dataUrl;
+    const {storage, ref, uploadString, getDownloadURL} = fbRef.current;
+    const storageRef = ref(storage, path);
+    await uploadString(storageRef, dataUrl, "data_url");
+    return await getDownloadURL(storageRef);
+  }
+
+  // ── Strip data: URLs from a design, uploading each to Storage ────────────
+  // Returns a "lean" design safe to store in Firestore (<1MB)
+  async function stripAndUpload(design){
+    const lean = JSON.parse(JSON.stringify(design)); // deep clone
+    const did  = String(design.id);
+
+    // Upload thumbnail
+    if(lean.thumbnail && lean.thumbnail.startsWith("data:")){
+      lean.thumbnail = await uploadDataUrl(`designs/${did}/thumbnail`, lean.thumbnail);
+    }
+
+    // Upload shirt images (only data: URLs — plain file paths stay as-is)
+    for(const [zoneId, src] of Object.entries(lean.shirtImages || {})){
+      if(src && src.startsWith("data:")){
+        lean.shirtImages[zoneId] = await uploadDataUrl(`designs/${did}/shirt/${zoneId}`, src);
+      }
+    }
+
+    // Upload art layer images and masks
+    for(const [zoneId, zone] of Object.entries(lean.zones || {})){
+      for(const layer of (zone.layers || [])){
+        if(layer.src && layer.src.startsWith("data:")){
+          layer.src = await uploadDataUrl(`designs/${did}/zones/${zoneId}/layers/${layer.id}/src`, layer.src);
+        }
+        if(layer.maskSrc && layer.maskSrc.startsWith("data:")){
+          layer.maskSrc = await uploadDataUrl(`designs/${did}/zones/${zoneId}/layers/${layer.id}/mask`, layer.maskSrc);
+        }
+      }
+    }
+
+    return lean;
+  }
+
+  // ── Internal: upload images then write lean doc to Firestore ─────────────
+  async function fbSaveInternal(design){
     if(!fbRef.current) return;
-    const {col,doc,setDoc}=fbRef.current;
-    setDoc(doc(col,String(design.id)),{...design,updatedAt:Date.now()}).catch(e=>console.warn("fbSave:",e));
+    const {col, doc, setDoc} = fbRef.current;
+    try{
+      const lean = await stripAndUpload(design);
+      await setDoc(doc(col, String(design.id)), {...lean, updatedAt: Date.now()});
+    }catch(e){
+      console.warn("fbSave failed:", e);
+    }
+  }
+
+  // ── Public helpers ────────────────────────────────────────────────────────
+  function fbSave(design){
+    fbSaveInternal(design); // fire and forget — localStorage is the sync source
   }
   function fbDelete(id){
     if(!fbRef.current) return;
-    const {col,doc,deleteDoc}=fbRef.current;
-    deleteDoc(doc(col,String(id))).catch(e=>console.warn("fbDelete:",e));
+    const {col, doc, deleteDoc} = fbRef.current;
+    deleteDoc(doc(col, String(id))).catch(e=>console.warn("fbDelete:", e));
   }
 
   // ── CRUD — writes localStorage AND Firestore in parallel ─────────────────
