@@ -166,7 +166,7 @@ const SHIRT_IMAGE_SRCS = {
   long_sleeve:  "side_longsleeve.png",
 };
 const ZONE_BASE_COLOR = {
-  short_front:"#d3783c", short_back:"#d3783c", short_sleeve:"#d3783c",
+  short_front:"#C9804F", short_back:"#C9804F", short_sleeve:"#C9804F",
   long_front:"#ffffff",  long_back:"#ffffff",   long_sleeve:"#ffffff",
 };
 const ZONE_OFFSET = {
@@ -183,7 +183,7 @@ const ZONE_LOGICAL = {
   long_front:[380,510],  long_back:[380,510],  long_sleeve:[250,510],
 };
 const SHIRT_COLORS = [
-  {name:"Dirt Orange",hex:"#d3783c"},{name:"White",hex:"#FFFFFF"},{name:"Black",hex:"#1a1a1a"},{name:"Navy",hex:"#1B2A4A"},
+  {name:"Red Clay",hex:"#C9804F"},{name:"White",hex:"#FFFFFF"},{name:"Black",hex:"#1a1a1a"},{name:"Navy",hex:"#1B2A4A"},
   {name:"Royal Blue",hex:"#2563EB"},{name:"Red",hex:"#DC2626"},{name:"Forest",hex:"#166534"},
   {name:"Charcoal",hex:"#374151"},{name:"Maroon",hex:"#7F1D1D"},{name:"Gold",hex:"#D97706"},
   {name:"Purple",hex:"#7C3AED"},{name:"Pink",hex:"#EC4899"},{name:"Orange",hex:"#EA580C"},
@@ -220,7 +220,7 @@ function hexToRgb(hex){const h=hex.replace('#','');return[parseInt(h.slice(0,2),
 function blankDesign(name="New Design"){
   function srcOrNull(key){const s=SHIRT_IMAGE_SRCS[key];return(s&&s!=="#")?s:null;}
   return{
-    id:Date.now()+Math.random(),name,shirtColor:"#d3783c",shirtSize:"M",shirtType:"short",activeZone:"short_front",
+    id:Date.now()+Math.random(),name,shirtColor:"#C9804F",shirtSize:"M",shirtType:"short",activeZone:"short_front",
     shirtImages:{short_front:srcOrNull("short_front"),short_back:srcOrNull("short_back"),short_sleeve:srcOrNull("short_sleeve"),long_front:srcOrNull("long_front"),long_back:srcOrNull("long_back"),long_sleeve:srcOrNull("long_sleeve")},
     zones:{short_front:{layers:[]},short_back:{layers:[]},short_sleeve:{layers:[]},long_front:{layers:[]},long_back:{layers:[]},long_sleeve:{layers:[]}},
   };
