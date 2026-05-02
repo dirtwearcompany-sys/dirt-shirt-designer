@@ -84,6 +84,15 @@
     .dtf-box-val { font-family: 'Bebas Neue', cursive; font-size: 22px; color: #fff; letter-spacing: 1px; }
     .dtf-box-sub { font-size: 10px; color: #555; margin-top: 2px; }
     .dot-indicator { display: inline-block; width: 6px; height: 6px; border-radius: 50%; vertical-align: middle; margin-left: 6px; }
+    /* shirt type select scroll */
+    .shirt-type-scroll { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
+    .shirt-type-scroll::-webkit-scrollbar { height: 3px; }
+    .shirt-type-scroll::-webkit-scrollbar-thumb { background: #333; }
+    .shirt-type-btn { flex-shrink: 0; padding: 5px 10px; font-size: 10px; border: none; cursor: pointer; border-radius: 6px; font-family: 'DM Mono', monospace; transition: all 0.15s; white-space: nowrap; }
+
+    /* paste toast */
+    .paste-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #22c55e; color: #000; font-family: 'DM Mono', monospace; font-size: 12px; padding: 8px 20px; border-radius: 20px; z-index: 9999; pointer-events: none; animation: fadeInOut 2.5s forwards; }
+    @keyframes fadeInOut { 0%{opacity:0;transform:translateX(-50%) translateY(10px)} 15%{opacity:1;transform:translateX(-50%) translateY(0)} 75%{opacity:1} 100%{opacity:0} }
 
     /* ── AI Background Removal Progress UI ── */
     .ai-bg-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:500; display:flex; align-items:center; justify-content:center; }
@@ -100,8 +109,6 @@
     .ai-spinner-ring { width:36px; height:36px; border:3px solid #222; border-top-color:#f97316; border-radius:50%; animation:spin 0.7s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-
-    /* ── threshold slider UI ── */
     .threshold-pill { display:inline-flex; align-items:center; gap:6px; background:#111; border:1px solid #2a2a2a; border-radius:20px; padding:3px 10px; font-size:10px; color:#666; }
 
     /* ── Drawing Modal ── */
@@ -126,9 +133,6 @@
     .draw-layer-del:hover { color:#ef4444; }
     .draw-layer-vis { background:none; border:none; color:#555; cursor:pointer; font-size:11px; padding:2px; line-height:1; flex-shrink:0; }
     .draw-layer-vis:hover { color:#ccc; }
-    .draw-props { width:180px; background:#0f0f0f; border-left:1px solid #1e1e1e; display:flex; flex-direction:column; flex-shrink:0; overflow-y:auto; }
-    .draw-props-section { padding:10px; border-bottom:1px solid #1a1a1a; }
-    .draw-props-label { font-size:9px; color:#444; text-transform:uppercase; letter-spacing:1px; margin-bottom:7px; }
     .arrange-btn { flex:1; padding:5px 4px; font-size:10px; background:#1a1a1a; border:1px solid #2a2a2a; color:#888; border-radius:5px; cursor:pointer; font-family:'DM Mono',monospace; transition:all 0.12s; }
     .arrange-btn:hover { border-color:#555; color:#ccc; }
     .ai-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000; display:flex; align-items:center; justify-content:center; }
@@ -156,32 +160,149 @@ const { useState, useRef, useEffect, useCallback, useMemo } = React;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHIRT IMAGE PATHS
-// ═══════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// HOW TO ADD YOUR SHIRT IMAGES:
+// Replace the placeholder strings below with the actual filename or data URL
+// for each shirt type and view. All images should be placed in the same folder
+// as this HTML file, or use a full URL / base64 data: string.
+//
+// SHIRT TYPE IDs:
+//   short      = Men's Short Sleeve
+//   long       = Men's Long Sleeve
+//   womens     = Women's Short Sleeve
+//   kids_short = Kids Short Sleeve
+//   kids_long  = Kids Long Sleeve
+//   hawx       = Men's Hawx Short Sleeve
+//
+// VIEWS per type: front, back, sleeve
+// ─────────────────────────────────────────────────────────────────────────────
 const SHIRT_IMAGE_SRCS = {
-  short_front:  "front_shortsleeve.png",
+  // ── Men's Short Sleeve ──────────────────────────────────────────────────────
+  short_front:  "front_shortsleeve.png",       // ← replace with your image path
   short_back:   "back_shortsleeve.png",
   short_sleeve: "side_shortsleeve.png",
-  long_front:   "back_longsleeve (1).png",
+
+  // ── Men's Long Sleeve ──────────────────────────────────────────────────────
+  long_front:   "back_longsleeve (1).png",     // ← front view
   long_back:    "back_longsleeve.png",
   long_sleeve:  "side_longsleeve.png",
+
+  // ── Women's Short Sleeve ───────────────────────────────────────────────────
+  // TODO: replace these placeholders with your actual women's shirt images
+  womens_front:  "",   // e.g. "womens_front.png"
+  womens_back:   "",   // e.g. "womens_back.png"
+  womens_sleeve: "",   // e.g. "womens_sleeve.png"
+
+  // ── Kids Short Sleeve ──────────────────────────────────────────────────────
+  // TODO: replace these placeholders with your actual kids short sleeve images
+  kids_short_front:  "",   // e.g. "kids_short_front.png"
+  kids_short_back:   "",   // e.g. "kids_short_back.png"
+  kids_short_sleeve: "",   // e.g. "kids_short_sleeve.png"
+
+  // ── Kids Long Sleeve ───────────────────────────────────────────────────────
+  // TODO: replace these placeholders with your actual kids long sleeve images
+  kids_long_front:  "",    // e.g. "kids_long_front.png"
+  kids_long_back:   "",    // e.g. "kids_long_back.png"
+  kids_long_sleeve: "",    // e.g. "kids_long_sleeve.png"
+
+  // ── Men's Hawx Short Sleeve ────────────────────────────────────────────────
+  // TODO: replace these placeholders with your actual hawx shirt images
+  hawx_front:  "",   // e.g. "hawx_front.png"
+  hawx_back:   "",   // e.g. "hawx_back.png"
+  hawx_sleeve: "",   // e.g. "hawx_sleeve.png"
 };
+
+// Base color hint for color-remapping (the dominant shirt color in the stock image)
 const ZONE_BASE_COLOR = {
   short_front:"#C9804F", short_back:"#C9804F", short_sleeve:"#C9804F",
   long_front:"#ffffff",  long_back:"#ffffff",   long_sleeve:"#ffffff",
+  // Women's — update if your image has a different base color
+  womens_front:"#C9804F",  womens_back:"#C9804F",  womens_sleeve:"#C9804F",
+  // Kids short
+  kids_short_front:"#C9804F", kids_short_back:"#C9804F", kids_short_sleeve:"#C9804F",
+  // Kids long
+  kids_long_front:"#ffffff",  kids_long_back:"#ffffff",  kids_long_sleeve:"#ffffff",
+  // Hawx
+  hawx_front:"#C9804F",  hawx_back:"#C9804F",  hawx_sleeve:"#C9804F",
 };
+
 const ZONE_OFFSET = {
-  short_front:  { x: 0, y: 0, s: 1.0 },
-  short_back:   { x: 0, y: 0, s: 1.0 },
-  short_sleeve: { x: 0, y: 0, s: 1.0 },
-  long_front:   { x: 0, y: 0, s: 1.0 },
-  long_back:    { x: 0, y: 0, s: 1.0 },
-  long_sleeve:  { x: 0, y: 0, s: 1.0 },
+  short_front:       { x: 0, y: 0, s: 1.0 },
+  short_back:        { x: 0, y: 0, s: 1.0 },
+  short_sleeve:      { x: 0, y: 0, s: 1.0 },
+  long_front:        { x: 0, y: 0, s: 1.0 },
+  long_back:         { x: 0, y: 0, s: 1.0 },
+  long_sleeve:       { x: 0, y: 0, s: 1.0 },
+  womens_front:      { x: 0, y: 0, s: 1.0 },
+  womens_back:       { x: 0, y: 0, s: 1.0 },
+  womens_sleeve:     { x: 0, y: 0, s: 1.0 },
+  kids_short_front:  { x: 0, y: 0, s: 1.0 },
+  kids_short_back:   { x: 0, y: 0, s: 1.0 },
+  kids_short_sleeve: { x: 0, y: 0, s: 1.0 },
+  kids_long_front:   { x: 0, y: 0, s: 1.0 },
+  kids_long_back:    { x: 0, y: 0, s: 1.0 },
+  kids_long_sleeve:  { x: 0, y: 0, s: 1.0 },
+  hawx_front:        { x: 0, y: 0, s: 1.0 },
+  hawx_back:         { x: 0, y: 0, s: 1.0 },
+  hawx_sleeve:       { x: 0, y: 0, s: 1.0 },
 };
+
 const STAGE_W = 420, STAGE_H = 520;
-const ZONE_LOGICAL = {
-  short_front:[380,460], short_back:[380,460], short_sleeve:[380,240],
-  long_front:[380,510],  long_back:[380,510],  long_sleeve:[250,510],
+
+// Zone definitions per shirt type
+const SHIRT_ZONES = {
+  short:[
+    {id:"short_front",  label:"Men's Short – Front",  maxW:12, maxH:14},
+    {id:"short_back",   label:"Men's Short – Back",   maxW:12, maxH:14},
+    {id:"short_sleeve", label:"Men's Short – Sleeve", maxW:4,  maxH:4},
+  ],
+  long:[
+    {id:"long_front",  label:"Men's Long – Front",  maxW:12, maxH:14},
+    {id:"long_back",   label:"Men's Long – Back",   maxW:12, maxH:14},
+    {id:"long_sleeve", label:"Men's Long – Sleeve", maxW:4,  maxH:14},
+  ],
+  womens:[
+    {id:"womens_front",  label:"Women's – Front",  maxW:11,  maxH:13},
+    {id:"womens_back",   label:"Women's – Back",   maxW:11,  maxH:13},
+    {id:"womens_sleeve", label:"Women's – Sleeve", maxW:3.5, maxH:4},
+  ],
+  kids_short:[
+    {id:"kids_short_front",  label:"Kids Short – Front",  maxW:9,  maxH:11},
+    {id:"kids_short_back",   label:"Kids Short – Back",   maxW:9,  maxH:11},
+    {id:"kids_short_sleeve", label:"Kids Short – Sleeve", maxW:3,  maxH:3},
+  ],
+  kids_long:[
+    {id:"kids_long_front",  label:"Kids Long – Front",  maxW:9,  maxH:11},
+    {id:"kids_long_back",   label:"Kids Long – Back",   maxW:9,  maxH:11},
+    {id:"kids_long_sleeve", label:"Kids Long – Sleeve", maxW:3,  maxH:11},
+  ],
+  hawx:[
+    {id:"hawx_front",  label:"Hawx – Front",  maxW:12, maxH:14},
+    {id:"hawx_back",   label:"Hawx – Back",   maxW:12, maxH:14},
+    {id:"hawx_sleeve", label:"Hawx – Sleeve", maxW:4,  maxH:4},
+  ],
 };
+
+// Human-readable labels per shirt type
+const SHIRT_TYPE_LABELS = {
+  short:      "Men's S/S",
+  long:       "Men's L/S",
+  womens:     "Women's S/S",
+  kids_short: "Kids S/S",
+  kids_long:  "Kids L/S",
+  hawx:       "Hawx S/S",
+};
+
+// Default zone for each shirt type
+const SHIRT_TYPE_DEFAULT_ZONE = {
+  short:      "short_front",
+  long:       "long_front",
+  womens:     "womens_front",
+  kids_short: "kids_short_front",
+  kids_long:  "kids_long_front",
+  hawx:       "hawx_front",
+};
+
 const SHIRT_COLORS = [
   {name:"Red Clay",hex:"#C9804F"},{name:"White",hex:"#FFFFFF"},{name:"Black",hex:"#1a1a1a"},{name:"Navy",hex:"#1B2A4A"},
   {name:"Royal Blue",hex:"#2563EB"},{name:"Red",hex:"#DC2626"},{name:"Forest",hex:"#166534"},
@@ -189,40 +310,48 @@ const SHIRT_COLORS = [
   {name:"Purple",hex:"#7C3AED"},{name:"Pink",hex:"#EC4899"},{name:"Orange",hex:"#EA580C"},
   {name:"Teal",hex:"#0D9488"},{name:"Gray",hex:"#9CA3AF"},{name:"Tan",hex:"#D4A574"},{name:"Lt Blue",hex:"#93C5FD"},
 ];
-const SIZE_SPECS = {
-  S:   { maxW:11,   maxH:17,   collarGap:1.5, bottomGap:4 },
-  M:   { maxW:11.5, maxH:17.5, collarGap:2,   bottomGap:4 },
-  L:   { maxW:12,   maxH:18,   collarGap:3,   bottomGap:4 },
-  XL:  { maxW:12.5, maxH:18.5, collarGap:3,   bottomGap:4 },
-  XXL: { maxW:13,   maxH:19,   collarGap:3,   bottomGap:4 },
-};
-const SHIRT_SIZES = ["S","M","L","XL","XXL"];
 
-const SHIRT_ZONES = {
-  short:[
-    {id:"short_front",label:"Short Sleeve – Front",maxW:12,maxH:14},
-    {id:"short_back",label:"Short Sleeve – Back",maxW:12,maxH:14},
-    {id:"short_sleeve",label:"Short Sleeve – Sleeve",maxW:4,maxH:4},
-  ],
-  long:[
-    {id:"long_front",label:"Long Sleeve – Front",maxW:12,maxH:14},
-    {id:"long_back",label:"Long Sleeve – Back",maxW:12,maxH:14},
-    {id:"long_sleeve",label:"Long Sleeve – Sleeve",maxW:4,maxH:14},
-  ],
+const SIZE_SPECS = {
+  "XS":{ maxW:10,   maxH:16,   collarGap:1.5, bottomGap:4 },
+  "S":  { maxW:11,   maxH:17,   collarGap:1.5, bottomGap:4 },
+  "M":  { maxW:11.5, maxH:17.5, collarGap:2,   bottomGap:4 },
+  "L":  { maxW:12,   maxH:18,   collarGap:3,   bottomGap:4 },
+  "XL": { maxW:12.5, maxH:18.5, collarGap:3,   bottomGap:4 },
+  "XXL":{ maxW:13,   maxH:19,   collarGap:3,   bottomGap:4 },
+  "2T": { maxW:7,    maxH:9,    collarGap:1,   bottomGap:2 },
+  "3T": { maxW:7.5,  maxH:9.5,  collarGap:1,   bottomGap:2 },
+  "4T": { maxW:8,    maxH:10,   collarGap:1,   bottomGap:2 },
+  "YS": { maxW:8.5,  maxH:11,   collarGap:1.5, bottomGap:3 },
+  "YM": { maxW:9,    maxH:12,   collarGap:1.5, bottomGap:3 },
+  "YL": { maxW:9.5,  maxH:13,   collarGap:1.5, bottomGap:3 },
 };
-const ZONE_LABELS = {
-  short_front:"Short Sleeve Front",short_back:"Short Sleeve Back",short_sleeve:"Short Sleeve Sleeve",
-  long_front:"Long Sleeve Front",long_back:"Long Sleeve Back",long_sleeve:"Long Sleeve Sleeve",
+
+// Sizes available per shirt type
+const SHIRT_TYPE_SIZES = {
+  short:      ["S","M","L","XL","XXL"],
+  long:       ["S","M","L","XL","XXL"],
+  womens:     ["XS","S","M","L","XL","XXL"],
+  kids_short: ["2T","3T","4T","YS","YM","YL"],
+  kids_long:  ["2T","3T","4T","YS","YM","YL"],
+  hawx:       ["S","M","L","XL","XXL"],
 };
 
 function calcDTF(pctW,pctH,maxW,maxH){return{w:((pctW/100)*maxW).toFixed(1),h:((pctH/100)*maxH).toFixed(1)};}
 function hexToRgb(hex){const h=hex.replace('#','');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+
 function blankDesign(name="New Design"){
-  function srcOrNull(key){const s=SHIRT_IMAGE_SRCS[key];return(s&&s!=="#")?s:null;}
+  function srcOrNull(key){const s=SHIRT_IMAGE_SRCS[key];return(s&&s.length>0)?s:null;}
+  // Build shirtImages for all zone keys
+  const shirtImages = {};
+  Object.keys(SHIRT_IMAGE_SRCS).forEach(k => { shirtImages[k] = srcOrNull(k); });
+  // Build zones for all zone keys
+  const zones = {};
+  Object.values(SHIRT_ZONES).forEach(zArr => zArr.forEach(z => { zones[z.id] = {layers:[]}; }));
   return{
-    id:Date.now()+Math.random(),name,shirtColor:"#C9804F",shirtSize:"M",shirtType:"short",activeZone:"short_front",
-    shirtImages:{short_front:srcOrNull("short_front"),short_back:srcOrNull("short_back"),short_sleeve:srcOrNull("short_sleeve"),long_front:srcOrNull("long_front"),long_back:srcOrNull("long_back"),long_sleeve:srcOrNull("long_sleeve")},
-    zones:{short_front:{layers:[]},short_back:{layers:[]},short_sleeve:{layers:[]},long_front:{layers:[]},long_back:{layers:[]},long_sleeve:{layers:[]}},
+    id:Date.now()+Math.random(), name,
+    shirtColor:"#C9804F", shirtSize:"M",
+    shirtType:"short", activeZone:"short_front",
+    shirtImages, zones,
   };
 }
 
@@ -235,9 +364,7 @@ let bgRemovalLibCallbacks = [];
 
 async function loadBgRemovalLib() {
   if (bgRemovalLib) return bgRemovalLib;
-  if (bgRemovalLibLoading) {
-    return new Promise((resolve) => bgRemovalLibCallbacks.push(resolve));
-  }
+  if (bgRemovalLibLoading) return new Promise((resolve) => bgRemovalLibCallbacks.push(resolve));
   bgRemovalLibLoading = true;
   try {
     const mod = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/background-removal.js');
@@ -278,9 +405,7 @@ async function removeBackgroundAI(dataUrl, onProgress) {
   const blob = dataUrlToBlob(dataUrl);
   const config = {
     progress: (key, current, total) => {
-      if (onProgress && total > 0) {
-        onProgress(Math.round((current / total) * 100), key);
-      }
+      if (onProgress && total > 0) onProgress(Math.round((current / total) * 100), key);
     },
     model: 'isnet_fp16',
     output: { format: 'image/png', quality: 1 },
@@ -313,10 +438,7 @@ async function removeBackgroundFallback(dataUrl, onProgress) {
           samplePoints.push([W-1, Math.floor(t * (H-1))]);
         }
         let bgR=0, bgG=0, bgB=0;
-        samplePoints.forEach(([x,y]) => {
-          const i=(y*W+x)*4;
-          bgR+=px[i]; bgG+=px[i+1]; bgB+=px[i+2];
-        });
+        samplePoints.forEach(([x,y]) => { const i=(y*W+x)*4; bgR+=px[i]; bgG+=px[i+1]; bgB+=px[i+2]; });
         bgR/=samplePoints.length; bgG/=samplePoints.length; bgB/=samplePoints.length;
         onProgress && onProgress(50, 'flood-fill');
         const dist = new Float32Array(N);
@@ -334,8 +456,7 @@ async function removeBackgroundFallback(dataUrl, onProgress) {
             const idx=queue[qHead++], x=idx%W, y=(idx/W)|0;
             const neighbors=[-1,1,-W,W,-W-1,-W+1,W-1,W+1];
             for (const d of neighbors) {
-              const ni=idx+d;
-              const nx=ni%W, ny=(ni/W)|0;
+              const ni=idx+d; const nx=ni%W, ny=(ni/W)|0;
               if(ni<0||ni>=N||isBg[ni])continue;
               if(Math.abs(nx-x)>1)continue;
               if(dist[ni]<=threshold){isBg[ni]=1;queue[qTail++]=ni;}
@@ -346,8 +467,7 @@ async function removeBackgroundFallback(dataUrl, onProgress) {
         onProgress && onProgress(75, 'feathering');
         for (let i = 0; i < N; i++) {
           if (!isBg[i]) continue;
-          const pi = i * 4;
-          const d = dist[i];
+          const pi = i * 4; const d = dist[i];
           if (d <= 30) { px[pi+3] = 0; }
           else if (d <= 100) { const t = (d - 30) / 70; px[pi+3] = Math.round(Math.pow(t, 1.8) * px[pi+3]); }
         }
@@ -370,127 +490,58 @@ function AIBgRemovalModal({ src, onClose, onSave }) {
   const [resultSrc, setResultSrc] = useState(null);
   const [useAI, setUseAI] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
-
   const STATUS_LABELS = {
-    'fetch:fetch': 'Downloading AI model…',
-    'fetch:ort-wasm': 'Initializing runtime…',
-    'inference': 'AI analyzing image…',
-    'analyzing': 'Analyzing colors…',
-    'sampling': 'Sampling background…',
-    'flood-fill': 'Removing background…',
-    'feathering': 'Smoothing edges…',
-    'done': 'Complete!',
+    'fetch:fetch':'Downloading AI model…','fetch:ort-wasm':'Initializing runtime…','inference':'AI analyzing image…',
+    'analyzing':'Analyzing colors…','sampling':'Sampling background…','flood-fill':'Removing background…','feathering':'Smoothing edges…','done':'Complete!',
   };
-
   async function run(forceAI = true) {
-    setPhase('loading-model');
-    setProgress(0);
-    setStatusMsg('Preparing…');
-    setErrorMsg('');
-    setResultSrc(null);
+    setPhase('loading-model'); setProgress(0); setStatusMsg('Preparing…'); setErrorMsg(''); setResultSrc(null);
     try {
       let result;
       if (forceAI) {
-        setPhase('processing');
-        setStatusMsg('Loading AI model (first run ~10s, then instant)…');
-        result = await removeBackgroundAI(src, (pct, key) => {
-          setProgress(pct);
-          setStatusMsg(STATUS_LABELS[key] || STATUS_LABELS[key?.split(':')[0]] || `Processing… ${pct}%`);
-        });
+        setPhase('processing'); setStatusMsg('Loading AI model (first run ~10s, then instant)…');
+        result = await removeBackgroundAI(src, (pct, key) => { setProgress(pct); setStatusMsg(STATUS_LABELS[key] || STATUS_LABELS[key?.split(':')[0]] || `Processing… ${pct}%`); });
         setUseAI(true);
       } else {
         setPhase('processing');
-        result = await removeBackgroundFallback(src, (pct, key) => {
-          setProgress(pct);
-          setStatusMsg(STATUS_LABELS[key] || `Processing… ${pct}%`);
-        });
+        result = await removeBackgroundFallback(src, (pct, key) => { setProgress(pct); setStatusMsg(STATUS_LABELS[key] || `Processing… ${pct}%`); });
         setUseAI(false);
       }
-      setProgress(100);
-      setResultSrc(result);
-      setPhase('done');
-      setStatusMsg('Background removed!');
+      setProgress(100); setResultSrc(result); setPhase('done'); setStatusMsg('Background removed!');
     } catch (err) {
       if (forceAI) {
-        setPhase('fallback');
-        setStatusMsg('AI unavailable — using enhanced removal…');
-        setErrorMsg('AI model could not load. Falling back to enhanced algorithm.');
+        setPhase('fallback'); setStatusMsg('AI unavailable — using enhanced removal…'); setErrorMsg('AI model could not load. Falling back to enhanced algorithm.');
         setTimeout(() => run(false), 800);
-      } else {
-        setPhase('error');
-        setStatusMsg('');
-        setErrorMsg('Removal failed: ' + err.message);
-      }
+      } else { setPhase('error'); setStatusMsg(''); setErrorMsg('Removal failed: ' + err.message); }
     }
   }
-
   useEffect(() => { run(true); }, []);
-
   return (
     <div className="ai-bg-modal-overlay">
       <div className="ai-bg-modal">
         <div className="ai-bg-modal-header">
-          <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:20,color:"#f97316",letterSpacing:2}}>
-            {useAI ? '🤖 AI BACKGROUND REMOVAL' : '⚡ SMART BACKGROUND REMOVAL'}
-          </span>
-          {phase !== 'processing' && phase !== 'loading-model' && phase !== 'fallback' && (
-            <button onClick={onClose} style={{marginLeft:'auto',background:'none',border:'none',color:'#555',cursor:'pointer',fontSize:18,lineHeight:1}}>✕</button>
-          )}
+          <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:20,color:"#f97316",letterSpacing:2}}>{useAI?'🤖 AI BACKGROUND REMOVAL':'⚡ SMART BACKGROUND REMOVAL'}</span>
+          {phase!=='processing'&&phase!=='loading-model'&&phase!=='fallback'&&(<button onClick={onClose} style={{marginLeft:'auto',background:'none',border:'none',color:'#555',cursor:'pointer',fontSize:18,lineHeight:1}}>✕</button>)}
         </div>
         <div className="ai-bg-modal-body">
           <div className="ai-bg-preview-pair">
-            <div>
-              <div className="ai-bg-preview-box"><img src={src} alt="original" /></div>
-              <div className="ai-bg-preview-label">Original</div>
-            </div>
+            <div><div className="ai-bg-preview-box"><img src={src} alt="original" /></div><div className="ai-bg-preview-label">Original</div></div>
             <div style={{flex:1}}>
-              <div className="ai-bg-preview-box">
-                {resultSrc
-                  ? <img src={resultSrc} alt="result" />
-                  : <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
-                      <div className="ai-spinner-ring" />
-                      <span style={{fontSize:10,color:'#555',fontFamily:"'DM Mono',monospace"}}>
-                        {phase==='fallback'?'Switching to fallback…':'Processing…'}
-                      </span>
-                    </div>
-                }
-              </div>
-              <div className="ai-bg-preview-label">
-                {phase==='done' ? (useAI ? '✨ AI Result' : '⚡ Enhanced Result') : 'Result preview'}
-              </div>
+              <div className="ai-bg-preview-box">{resultSrc?<img src={resultSrc} alt="result" />:<div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:12}}><div className="ai-spinner-ring" /><span style={{fontSize:10,color:'#555',fontFamily:"'DM Mono',monospace"}}>{phase==='fallback'?'Switching to fallback…':'Processing…'}</span></div>}</div>
+              <div className="ai-bg-preview-label">{phase==='done'?(useAI?'✨ AI Result':'⚡ Enhanced Result'):'Result preview'}</div>
             </div>
           </div>
           <div style={{width:'100%'}}>
-            <div className="ai-progress-bar-wrap">
-              <div className="ai-progress-bar" style={{width:`${progress}%`}} />
-            </div>
-            <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}>
-              <span className="ai-status-text">{statusMsg}</span>
-              <span className="ai-status-text">{progress > 0 ? `${progress}%` : ''}</span>
-            </div>
+            <div className="ai-progress-bar-wrap"><div className="ai-progress-bar" style={{width:`${progress}%`}} /></div>
+            <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}><span className="ai-status-text">{statusMsg}</span><span className="ai-status-text">{progress>0?`${progress}%`:''}</span></div>
           </div>
-          {errorMsg && (
-            <div style={{background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:8,padding:'8px 12px',fontSize:10,color:'#ef4444',fontFamily:"'DM Mono',monospace"}}>
-              ⚠ {errorMsg}
-            </div>
-          )}
-          <div style={{display:'flex',justifyContent:'center',gap:8,flexWrap:'wrap'}}>
-            {useAI && phase !== 'error'
-              ? <span className="threshold-pill">🧠 Neural network · isnet_fp16 model · runs in-browser</span>
-              : <span className="threshold-pill">⚡ Enhanced flood-fill · edge feathering</span>
-            }
-          </div>
+          {errorMsg&&(<div style={{background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:8,padding:'8px 12px',fontSize:10,color:'#ef4444',fontFamily:"'DM Mono',monospace"}}>⚠ {errorMsg}</div>)}
+          <div style={{display:'flex',justifyContent:'center',gap:8,flexWrap:'wrap'}}>{useAI&&phase!=='error'?<span className="threshold-pill">🧠 Neural network · isnet_fp16 model · runs in-browser</span>:<span className="threshold-pill">⚡ Enhanced flood-fill · edge feathering</span>}</div>
         </div>
         <div style={{background:'#111',borderTop:'1px solid #222',padding:'12px 20px',display:'flex',gap:8,justifyContent:'flex-end',alignItems:'center'}}>
-          {phase === 'done' && (
-            <button className="btn btn-ghost" style={{fontSize:11}} onClick={() => run(!useAI)}>
-              {useAI ? '⚡ Try Classic Mode' : '🤖 Try AI Mode'}
-            </button>
-          )}
+          {phase==='done'&&(<button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>run(!useAI)}>{useAI?'⚡ Try Classic Mode':'🤖 Try AI Mode'}</button>)}
           <button className="btn btn-ghost" onClick={onClose} style={{fontSize:11}} disabled={phase==='processing'||phase==='loading-model'||phase==='fallback'}>Cancel</button>
-          <button className="btn btn-primary" style={{fontSize:11}} disabled={!resultSrc} onClick={() => { onSave(resultSrc); onClose(); }}>
-            ✅ Use Result
-          </button>
+          <button className="btn btn-primary" style={{fontSize:11}} disabled={!resultSrc} onClick={()=>{onSave(resultSrc);onClose();}}>✅ Use Result</button>
         </div>
       </div>
     </div>
@@ -501,7 +552,7 @@ function AIBgRemovalModal({ src, onClose, onSave }) {
 function ShirtBackground({shirtImage,shirtColor,baseColor,offset,canvasRef:externalRef}){
   const internalRef=useRef(null);
   const canvasRef=externalRef||internalRef;
-  const [naturalImg,setNaturalImg]=useState(null);
+  const[naturalImg,setNaturalImg]=useState(null);
   useEffect(()=>{
     if(!shirtImage)return;
     const img=new Image();
@@ -534,30 +585,10 @@ function ShirtBackground({shirtImage,shirtColor,baseColor,offset,canvasRef:exter
     for(let x=0;x<W;x++){seedPx(x);seedPx((H-1)*W+x);}for(let y=1;y<H-1;y++){seedPx(y*W);seedPx(y*W+W-1);}
     while(qHead<qTail){const idx=queue[qHead++],x=idx%W,y=(idx/W)|0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=x+dx,ny=y+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const ni=ny*W+nx;if(isBg[ni])continue;const np=ni*4,nr=px[np],ng=px[np+1],nb2=px[np+2];let isBgPixel=false;if(isDarkBg){const pixLum=(0.299*nr+0.587*ng+0.114*nb2)/255;isBgPixel=pixLum<0.06;}else{const dr=nr-bgR,dg=ng-bgG,db=nb2-bgB;isBgPixel=Math.sqrt(dr*dr+dg*dg+db*db)<35;}if(isBgPixel){isBg[ni]=1;queue[qTail++]=ni;}}}
     const[tR,tG,tB]=hexToRgb(shirtColor||"#ffffff");
-    // Compute average luminance of shirt pixels so we can normalize.
-    // This maps the average brightness to the full target color,
-    // preserving relative light/dark variation without blowing out highlights.
     let sumLum=0,lumN=0;
-    for(let i=0;i<W*H;i++){
-      if(isBg[i])continue;
-      const pi=i*4;
-      if(px[pi+3]<10)continue;
-      sumLum+=(0.299*px[pi]+0.587*px[pi+1]+0.114*px[pi+2])/255;
-      lumN++;
-    }
+    for(let i=0;i<W*H;i++){if(isBg[i])continue;const pi=i*4;if(px[pi+3]<10)continue;sumLum+=(0.299*px[pi]+0.587*px[pi+1]+0.114*px[pi+2])/255;lumN++;}
     const avgLum=lumN>0?sumLum/lumN:0.5;
-    for(let i=0;i<W*H;i++){
-      if(isBg[i])continue;
-      const pi=i*4;
-      if(px[pi+3]<10)continue;
-      // Normalize so avgLum maps to 1.0 (full target color), preserving variation.
-      // Clamp norm to 1.0 so highlights never exceed the target color (prevents glow/blowout).
-      const lum=(0.299*px[pi]+0.587*px[pi+1]+0.114*px[pi+2])/255;
-      const norm=Math.min(1.0, avgLum>0?lum/avgLum:lum);
-      px[pi]  =Math.min(255,Math.max(0,Math.round(tR*norm)));
-      px[pi+1]=Math.min(255,Math.max(0,Math.round(tG*norm)));
-      px[pi+2]=Math.min(255,Math.max(0,Math.round(tB*norm)));
-    }
+    for(let i=0;i<W*H;i++){if(isBg[i])continue;const pi=i*4;if(px[pi+3]<10)continue;const lum=(0.299*px[pi]+0.587*px[pi+1]+0.114*px[pi+2])/255;const norm=Math.min(1.0,avgLum>0?lum/avgLum:lum);px[pi]=Math.min(255,Math.max(0,Math.round(tR*norm)));px[pi+1]=Math.min(255,Math.max(0,Math.round(tG*norm)));px[pi+2]=Math.min(255,Math.max(0,Math.round(tB*norm)));}
     ctx.putImageData(data,0,0);
   },[naturalImg,shirtColor,baseColor]);
   if(!shirtImage)return null;
@@ -572,7 +603,6 @@ function Slider({label,value,min,max,onChange}){
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ─── DrawingModal ─────────────────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
 const DRAW_CW = 800, DRAW_CH = 600;
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function getBoundingBox(layer){
@@ -712,7 +742,7 @@ function DrawingModal({onClose,onAdd,initialImage}){
   useEffect(()=>{function onKey(e){if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;if(e.key==="Delete"||e.key==="Backspace"){if(selId)deleteLayer(selId);return;}if(e.ctrlKey||e.metaKey){if(e.key==="z"){e.preventDefault();undo();return;}if(e.key==="y"||e.key==="Z"){e.preventDefault();redo();return;}if(e.key==="d"){e.preventDefault();if(selId)duplicateLayer(selId);return;}}if(e.key==="Escape"){if(polyActive){finishPolyline();}else{setSelId(null);}return;}if(e.key==="Enter"&&polyActive){finishPolyline();return;}const MOVE=e.shiftKey?10:2;if(selId&&["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)){e.preventDefault();const dx=e.key==="ArrowLeft"?-MOVE:e.key==="ArrowRight"?MOVE:0;const dy=e.key==="ArrowUp"?-MOVE:e.key==="ArrowDown"?MOVE:0;setLayers(ls=>ls.map(l=>l.id===selId?{...l,x:(l.x||0)+dx,y:(l.y||0)+dy}:l));}}window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);},[selId,polyActive,layers]);
 
   const selLayer=layers.find(l=>l.id===selId);
-  const TOOLS_BASIC=[{id:"select",label:"↖ Select",tip:"Select & move"},{id:"pen",label:"✏️ Pen",tip:"Freehand"},{id:"eraser",label:"⬜ Eraser",tip:"Erase"}];
+  const TOOLS_BASIC=[{id:"select",label:"↖ Select"},{id:"pen",label:"✏️ Pen"},{id:"eraser",label:"⬜ Eraser"}];
   const TOOLS_SHAPE=[{id:"line",label:"╱ Line"},{id:"arrow",label:"→ Arrow"},{id:"rect",label:"▭ Rect"},{id:"ellipse",label:"◯ Ellipse"},{id:"triangle",label:"△ Tri"},{id:"star",label:"★ Star"},{id:"diamond",label:"◇ Diamond"},{id:"hexagon",label:"⬡ Hex"},{id:"callout",label:"💬 Callout"},{id:"polyline",label:"╱╱ Poly"}];
   const FONTS=[{label:"Mono",val:"'DM Mono', monospace"},{label:"Bebas",val:"'Bebas Neue', cursive"},{label:"Serif",val:"Georgia, serif"},{label:"Sans",val:"Arial, sans-serif"},{label:"Impact",val:"Impact, sans-serif"}];
 
@@ -835,281 +865,92 @@ function BgEraserModal({src,onClose,onSave}){
 
 // ── MaskEditorModal ──────────────────────────────────────────────────────────
 function MaskEditorModal({ src, existingMask, onClose, onSave, onClearMask }) {
-  const displayRef = useRef(null);
-  const maskRef    = useRef(null);
-  const origRef    = useRef(null);
-  const [tool, setTool]       = useState('brush-erase');
-  const [brushSize, setBrushSize] = useState(30);
-  const [wandTol,  setWandTol]    = useState(35);
-  const [hardness, setHardness]   = useState(80);
+  const displayRef = useRef(null), maskRef = useRef(null), origRef = useRef(null);
+  const [tool, setTool] = useState('brush-erase');
+  const [brushSize, setBrushSize] = useState(30), [wandTol, setWandTol] = useState(35), [hardness, setHardness] = useState(80);
   const [cursorPos, setCursorPos] = useState({x:-999,y:-999});
-  const [lassoActive, setLassoActive] = useState(false);
-  const [lassoPoints, setLassoPoints] = useState([]);
-  const painting = useRef(false);
-  const CW = useRef(0), CH = useRef(0);
+  const [lassoActive, setLassoActive] = useState(false), [lassoPoints, setLassoPoints] = useState([]);
+  const painting = useRef(false), CW = useRef(0), CH = useRef(0);
 
   useEffect(() => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
+    const img = new Image(); img.crossOrigin = 'anonymous';
     img.onload = () => {
       CW.current = img.width; CH.current = img.height;
-      const oc = origRef.current;
-      oc.width = img.width; oc.height = img.height;
+      const oc = origRef.current; oc.width = img.width; oc.height = img.height;
       oc.getContext('2d').drawImage(img, 0, 0);
-      const mc = maskRef.current;
-      mc.width = img.width; mc.height = img.height;
+      const mc = maskRef.current; mc.width = img.width; mc.height = img.height;
       const mctx = mc.getContext('2d');
       if (existingMask) {
-        const em = new Image();
-        em.onload = () => {
+        const em = new Image(); em.onload = () => {
           mctx.fillStyle = '#ffffff'; mctx.fillRect(0, 0, mc.width, mc.height);
-          const tmp = document.createElement('canvas');
-          tmp.width = mc.width; tmp.height = mc.height;
-          const tctx = tmp.getContext('2d');
-          tctx.drawImage(em, 0, 0);
+          const tmp = document.createElement('canvas'); tmp.width = mc.width; tmp.height = mc.height;
+          const tctx = tmp.getContext('2d'); tctx.drawImage(em, 0, 0);
           const emData = tctx.getImageData(0, 0, mc.width, mc.height);
           const maskData = mctx.getImageData(0, 0, mc.width, mc.height);
-          for (let i = 0; i < emData.data.length; i += 4) {
-            const a = emData.data[i+3];
-            maskData.data[i] = maskData.data[i+1] = maskData.data[i+2] = a;
-            maskData.data[i+3] = 255;
-          }
-          mctx.putImageData(maskData, 0, 0);
-          renderDisplay();
-        };
-        em.src = existingMask;
-      } else {
-        mctx.fillStyle = '#ffffff';
-        mctx.fillRect(0, 0, img.width, img.height);
-        renderDisplay();
-      }
-    };
-    img.src = src;
+          for (let i = 0; i < emData.data.length; i += 4) { const a = emData.data[i+3]; maskData.data[i] = maskData.data[i+1] = maskData.data[i+2] = a; maskData.data[i+3] = 255; }
+          mctx.putImageData(maskData, 0, 0); renderDisplay();
+        }; em.src = existingMask;
+      } else { mctx.fillStyle = '#ffffff'; mctx.fillRect(0, 0, img.width, img.height); renderDisplay(); }
+    }; img.src = src;
   }, []);
 
   function renderDisplay() {
-    const dc = displayRef.current;
-    const mc = maskRef.current;
-    const oc = origRef.current;
+    const dc = displayRef.current, mc = maskRef.current, oc = origRef.current;
     if (!dc || !mc || !oc || !CW.current) return;
-    const W = CW.current, H = CH.current;
-    dc.width = W; dc.height = H;
+    const W = CW.current, H = CH.current; dc.width = W; dc.height = H;
     const dctx = dc.getContext('2d');
     const sz = Math.max(6, Math.floor(W / 40));
-    for (let y = 0; y < H; y += sz) for (let x = 0; x < W; x += sz) {
-      dctx.fillStyle = ((Math.floor(x/sz)+Math.floor(y/sz))%2===0) ? '#d0d0d0' : '#999';
-      dctx.fillRect(x, y, sz, sz);
-    }
-    const origData = oc.getContext('2d').getImageData(0, 0, W, H);
-    const maskData = mc.getContext('2d').getImageData(0, 0, W, H);
+    for (let y = 0; y < H; y += sz) for (let x = 0; x < W; x += sz) { dctx.fillStyle = ((Math.floor(x/sz)+Math.floor(y/sz))%2===0)?'#d0d0d0':'#999'; dctx.fillRect(x,y,sz,sz); }
+    const origData = oc.getContext('2d').getImageData(0,0,W,H), maskData = mc.getContext('2d').getImageData(0,0,W,H);
     const composite = dctx.createImageData(W, H);
     for (let i = 0; i < origData.data.length; i += 4) {
-      composite.data[i]   = origData.data[i];
-      composite.data[i+1] = origData.data[i+1];
-      composite.data[i+2] = origData.data[i+2];
-      const maskLum = (0.299*maskData.data[i] + 0.587*maskData.data[i+1] + 0.114*maskData.data[i+2]) / 255;
-      composite.data[i+3] = Math.round(origData.data[i+3] * maskLum);
+      composite.data[i]=origData.data[i]; composite.data[i+1]=origData.data[i+1]; composite.data[i+2]=origData.data[i+2];
+      const ml=(0.299*maskData.data[i]+0.587*maskData.data[i+1]+0.114*maskData.data[i+2])/255;
+      composite.data[i+3]=Math.round(origData.data[i+3]*ml);
     }
     dctx.putImageData(composite, 0, 0);
-    if (lassoPoints.length > 1) {
-      dctx.save();
-      dctx.strokeStyle = '#ef4444'; dctx.lineWidth = 1.5;
-      dctx.setLineDash([5, 3]);
-      dctx.beginPath();
-      dctx.moveTo(lassoPoints[0].x, lassoPoints[0].y);
-      lassoPoints.forEach(p => dctx.lineTo(p.x, p.y));
-      dctx.stroke();
-      dctx.restore();
-    }
   }
-
   useEffect(() => { renderDisplay(); }, [lassoPoints]);
 
-  function getPos(e) {
-    const rect = displayRef.current.getBoundingClientRect();
-    const scaleX = CW.current / rect.width, scaleY = CH.current / rect.height;
-    const cl = e.touches ? e.touches[0] : e;
-    return { x: Math.round((cl.clientX - rect.left) * scaleX), y: Math.round((cl.clientY - rect.top) * scaleY) };
-  }
-
-  function paintMask(x, y, erase) {
-    const mc = maskRef.current;
-    const mctx = mc.getContext('2d');
-    const r = brushSize / 2;
-    const hardRatio = hardness / 100;
-    if (erase) {
-      const grad = mctx.createRadialGradient(x, y, r*hardRatio, x, y, r);
-      grad.addColorStop(0, 'rgba(0,0,0,1)');
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      mctx.globalCompositeOperation = 'source-over';
-      mctx.fillStyle = grad;
-      mctx.beginPath(); mctx.arc(x, y, r, 0, Math.PI*2); mctx.fill();
-    } else {
-      const grad = mctx.createRadialGradient(x, y, r*hardRatio, x, y, r);
-      grad.addColorStop(0, 'rgba(255,255,255,1)');
-      grad.addColorStop(1, 'rgba(255,255,255,0)');
-      mctx.globalCompositeOperation = 'source-over';
-      mctx.fillStyle = grad;
-      mctx.beginPath(); mctx.arc(x, y, r, 0, Math.PI*2); mctx.fill();
-    }
+  function getPos(e) { const rect=displayRef.current.getBoundingClientRect(); const scaleX=CW.current/rect.width,scaleY=CH.current/rect.height; const cl=e.touches?e.touches[0]:e; return{x:Math.round((cl.clientX-rect.left)*scaleX),y:Math.round((cl.clientY-rect.top)*scaleY)}; }
+  function paintMask(x,y,erase) {
+    const mc=maskRef.current,mctx=mc.getContext('2d'),r=brushSize/2,hardRatio=hardness/100;
+    if(erase){const grad=mctx.createRadialGradient(x,y,r*hardRatio,x,y,r);grad.addColorStop(0,'rgba(0,0,0,1)');grad.addColorStop(1,'rgba(0,0,0,0)');mctx.globalCompositeOperation='source-over';mctx.fillStyle=grad;mctx.beginPath();mctx.arc(x,y,r,0,Math.PI*2);mctx.fill();}
+    else{const grad=mctx.createRadialGradient(x,y,r*hardRatio,x,y,r);grad.addColorStop(0,'rgba(255,255,255,1)');grad.addColorStop(1,'rgba(255,255,255,0)');mctx.globalCompositeOperation='source-over';mctx.fillStyle=grad;mctx.beginPath();mctx.arc(x,y,r,0,Math.PI*2);mctx.fill();}
     renderDisplay();
   }
-
-  function wandErase(x, y) {
-    const oc = origRef.current;
-    const mc = maskRef.current;
-    const W = CW.current, H = CH.current;
-    const origData = oc.getContext('2d').getImageData(0, 0, W, H);
-    const maskData = mc.getContext('2d').getImageData(0, 0, W, H);
-    const px = origData.data;
-    const idx0 = (y * W + x) * 4;
-    const seedR = px[idx0], seedG = px[idx0+1], seedB = px[idx0+2];
-    const visited = new Uint8Array(W * H);
-    const queue = [y * W + x];
-    visited[y * W + x] = 1;
-    while (queue.length) {
-      const idx = queue.pop();
-      const xi = idx % W, yi = (idx / W) | 0;
-      const pi = idx * 4;
-      const dr = px[pi]-seedR, dg = px[pi+1]-seedG, db = px[pi+2]-seedB;
-      if (Math.sqrt(dr*dr+dg*dg+db*db) > wandTol) continue;
-      maskData.data[pi] = maskData.data[pi+1] = maskData.data[pi+2] = 0;
-      for (const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
-        const nx=xi+dx, ny=yi+dy;
-        if (nx<0||nx>=W||ny<0||ny>=H) continue;
-        const ni = ny*W+nx;
-        if (!visited[ni]) { visited[ni]=1; queue.push(ni); }
-      }
-    }
-    mc.getContext('2d').putImageData(maskData, 0, 0);
-    renderDisplay();
+  function wandErase(x,y) {
+    const oc=origRef.current,mc=maskRef.current,W=CW.current,H=CH.current;
+    const origData=oc.getContext('2d').getImageData(0,0,W,H),maskData=mc.getContext('2d').getImageData(0,0,W,H);
+    const px=origData.data,idx0=(y*W+x)*4,seedR=px[idx0],seedG=px[idx0+1],seedB=px[idx0+2];
+    const visited=new Uint8Array(W*H),queue=[y*W+x];visited[y*W+x]=1;
+    while(queue.length){const idx=queue.pop();const xi=idx%W,yi=(idx/W)|0;const pi=idx*4;const dr=px[pi]-seedR,dg=px[pi+1]-seedG,db=px[pi+2]-seedB;if(Math.sqrt(dr*dr+dg*dg+db*db)>wandTol)continue;maskData.data[pi]=maskData.data[pi+1]=maskData.data[pi+2]=0;for(const[dx,dy] of[[-1,0],[1,0],[0,-1],[0,1]]){const nx=xi+dx,ny=yi+dy;if(nx<0||nx>=W||ny<0||ny>=H)continue;const ni=ny*W+nx;if(!visited[ni]){visited[ni]=1;queue.push(ni);}}}
+    mc.getContext('2d').putImageData(maskData,0,0);renderDisplay();
   }
-
-  function applyLasso(pts, erase) {
-    if (pts.length < 3) return;
-    const mc = maskRef.current;
-    const mctx = mc.getContext('2d');
-    mctx.save();
-    mctx.beginPath();
-    mctx.moveTo(pts[0].x, pts[0].y);
-    pts.forEach(p => mctx.lineTo(p.x, p.y));
-    mctx.closePath();
-    mctx.clip();
-    mctx.fillStyle = erase ? '#000' : '#fff';
-    mctx.fillRect(0, 0, CW.current, CH.current);
-    mctx.restore();
-    renderDisplay();
-  }
-
-  function onMouseDown(e) {
-    e.preventDefault();
-    const p = getPos(e);
-    if (tool === 'lasso') {
-      if (!lassoActive) { setLassoActive(true); setLassoPoints([p]); }
-      return;
-    }
-    if (tool === 'wand') { wandErase(p.x, p.y); return; }
-    painting.current = true;
-    paintMask(p.x, p.y, tool === 'brush-erase');
-  }
-  function onMouseMove(e) {
-    const p = getPos(e);
-    setCursorPos({ x: e.clientX, y: e.clientY });
-    if (tool === 'lasso' && lassoActive) { setLassoPoints(prev => [...prev, p]); return; }
-    if (!painting.current) return;
-    paintMask(p.x, p.y, tool === 'brush-erase');
-  }
-  function onMouseUp(e) {
-    painting.current = false;
-    if (tool === 'lasso' && lassoActive) {
-      applyLasso(lassoPoints, true);
-      setLassoActive(false);
-      setLassoPoints([]);
-    }
-  }
-
-  function exportMasked() {
-    const oc = origRef.current;
-    const mc = maskRef.current;
-    const W = CW.current, H = CH.current;
-    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-    const ctx = cv.getContext('2d');
-    const origData = oc.getContext('2d').getImageData(0, 0, W, H);
-    const maskData = mc.getContext('2d').getImageData(0, 0, W, H);
-    const out = ctx.createImageData(W, H);
-    for (let i = 0; i < origData.data.length; i += 4) {
-      out.data[i]   = origData.data[i];
-      out.data[i+1] = origData.data[i+1];
-      out.data[i+2] = origData.data[i+2];
-      const ml = (0.299*maskData.data[i]+0.587*maskData.data[i+1]+0.114*maskData.data[i+2])/255;
-      out.data[i+3] = Math.round(origData.data[i+3] * ml);
-    }
-    ctx.putImageData(out, 0, 0);
-    return cv.toDataURL('image/png');
-  }
-
-  const displayBrushPx = displayRef.current
-    ? brushSize * (displayRef.current.getBoundingClientRect().width / (CW.current || 1))
-    : brushSize;
-
-  const TOOLS = [
-    { id:'brush-erase',   label:'🖌 Erase Brush' },
-    { id:'brush-restore', label:'✏️ Restore Brush' },
-    { id:'lasso',         label:'🔲 Lasso Erase' },
-    { id:'wand',          label:'🪄 Magic Wand' },
-  ];
-
-  return (
+  function applyLasso(pts,erase){if(pts.length<3)return;const mc=maskRef.current,mctx=mc.getContext('2d');mctx.save();mctx.beginPath();mctx.moveTo(pts[0].x,pts[0].y);pts.forEach(p=>mctx.lineTo(p.x,p.y));mctx.closePath();mctx.clip();mctx.fillStyle=erase?'#000':'#fff';mctx.fillRect(0,0,CW.current,CH.current);mctx.restore();renderDisplay();}
+  function onMouseDown(e){e.preventDefault();const p=getPos(e);if(tool==='lasso'){if(!lassoActive){setLassoActive(true);setLassoPoints([p]);}return;}if(tool==='wand'){wandErase(p.x,p.y);return;}painting.current=true;paintMask(p.x,p.y,tool==='brush-erase');}
+  function onMouseMove(e){const p=getPos(e);setCursorPos({x:e.clientX,y:e.clientY});if(tool==='lasso'&&lassoActive){setLassoPoints(prev=>[...prev,p]);return;}if(!painting.current)return;paintMask(p.x,p.y,tool==='brush-erase');}
+  function onMouseUp(e){painting.current=false;if(tool==='lasso'&&lassoActive){applyLasso(lassoPoints,true);setLassoActive(false);setLassoPoints([]);}}
+  function exportMasked(){const oc=origRef.current,mc=maskRef.current,W=CW.current,H=CH.current;const cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');const origData=oc.getContext('2d').getImageData(0,0,W,H),maskData=mc.getContext('2d').getImageData(0,0,W,H);const out=ctx.createImageData(W,H);for(let i=0;i<origData.data.length;i+=4){out.data[i]=origData.data[i];out.data[i+1]=origData.data[i+1];out.data[i+2]=origData.data[i+2];const ml=(0.299*maskData.data[i]+0.587*maskData.data[i+1]+0.114*maskData.data[i+2])/255;out.data[i+3]=Math.round(origData.data[i+3]*ml);}ctx.putImageData(out,0,0);return cv.toDataURL('image/png');}
+  const displayBrushPx=displayRef.current?brushSize*(displayRef.current.getBoundingClientRect().width/(CW.current||1)):brushSize;
+  const TOOLS=[{id:'brush-erase',label:'🖌 Erase Brush'},{id:'brush-restore',label:'✏️ Restore Brush'},{id:'lasso',label:'🔲 Lasso Erase'},{id:'wand',label:'🪄 Magic Wand'}];
+  return(
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.92)',zIndex:300,display:'flex',flexDirection:'column'}}>
-      {(tool==='brush-erase'||tool==='brush-restore') && (
-        <div style={{position:'fixed',left:cursorPos.x,top:cursorPos.y,width:displayBrushPx,height:displayBrushPx,borderRadius:'50%',
-          border:`2px solid ${tool==='brush-erase'?'rgba(239,68,68,0.9)':'rgba(34,197,94,0.9)'}`,
-          transform:'translate(-50%,-50%)',zIndex:9999,pointerEvents:'none'}} />
-      )}
+      {(tool==='brush-erase'||tool==='brush-restore')&&(<div style={{position:'fixed',left:cursorPos.x,top:cursorPos.y,width:displayBrushPx,height:displayBrushPx,borderRadius:'50%',border:`2px solid ${tool==='brush-erase'?'rgba(239,68,68,0.9)':'rgba(34,197,94,0.9)'}`,transform:'translate(-50%,-50%)',zIndex:9999,pointerEvents:'none'}} />)}
       <div style={{background:'#141414',borderBottom:'1px solid #222',padding:'10px 18px',display:'flex',alignItems:'center',gap:12,flexShrink:0,flexWrap:'wrap'}}>
         <span style={{fontFamily:"'Bebas Neue',cursive",fontSize:18,color:'#ef4444',letterSpacing:2}}>🎭 MASK EDITOR</span>
-        <div style={{display:'flex',gap:4,marginLeft:8}}>
-          {TOOLS.map(t=>(
-            <button key={t.id}
-              style={{padding:'5px 10px',borderRadius:6,border:`1px solid ${tool===t.id?'#ef4444':'#333'}`,
-                background:tool===t.id?'#ef4444':'transparent',color:tool===t.id?'#000':'#888',
-                cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace",transition:'all 0.15s'}}
-              onClick={()=>{setTool(t.id);setLassoActive(false);setLassoPoints([]);}}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <div style={{display:'flex',gap:4,marginLeft:8}}>{TOOLS.map(t=>(<button key={t.id} style={{padding:'5px 10px',borderRadius:6,border:`1px solid ${tool===t.id?'#ef4444':'#333'}`,background:tool===t.id?'#ef4444':'transparent',color:tool===t.id?'#000':'#888',cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace",transition:'all 0.15s'}} onClick={()=>{setTool(t.id);setLassoActive(false);setLassoPoints([]);}}>{t.label}</button>))}</div>
         <div style={{width:1,height:22,background:'#2a2a2a'}} />
-        {(tool==='brush-erase'||tool==='brush-restore') && (
-          <>
-            <div style={{display:'flex',alignItems:'center',gap:6,minWidth:130}}>
-              <span style={{fontSize:10,color:'#555',whiteSpace:'nowrap'}}>Size {brushSize}px</span>
-              <input type="range" min={4} max={200} value={brushSize} onChange={e=>setBrushSize(+e.target.value)} style={{width:80,accentColor:'#ef4444'}} />
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:6,minWidth:130}}>
-              <span style={{fontSize:10,color:'#555',whiteSpace:'nowrap'}}>Hardness {hardness}%</span>
-              <input type="range" min={0} max={100} value={hardness} onChange={e=>setHardness(+e.target.value)} style={{width:80,accentColor:'#ef4444'}} />
-            </div>
-          </>
-        )}
-        {tool==='wand' && (
-          <div style={{display:'flex',alignItems:'center',gap:6,minWidth:150}}>
-            <span style={{fontSize:10,color:'#555',whiteSpace:'nowrap'}}>Tolerance {wandTol}</span>
-            <input type="range" min={5} max={120} value={wandTol} onChange={e=>setWandTol(+e.target.value)} style={{width:90,accentColor:'#ef4444'}} />
-          </div>
-        )}
+        {(tool==='brush-erase'||tool==='brush-restore')&&(<><div style={{display:'flex',alignItems:'center',gap:6,minWidth:130}}><span style={{fontSize:10,color:'#555',whiteSpace:'nowrap'}}>Size {brushSize}px</span><input type="range" min={4} max={200} value={brushSize} onChange={e=>setBrushSize(+e.target.value)} style={{width:80,accentColor:'#ef4444'}} /></div><div style={{display:'flex',alignItems:'center',gap:6,minWidth:130}}><span style={{fontSize:10,color:'#555',whiteSpace:'nowrap'}}>Hardness {hardness}%</span><input type="range" min={0} max={100} value={hardness} onChange={e=>setHardness(+e.target.value)} style={{width:80,accentColor:'#ef4444'}} /></div></>)}
+        {tool==='wand'&&(<div style={{display:'flex',alignItems:'center',gap:6,minWidth:150}}><span style={{fontSize:10,color:'#555',whiteSpace:'nowrap'}}>Tolerance {wandTol}</span><input type="range" min={5} max={120} value={wandTol} onChange={e=>setWandTol(+e.target.value)} style={{width:90,accentColor:'#ef4444'}} /></div>)}
         <div style={{marginLeft:'auto',display:'flex',gap:6}}>
-          <button onClick={()=>{const mc=maskRef.current;const mctx=mc.getContext('2d');const md=mctx.getImageData(0,0,CW.current,CH.current);for(let i=0;i<md.data.length;i+=4){md.data[i]=255-md.data[i];md.data[i+1]=255-md.data[i+1];md.data[i+2]=255-md.data[i+2];}mctx.putImageData(md,0,0);renderDisplay();}}
-            style={{padding:'5px 10px',borderRadius:6,border:'1px solid #333',background:'transparent',color:'#888',cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace"}}>⇄ Invert</button>
-          <button onClick={()=>{const mc=maskRef.current;const mctx=mc.getContext('2d');mctx.fillStyle='#fff';mctx.fillRect(0,0,CW.current,CH.current);renderDisplay();}}
-            style={{padding:'5px 10px',borderRadius:6,border:'1px solid #333',background:'transparent',color:'#888',cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace"}}>↺ Reset</button>
+          <button onClick={()=>{const mc=maskRef.current;const mctx=mc.getContext('2d');const md=mctx.getImageData(0,0,CW.current,CH.current);for(let i=0;i<md.data.length;i+=4){md.data[i]=255-md.data[i];md.data[i+1]=255-md.data[i+1];md.data[i+2]=255-md.data[i+2];}mctx.putImageData(md,0,0);renderDisplay();}} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #333',background:'transparent',color:'#888',cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace"}}>⇄ Invert</button>
+          <button onClick={()=>{const mc=maskRef.current;mc.getContext('2d').fillStyle='#fff';mc.getContext('2d').fillRect(0,0,CW.current,CH.current);renderDisplay();}} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #333',background:'transparent',color:'#888',cursor:'pointer',fontSize:11,fontFamily:"'DM Mono',monospace"}}>↺ Reset</button>
         </div>
       </div>
-      <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',background:'#0a0a0a',overflow:'hidden',cursor:'none',position:'relative'}}
-        onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={()=>{painting.current=false;}}>
+      <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',background:'#0a0a0a',overflow:'hidden',cursor:'none',position:'relative'}} onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={()=>{painting.current=false;}}>
         <canvas ref={displayRef} style={{maxWidth:'90%',maxHeight:'90%',imageRendering:'pixelated',boxShadow:'0 0 60px rgba(0,0,0,0.8), 0 0 0 1px #222',cursor:tool==='wand'?'crosshair':tool==='lasso'?'crosshair':'none'}} />
-        <canvas ref={maskRef} style={{display:'none'}} />
-        <canvas ref={origRef} style={{display:'none'}} />
+        <canvas ref={maskRef} style={{display:'none'}} /><canvas ref={origRef} style={{display:'none'}} />
       </div>
       <div style={{background:'#141414',borderTop:'1px solid #222',padding:'10px 18px',display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
         <span style={{fontSize:10,color:'#444',marginRight:'auto',fontFamily:"'DM Mono',monospace"}}>🖌 Brush · 🪄 Wand · 🔲 Lasso · ✏️ Restore · Checkerboard = transparent</span>
@@ -1121,139 +962,37 @@ function MaskEditorModal({ src, existingMask, onClose, onSave, onClearMask }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
 // ─── App ─────────────────────────────────────────────────────────────────────
 function App(){
-  // ── Sanitize: only fix missing shirtSize, never null out image paths ──
   function sanitize(designs){
-    return designs.map(d=>({
-      ...d,
-      shirtSize: d.shirtSize || "M",
-      // Preserve ALL shirtImages as-is — file paths and data: URLs both valid
-      shirtImages: d.shirtImages || {},
-    }));
+    return designs.map(d=>{
+      // Ensure all zone layers exist
+      const zones = d.zones || {};
+      Object.values(SHIRT_ZONES).forEach(zArr => zArr.forEach(z => { if(!zones[z.id]) zones[z.id]={layers:[]}; }));
+      return { ...d, shirtSize: d.shirtSize||"M", shirtImages: d.shirtImages||{}, zones };
+    });
   }
+  function lsLoad(){try{const raw=localStorage.getItem("dirtshirt_designs");if(raw){const p=JSON.parse(raw);if(Array.isArray(p)&&p.length>0)return sanitize(p);}}catch(e){}return null;}
+  function lsSave(designs){try{localStorage.setItem("dirtshirt_designs",JSON.stringify(designs));}catch(e){}}
 
-  // ── Always read fresh from localStorage, never from stale closure ──
-  function lsLoad(){
-    try{
-      const raw = localStorage.getItem("dirtshirt_designs");
-      if(raw){
-        const p = JSON.parse(raw);
-        if(Array.isArray(p) && p.length > 0) return sanitize(p);
-      }
-    }catch(e){ console.warn("lsLoad error", e); }
-    return null;
-  }
+  const[designs,setDesigns]=useState(()=>lsLoad()||[]);
+  const[activeId,setActiveId]=useState(()=>{const s=lsLoad();return s&&s.length>0?s[0].id:null;});
+  const[view,setView]=useState("editor");
+  const importRef=useRef(null);
+  const isInitialized=useRef(false);
 
-  // ── Save full array — always write, even if length is 0 ──
-  function lsSave(designs){
-    try{
-      localStorage.setItem("dirtshirt_designs", JSON.stringify(designs));
-    }catch(e){ console.warn("lsSave error", e); }
-  }
+  function exportDesigns(){const data=JSON.stringify(designs,null,2);const blob=new Blob([data],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`dirtshirt-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);}
+  function importDesigns(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{const imported=JSON.parse(ev.target.result);if(!Array.isArray(imported))throw new Error("Invalid format");const cleaned=sanitize(imported);const importedIds=new Set(cleaned.map(d=>String(d.id)));const existing=designs.filter(d=>!importedIds.has(String(d.id)));const merged=[...cleaned,...existing];setDesigns(merged);lsSave(merged);if(merged.length>0)setActiveId(merged[0].id);alert(`✅ Imported ${cleaned.length} design${cleaned.length!==1?"s":""}!`);}catch(err){alert("❌ Could not read backup file: "+err.message);}};reader.readAsText(file);e.target.value="";}
 
-  // ── Upsert a single design by reading fresh from storage first ──
-  function lsSaveOne(design){
-    try{
-      const raw = localStorage.getItem("dirtshirt_designs");
-      const all = raw ? JSON.parse(raw) : [];
-      const exists = all.some(d => String(d.id) === String(design.id));
-      const next = exists
-        ? all.map(d => String(d.id) === String(design.id) ? design : d)
-        : [design, ...all];
-      localStorage.setItem("dirtshirt_designs", JSON.stringify(next));
-    }catch(e){ console.warn("lsSaveOne error", e); }
-  }
+  function createDesign(name){const d=blankDesign(name||"New Design");setDesigns(prev=>{const next=[d,...prev];lsSave(next);return next;});setActiveId(d.id);setView("editor");return d;}
+  function saveDesign(updated){setDesigns(prev=>{const next=prev.map(d=>d.id===updated.id?updated:d);lsSave(next);return next;});setActiveId(updated.id);}
+  function duplicateDesign(d){const copy={...JSON.parse(JSON.stringify(d)),id:Date.now()+Math.random(),name:d.name+" (Copy)"};setDesigns(prev=>{const next=[copy,...prev];lsSave(next);return next;});setActiveId(copy.id);setView("editor");}
+  function deleteDesign(id){setDesigns(prev=>{const next=prev.filter(d=>d.id!==id);lsSave(next);return next;});if(activeId===id){setActiveId(null);setView("library");}}
 
-  // ── Delete by reading fresh from storage first ──
-  function lsDelete(id){
-    try{
-      const raw = localStorage.getItem("dirtshirt_designs");
-      if(!raw) return;
-      const next = JSON.parse(raw).filter(d => String(d.id) !== String(id));
-      localStorage.setItem("dirtshirt_designs", JSON.stringify(next));
-    }catch(e){ console.warn("lsDelete error", e); }
-  }
+  useEffect(()=>{if(isInitialized.current)return;isInitialized.current=true;const saved=lsLoad();if(!saved||saved.length===0)createDesign("My First Design");},[]);
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  const[designs, setDesigns] = useState(() => lsLoad() || []);
-  const[activeId, setActiveId] = useState(() => { const s=lsLoad(); return s&&s.length>0?s[0].id:null; });
-  const[view, setView] = useState("editor");
-  const importRef = useRef(null);
-  const isInitialized = useRef(false);
-
-  // ── Export all designs as a JSON backup file ─────────────────────────────
-  function exportDesigns(){
-    const data = JSON.stringify(designs, null, 2);
-    const blob = new Blob([data], {type:"application/json"});
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href     = url;
-    a.download = `dirtshirt-backup-${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  // ── Import designs from a JSON backup file ────────────────────────────────
-  function importDesigns(e){
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      try{
-        const imported = JSON.parse(ev.target.result);
-        if(!Array.isArray(imported)) throw new Error("Invalid format");
-        const cleaned = sanitize(imported);
-        // Merge: imported designs win for matching IDs, keep existing unique ones
-        const importedIds = new Set(cleaned.map(d=>String(d.id)));
-        const existing    = designs.filter(d=>!importedIds.has(String(d.id)));
-        const merged      = [...cleaned, ...existing];
-        setDesigns(merged);
-        lsSave(merged);
-        if(merged.length > 0) setActiveId(merged[0].id);
-        alert(`✅ Imported ${cleaned.length} design${cleaned.length!==1?"s":""}!`);
-      }catch(err){
-        alert("❌ Could not read backup file: " + err.message);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  }
-
-  // ── CRUD — writes localStorage AND Firestore in parallel ─────────────────
-  function createDesign(name){
-    const d = blankDesign(name||"New Design");
-    setDesigns(prev=>{ const next=[d,...prev]; lsSave(next); return next; });
-    setActiveId(d.id); setView("editor");
-    return d;
-  }
-
-  function saveDesign(updated){
-    setDesigns(prev=>{ const next=prev.map(d=>d.id===updated.id?updated:d); lsSave(next); return next; });
-    setActiveId(updated.id);
-  }
-
-  function duplicateDesign(d){
-    const copy={...JSON.parse(JSON.stringify(d)),id:Date.now()+Math.random(),name:d.name+" (Copy)"};
-    setDesigns(prev=>{ const next=[copy,...prev]; lsSave(next); return next; });
-    setActiveId(copy.id); setView("editor");
-  }
-
-  function deleteDesign(id){
-    setDesigns(prev=>{ const next=prev.filter(d=>d.id!==id); lsSave(next); return next; });
-    if(activeId===id){ setActiveId(null); setView("library"); }
-  }
-
-  // ── Create starter design only if truly nothing anywhere ──────────────────
-  useEffect(()=>{
-    if(isInitialized.current) return;
-    isInitialized.current = true;
-    const saved = lsLoad();
-    if(!saved||saved.length===0) createDesign("My First Design");
-  },[]);
-
-  const activeDesign = designs.find(d=>d.id===activeId)||null;
-
+  const activeDesign=designs.find(d=>d.id===activeId)||null;
   return(
     <div style={{display:"flex",flexDirection:"column",height:"100vh",overflow:"hidden"}}>
       <div className="header">
@@ -1262,8 +1001,8 @@ function App(){
         <span className="logo-sub">DTF Transfer Studio</span>
         <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}}>
           <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={importDesigns} />
-          <button className="btn btn-ghost" style={{fontSize:10,padding:"5px 12px"}} onClick={exportDesigns} title="Download all designs as a backup file">⬇ Export Backup</button>
-          <button className="btn btn-ghost" style={{fontSize:10,padding:"5px 12px"}} onClick={()=>importRef.current.click()} title="Restore designs from a backup file">⬆ Import Backup</button>
+          <button className="btn btn-ghost" style={{fontSize:10,padding:"5px 12px"}} onClick={exportDesigns}>⬇ Export Backup</button>
+          <button className="btn btn-ghost" style={{fontSize:10,padding:"5px 12px"}} onClick={()=>importRef.current.click()}>⬆ Import Backup</button>
           <button className="btn btn-ghost" onClick={()=>setView("library")}>📂 My Designs ({designs.length})</button>
           <button className="btn btn-primary" onClick={()=>createDesign()}>+ New Design</button>
         </div>
@@ -1290,9 +1029,8 @@ function Library({designs,onOpen,onDuplicate,onDelete,onLock,onNew}){
           <div key={d.id} className="design-card" style={{opacity:d.locked?0.85:1,cursor:d.locked?"default":"pointer"}} onClick={()=>!d.locked&&onOpen(d)}>
             <div className="design-card-thumb">
               {d.thumbnail?<img src={d.thumbnail} alt="" />:<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}><div style={{fontSize:36,opacity:0.12}}>👕</div><div style={{fontSize:8,color:"#2a2a2a",fontFamily:"'DM Mono',monospace",textAlign:"center",padding:"0 8px"}}>save to preview</div></div>}
-              {d.locked&&(<div style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,0.7)",borderRadius:5,padding:"3px 6px",fontSize:11,lineHeight:1}}>🔒</div>)}
-              <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,opacity:0,transition:"opacity 0.15s"}}
-                onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0}>
+              {d.locked&&<div style={{position:"absolute",top:6,right:6,background:"rgba(0,0,0,0.7)",borderRadius:5,padding:"3px 6px",fontSize:11,lineHeight:1}}>🔒</div>}
+              <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,opacity:0,transition:"opacity 0.15s"}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0}>
                 {!d.locked&&<button className="btn btn-primary" style={{fontSize:10,padding:"5px 14px",width:"80%"}} onClick={e=>{e.stopPropagation();onOpen(d);}}>✏️ Edit</button>}
                 {!d.locked&&<button className="btn btn-ghost" style={{fontSize:10,padding:"5px 14px",width:"80%"}} onClick={e=>{e.stopPropagation();onDuplicate(d);}}>⧉ Duplicate</button>}
                 <button className="btn btn-ghost" style={{fontSize:10,padding:"5px 14px",width:"80%",borderColor:d.locked?"rgba(249,115,22,0.5)":"#333",color:d.locked?"#f97316":"#aaa"}} onClick={e=>{e.stopPropagation();onLock(d.id);}}>{d.locked?"🔓 Unlock":"🔒 Lock"}</button>
@@ -1301,7 +1039,7 @@ function Library({designs,onOpen,onDuplicate,onDelete,onLock,onNew}){
             </div>
             <div className="design-card-info">
               <div style={{fontWeight:500,fontSize:11,color:d.locked?"#888":"#d0d0d0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
-              <div style={{fontSize:9,color:"#444",fontFamily:"'DM Mono',monospace"}}>{d.shirtType==="short"?"S/S":"L/S"} · {d.shirtSize||"M"} · {totalLayers} layer{totalLayers!==1?"s":""}</div>
+              <div style={{fontSize:9,color:"#444"}}>{SHIRT_TYPE_LABELS[d.shirtType]||d.shirtType} · {d.shirtSize||"M"} · {totalLayers} layer{totalLayers!==1?"s":""}</div>
             </div>
           </div>
         );})}</div>
@@ -1328,28 +1066,60 @@ function Editor({design,onSave,onDuplicate,onBack}){
   const[maskLayerId,setMaskLayerId]=useState(null);
   const[stageMode,setStageMode]=useState('shirt');
   const[showDTFOnShirt,setShowDTFOnShirt]=useState(false);
+  const[pasteToast,setPasteToast]=useState(false);
   const stageRef=useRef(null),isDragging=useRef(false),dragStart=useRef({}),artFileRef=useRef(null),shirtCanvasRef=useRef(null);
 
-  const zone=d.zones[d.activeZone];
-  const allZones=[...SHIRT_ZONES.short,...SHIRT_ZONES.long];
-  const zoneInfo=allZones.find(z=>z.id===d.activeZone);
-  const sizeSpec=SIZE_SPECS[d.shirtSize||"M"];
-  const isSleeveZone=d.activeZone.includes("sleeve");
-  const activeMaxW=isSleeveZone?(zoneInfo?.maxW||4):sizeSpec.maxW;
-  const activeMaxH=isSleeveZone?(zoneInfo?.maxH||14):sizeSpec.maxH;
-  const selLayer=zone.layers.find(l=>l.id===selectedLayer);
-  const dtfInfo=selLayer?calcDTF(selLayer.w,selLayer.h,activeMaxW,activeMaxH):null;
-  const currentShirtImg=d.shirtImages?.[d.activeZone];
+  const zone = (d.zones && d.zones[d.activeZone]) ? d.zones[d.activeZone] : {layers:[]};
+  const currentZones = SHIRT_ZONES[d.shirtType] || SHIRT_ZONES.short;
+  const zoneInfo = currentZones.find(z=>z.id===d.activeZone);
+  const availableSizes = SHIRT_TYPE_SIZES[d.shirtType] || ["S","M","L","XL","XXL"];
+  const sizeSpec = SIZE_SPECS[d.shirtSize] || SIZE_SPECS["M"];
+  const isSleeveZone = d.activeZone.includes("sleeve");
+  const activeMaxW = isSleeveZone ? (zoneInfo?.maxW||4) : sizeSpec.maxW;
+  const activeMaxH = isSleeveZone ? (zoneInfo?.maxH||14) : sizeSpec.maxH;
+  const selLayer = zone.layers.find(l=>l.id===selectedLayer);
+  const dtfInfo = selLayer ? calcDTF(selLayer.w,selLayer.h,activeMaxW,activeMaxH) : null;
+  const currentShirtImg = d.shirtImages?.[d.activeZone];
 
   const upd=useCallback(patch=>setD(p=>({...p,...patch})),[]);
-  const updZone=useCallback((zid,patch)=>setD(p=>({...p,zones:{...p.zones,[zid]:{...p.zones[zid],...patch}}})),[]);
-  const updLayer=useCallback((lid,patch)=>{setD(p=>{const layers=p.zones[p.activeZone].layers.map(l=>l.id===lid?{...l,...patch}:l);return{...p,zones:{...p.zones,[p.activeZone]:{...p.zones[p.activeZone],layers}}};});},[]);
+  const updZone=useCallback((zid,patch)=>setD(p=>({...p,zones:{...p.zones,[zid]:{...(p.zones[zid]||{layers:[]}),...patch}}})),[]);
+  const updLayer=useCallback((lid,patch)=>{setD(p=>{const layers=(p.zones[p.activeZone]?.layers||[]).map(l=>l.id===lid?{...l,...patch}:l);return{...p,zones:{...p.zones,[p.activeZone]:{...(p.zones[p.activeZone]||{}),layers}}};});},[]);
   const updOffset=useCallback((zid,patch)=>setOffsets(o=>({...o,[zid]:{...o[zid],...patch}})),[]);
+
+  // ── Paste image from clipboard (Ctrl+V / Cmd+V) ──────────────────────────
+  useEffect(()=>{
+    async function onPaste(e){
+      if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
+      const items=e.clipboardData?.items;
+      if(!items)return;
+      for(const item of items){
+        if(item.type.startsWith("image/")){
+          e.preventDefault();
+          const blob=item.getAsFile();
+          const reader=new FileReader();
+          reader.onload=ev=>{addArtLayer(ev.target.result);setPasteToast(true);setTimeout(()=>setPasteToast(false),2500);};
+          reader.readAsDataURL(blob);
+          break;
+        }
+      }
+    }
+    window.addEventListener("paste",onPaste);
+    return()=>window.removeEventListener("paste",onPaste);
+  },[d.activeZone,zone]);
 
   useEffect(()=>{
     function onKeyDown(e){if(!selectedLayer)return;if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();deleteLayer(selectedLayer);}}
     window.addEventListener("keydown",onKeyDown);return()=>window.removeEventListener("keydown",onKeyDown);
   },[selectedLayer]);
+
+  // When shirt type changes, switch to the correct default zone + fix size
+  function changeShirtType(newType){
+    const defaultZone=SHIRT_TYPE_DEFAULT_ZONE[newType];
+    const newSizes=SHIRT_TYPE_SIZES[newType]||["S","M","L","XL","XXL"];
+    const newSize=newSizes.includes(d.shirtSize)?d.shirtSize:newSizes[Math.floor(newSizes.length/2)];
+    upd({shirtType:newType,activeZone:defaultZone,shirtSize:newSize});
+    setSelectedLayer(null);
+  }
 
   function setShirtImg(zid,src){setD(p=>({...p,shirtImages:{...p.shirtImages,[zid]:src}}));}
   function addArtLayer(dataUrl){
@@ -1358,150 +1128,89 @@ function Editor({design,onSave,onDuplicate,onBack}){
       const asp=img.width>0&&img.height>0?img.width/img.height:1;
       const w=40,h=Math.max(5,w/asp);
       const layer={id:Date.now()+Math.random(),src:dataUrl,x:30,y:20,w,h,opacity:100,rotation:0,locked:false};
-      updZone(d.activeZone,{layers:[...zone.layers,layer]});
+      updZone(d.activeZone,{layers:[...(zone.layers||[]),layer]});
       setSelectedLayer(layer.id);
     };
     img.crossOrigin="anonymous";img.src=dataUrl;
     if(img.complete&&img.naturalWidth>0)img.onload();
   }
   function handleArtFile(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>addArtLayer(ev.target.result);reader.readAsDataURL(file);e.target.value="";}
-  function deleteLayer(id){updZone(d.activeZone,{layers:zone.layers.filter(l=>l.id!==id)});if(selectedLayer===id)setSelectedLayer(null);}
-  function reorderLayer(id,dir){const layers=[...zone.layers],idx=layers.findIndex(l=>l.id===id),ni=idx+dir;if(ni<0||ni>=layers.length)return;[layers[idx],layers[ni]]=[layers[ni],layers[idx]];updZone(d.activeZone,{layers});}
-  function layerAt(cx,cy){for(let i=zone.layers.length-1;i>=0;i--){const l=zone.layers[i];const lx=(l.x/100)*STAGE_W,ly=(l.y/100)*STAGE_H,lw=(l.w/100)*STAGE_W,lh=(l.h/100)*STAGE_H;if(cx>=lx&&cx<=lx+lw&&cy>=ly&&cy<=ly+lh)return l;}return null;}
+  function deleteLayer(id){updZone(d.activeZone,{layers:(zone.layers||[]).filter(l=>l.id!==id)});if(selectedLayer===id)setSelectedLayer(null);}
+  function reorderLayer(id,dir){const layers=[...(zone.layers||[])],idx=layers.findIndex(l=>l.id===id),ni=idx+dir;if(ni<0||ni>=layers.length)return;[layers[idx],layers[ni]]=[layers[ni],layers[idx]];updZone(d.activeZone,{layers});}
+  function layerAt(cx,cy){const layers=zone.layers||[];for(let i=layers.length-1;i>=0;i--){const l=layers[i];const lx=(l.x/100)*STAGE_W,ly=(l.y/100)*STAGE_H,lw=(l.w/100)*STAGE_W,lh=(l.h/100)*STAGE_H;if(cx>=lx&&cx<=lx+lw&&cy>=ly&&cy<=ly+lh)return l;}return null;}
   function onMD(e){const rect=stageRef.current.getBoundingClientRect();const cx=e.clientX-rect.left,cy=e.clientY-rect.top;const layer=layerAt(cx,cy);if(layer&&!layer.locked){setSelectedLayer(layer.id);isDragging.current=true;dragStart.current={cx,cy,ox:layer.x,oy:layer.y};}else if(!layer)setSelectedLayer(null);}
   function onMM(e){if(!isDragging.current||!selectedLayer)return;const rect=stageRef.current.getBoundingClientRect();const cx=e.clientX-rect.left,cy=e.clientY-rect.top;const dx=((cx-dragStart.current.cx)/STAGE_W)*100,dy=((cy-dragStart.current.cy)/STAGE_H)*100;updLayer(selectedLayer,{x:dragStart.current.ox+dx,y:dragStart.current.oy+dy});}
   function onMU(){isDragging.current=false;}
+
+  // Drag-and-drop image onto stage
+  function onStageDrop(e){
+    e.preventDefault();
+    const file=e.dataTransfer.files[0];
+    if(file&&file.type.startsWith("image/")){const reader=new FileReader();reader.onload=ev=>addArtLayer(ev.target.result);reader.readAsDataURL(file);}
+  }
 
   async function download(withShirt){
     const SW=STAGE_W,SH=STAGE_H,sc=4,OW=SW*sc,OH=SH*sc;
     const cv=document.createElement("canvas");cv.width=OW;cv.height=OH;
     const ctx=cv.getContext("2d");ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
-    if(withShirt){
-      const liveCanvas=shirtCanvasRef.current;
-      if(liveCanvas){
-        // Draw shirt canvas pixel-perfect — no smoothing to avoid color shift
-        ctx.imageSmoothingEnabled=false;
-        ctx.drawImage(liveCanvas,0,0,OW,OH);
-        ctx.imageSmoothingEnabled=true;
-      }else{
-        ctx.fillStyle=d.shirtColor||"#d3783c";
-        ctx.fillRect(0,0,OW,OH);
-      }
-    }
-    for(const layer of zone.layers){
-      await new Promise(res=>{
-        const img=new Image();
-        img.onload=()=>{
-          const natW=img.naturalWidth||img.width,natH=img.naturalHeight||img.height;
-          const lx=(layer.x/100)*OW,ly=(layer.y/100)*OH,lw=(layer.w/100)*OW,lh=(layer.h/100)*OH;
-          const imgAsp=natW/natH,boxAsp=lw/lh;
-          let drawW,drawH;
-          if(imgAsp>boxAsp){drawW=lw;drawH=lw/imgAsp;}else{drawH=lh;drawW=lh*imgAsp;}
-          const offX=(lw-drawW)/2,offY=(lh-drawH)/2;
-          ctx.save();ctx.globalAlpha=layer.opacity/100;ctx.translate(lx+lw/2,ly+lh/2);ctx.rotate((layer.rotation||0)*Math.PI/180);ctx.drawImage(img,-lw/2+offX,-lh/2+offY,drawW,drawH);ctx.restore();ctx.globalAlpha=1;res();
-        };
-        img.src=layer.maskSrc||layer.src;
-      });
+    if(withShirt){const liveCanvas=shirtCanvasRef.current;if(liveCanvas){ctx.imageSmoothingEnabled=false;ctx.drawImage(liveCanvas,0,0,OW,OH);ctx.imageSmoothingEnabled=true;}else{ctx.fillStyle=d.shirtColor||"#d3783c";ctx.fillRect(0,0,OW,OH);}}
+    for(const layer of (zone.layers||[])){
+      await new Promise(res=>{const img=new Image();img.onload=()=>{const natW=img.naturalWidth||img.width,natH=img.naturalHeight||img.height;const lx=(layer.x/100)*OW,ly=(layer.y/100)*OH,lw=(layer.w/100)*OW,lh=(layer.h/100)*OH;const imgAsp=natW/natH,boxAsp=lw/lh;let drawW,drawH;if(imgAsp>boxAsp){drawW=lw;drawH=lw/imgAsp;}else{drawH=lh;drawW=lh*imgAsp;}const offX=(lw-drawW)/2,offY=(lh-drawH)/2;ctx.save();ctx.globalAlpha=layer.opacity/100;ctx.translate(lx+lw/2,ly+lh/2);ctx.rotate((layer.rotation||0)*Math.PI/180);ctx.drawImage(img,-lw/2+offX,-lh/2+offY,drawW,drawH);ctx.restore();ctx.globalAlpha=1;res();};img.src=layer.maskSrc||layer.src;});
     }
     const a=document.createElement("a");a.href=cv.toDataURL("image/png");a.download=`${d.name.replace(/\s+/g,"-")}-${d.activeZone}${withShirt?"-with-shirt":"-logo"}.png`;a.click();
   }
 
   async function generateThumbnail(){
-    const TW=420,TH=520;
-    const stage=document.createElement("canvas");stage.width=TW;stage.height=TH;
+    const TW=420,TH=520;const stage=document.createElement("canvas");stage.width=TW;stage.height=TH;
     const sctx=stage.getContext("2d");sctx.clearRect(0,0,TW,TH);
     const src=d.shirtImages?.[d.activeZone];
-    if(src){
-      await new Promise(res=>{
-        const img=new Image();img.crossOrigin="anonymous";
-        img.onload=()=>{
-          const tmp=document.createElement("canvas");tmp.width=img.width;tmp.height=img.height;
-          const tctx=tmp.getContext("2d");tctx.drawImage(img,0,0);
-          const raw=tctx.getImageData(0,0,img.width,img.height);
-          const rp=raw.data,RW=img.width,RH=img.height;
-          let minX=RW,maxX=0,minY=RH,maxY=0;
-          const cornerLum=(0.299*rp[0]+0.587*rp[1]+0.114*rp[2])/255;
-          const isLightBg=cornerLum>=0.12,LUM_THRESH=cornerLum<0.12?0.06:0.94;
-          for(let y=0;y<RH;y++)for(let x=0;x<RW;x++){const i=(y*RW+x)*4;const lum=(0.299*rp[i]+0.587*rp[i+1]+0.114*rp[i+2])/255;const isShirt=isLightBg?lum<LUM_THRESH:lum>LUM_THRESH;if(isShirt){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;}}
-          const padX=Math.floor(RW*0.02),padY=Math.floor(RH*0.02);
-          minX=Math.max(0,minX-padX);maxX=Math.min(RW-1,maxX+padX);minY=Math.max(0,minY-padY);maxY=Math.min(RH-1,maxY+padY);
-          const cropW=maxX-minX+1,cropH=maxY-minY+1;
-          const scale=Math.min(TW/cropW,TH/cropH)*0.96;
-          const dw=cropW*scale,dh=cropH*scale,dx=(TW-dw)/2,dy=(TH-dh)/2;
-          const coloredTmp=document.createElement("canvas");coloredTmp.width=RW;coloredTmp.height=RH;
-          const cctx=coloredTmp.getContext("2d");cctx.drawImage(img,0,0);
-          const cdata=cctx.getImageData(0,0,RW,RH);const cpx=cdata.data;
-          let sr2=0,sg2=0,sb2=0,sc3=0;
-          for(let x=0;x<RW;x++){for(const yy of[0,RH-1]){const i=(yy*RW+x)*4;sr2+=cpx[i];sg2+=cpx[i+1];sb2+=cpx[i+2];sc3++;}}
-          for(let y=1;y<RH-1;y++){for(const x of[0,RW-1]){const i=(y*RW+x)*4;sr2+=cpx[i];sg2+=cpx[i+1];sb2+=cpx[i+2];sc3++;}}
-          const bgR2=Math.round(sr2/sc3),bgG2=Math.round(sg2/sc3),bgB2=Math.round(sb2/sc3);
-          const bgLum2=(0.299*bgR2+0.587*bgG2+0.114*bgB2)/255;const isDark2=bgLum2<0.12;
-          const iBg2=new Uint8Array(RW*RH),iq2=new Int32Array(RW*RH*2);let iqH2=0,iqT2=0;
-          function sp2(i){if(!iBg2[i]){iBg2[i]=1;iq2[iqT2++]=i;}}
-          for(let x=0;x<RW;x++){sp2(x);sp2((RH-1)*RW+x);}for(let y=1;y<RH-1;y++){sp2(y*RW);sp2(y*RW+RW-1);}
-          while(iqH2<iqT2){const idx=iq2[iqH2++],ix=idx%RW,iy=(idx/RW)|0;for(let dy2=-1;dy2<=1;dy2++)for(let dx2=-1;dx2<=1;dx2++){if(!dx2&&!dy2)continue;const nx=ix+dx2,ny=iy+dy2;if(nx<0||nx>=RW||ny<0||ny>=RH)continue;const ni=ny*RW+nx;if(iBg2[ni])continue;const np=ni*4,nr=cpx[np],ng=cpx[np+1],nb3=cpx[np+2];let hit=false;if(isDark2){const pl=(0.299*nr+0.587*ng+0.114*nb3)/255;hit=pl<0.06;}else{const dr=nr-bgR2,dg=ng-bgG2,db=nb3-bgB2;hit=Math.sqrt(dr*dr+dg*dg+db*db)<35;}if(hit){iBg2[ni]=1;iq2[iqT2++]=ni;}}}
-          const[tR2,tG2,tB2]=hexToRgb(d.shirtColor||"#ffffff");
-          let sumLum2=0,lumN2=0;
-          for(let i=0;i<RW*RH;i++){if(iBg2[i])continue;const pi=i*4;if(cpx[pi+3]<10)continue;sumLum2+=(0.299*cpx[pi]+0.587*cpx[pi+1]+0.114*cpx[pi+2])/255;lumN2++;}
-          const avgLum2=lumN2>0?sumLum2/lumN2:0.5;
-          for(let i=0;i<RW*RH;i++){if(iBg2[i])continue;const pi=i*4;if(cpx[pi+3]<10)continue;const lum2=(0.299*cpx[pi]+0.587*cpx[pi+1]+0.114*cpx[pi+2])/255;const norm2=Math.min(1.0,avgLum2>0?lum2/avgLum2:lum2);cpx[pi]=Math.min(255,Math.max(0,Math.round(tR2*norm2)));cpx[pi+1]=Math.min(255,Math.max(0,Math.round(tG2*norm2)));cpx[pi+2]=Math.min(255,Math.max(0,Math.round(tB2*norm2)));}
-          cctx.putImageData(cdata,0,0);
-          sctx.drawImage(cctx.canvas,minX,minY,cropW,cropH,dx,dy,dw,dh);
-          res();
-        };
-        img.src=src;
-      });
-    }
-    for(const layer of zone.layers){
-      await new Promise(res=>{
-        const img=new Image();
-        img.onload=()=>{
-          sctx.globalAlpha=layer.opacity/100;
-          const lx=(layer.x/100)*TW,ly=(layer.y/100)*TH,lw=(layer.w/100)*TW,lh=(layer.h/100)*TH;
-          const natW=img.naturalWidth||img.width,natH=img.naturalHeight||img.height;
-          const imgAsp=natW/natH,boxAsp=lw/lh;
-          let drawW,drawH;
-          if(imgAsp>boxAsp){drawW=lw;drawH=lw/imgAsp;}else{drawH=lh;drawW=lh*imgAsp;}
-          const offX=(lw-drawW)/2,offY=(lh-drawH)/2;
-          sctx.save();sctx.translate(lx+lw/2,ly+lh/2);sctx.rotate((layer.rotation||0)*Math.PI/180);
-          sctx.drawImage(img,-lw/2+offX,-lh/2+offY,drawW,drawH);sctx.restore();sctx.globalAlpha=1;res();
-        };
-        img.src=layer.maskSrc||layer.src;
-      });
-    }
+    if(src){await new Promise(res=>{const img=new Image();img.crossOrigin="anonymous";img.onload=()=>{sctx.drawImage(img,0,0,TW,TH);res();};img.src=src;});}
+    for(const layer of (zone.layers||[])){await new Promise(res=>{const img=new Image();img.onload=()=>{sctx.globalAlpha=layer.opacity/100;const lx=(layer.x/100)*TW,ly=(layer.y/100)*TH,lw=(layer.w/100)*TW,lh=(layer.h/100)*TH;const natW=img.naturalWidth||img.width,natH=img.naturalHeight||img.height;const imgAsp=natW/natH,boxAsp=lw/lh;let drawW,drawH;if(imgAsp>boxAsp){drawW=lw;drawH=lw/imgAsp;}else{drawH=lh;drawW=lh*imgAsp;}const offX=(lw-drawW)/2,offY=(lh-drawH)/2;sctx.save();sctx.translate(lx+lw/2,ly+lh/2);sctx.rotate((layer.rotation||0)*Math.PI/180);sctx.drawImage(img,-lw/2+offX,-lh/2+offY,drawW,drawH);sctx.restore();sctx.globalAlpha=1;res();};img.src=layer.maskSrc||layer.src;});}
     return stage.toDataURL("image/png");
   }
 
   return(
     <div style={{display:"flex",height:"calc(100vh - 53px)",overflow:"hidden"}} className="editor-wrap">
-      {/* LEFT */}
+
+      {/* ── LEFT PANEL ── */}
       <div className="left-panel">
         <div className="panel-section">
+          {/* Shirt Type Selector */}
           <div className="panel-label">Shirt Type</div>
-          <div style={{display:"flex",gap:6,marginBottom:12}}>
-            {["short","long"].map(t=>(<button key={t} className="btn-type" style={{background:d.shirtType===t?"#f97316":"#222",color:d.shirtType===t?"#000":"#888"}} onClick={()=>{upd({shirtType:t,activeZone:t==="short"?"short_front":"long_front"});setSelectedLayer(null);}}>{t==="short"?"Short Sleeve":"Long Sleeve"}</button>))}
+          <div className="shirt-type-scroll" style={{marginBottom:10}}>
+            {Object.entries(SHIRT_TYPE_LABELS).map(([key,label])=>(
+              <button key={key} className="shirt-type-btn"
+                style={{background:d.shirtType===key?"#f97316":"#222",color:d.shirtType===key?"#000":"#888",border:"none"}}
+                onClick={()=>changeShirtType(key)}>
+                {label}
+              </button>
+            ))}
           </div>
-          <div className="panel-label" style={{marginTop:8}}>Shirt Size</div>
+
+          {/* Shirt Size */}
+          <div className="panel-label">Shirt Size</div>
           <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
-            {SHIRT_SIZES.map(sz=>(
+            {availableSizes.map(sz=>(
               <button key={sz} onClick={()=>upd({shirtSize:sz})}
-                style={{flex:1,padding:"4px 0",fontSize:11,border:"none",borderRadius:6,cursor:"pointer",fontFamily:"'DM Mono',monospace",transition:"all 0.15s",
+                style={{flex:1,minWidth:"auto",padding:"4px 0",fontSize:10,border:"none",borderRadius:6,cursor:"pointer",fontFamily:"'DM Mono',monospace",transition:"all 0.15s",
                   background:d.shirtSize===sz?"#f97316":"#222",color:d.shirtSize===sz?"#000":"#888",fontWeight:d.shirtSize===sz?700:400}}>
                 {sz}
               </button>
             ))}
           </div>
+
+          {/* Zone Selector */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div className="panel-label" style={{margin:0}}>Zones</div>
-            <span style={{fontSize:9,color:"#444",fontFamily:"'DM Mono',monospace"}}>click 📁 to upload shirt</span>
+            <div className="panel-label" style={{margin:0}}>Views</div>
+            <span style={{fontSize:9,color:"#444"}}>📁 upload shirt</span>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:4,marginTop:6}}>
-            {SHIRT_ZONES[d.shirtType].map(z=>{
+            {currentZones.map(z=>{
               const zoneFileRef=React.createRef();
               return(
                 <div key={z.id} style={{display:"flex",gap:4,alignItems:"center"}}>
                   <button className={`zone-tab${d.activeZone===z.id?" active":""}`} style={{flex:1}} onClick={()=>{upd({activeZone:z.id});setSelectedLayer(null);}}>
-                    {z.label.split("–")[1]?.trim()}
+                    {z.label.split("–")[1]?.trim()||z.label}
                     {d.shirtImages?.[z.id]
                       ?<span className="dot-indicator" style={{background:d.activeZone===z.id?"#000":"#22c55e"}} />
                       :<span className="dot-indicator" style={{background:"#ef4444"}} />
@@ -1520,6 +1229,8 @@ function Editor({design,onSave,onDuplicate,onBack}){
             })}
           </div>
         </div>
+
+        {/* Shirt Position Nudge */}
         <div className="panel-section" style={{paddingBottom:showNudge?10:12}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setShowNudge(v=>!v)}>
             <span className="panel-label" style={{margin:0}}>Shirt Position</span>
@@ -1527,10 +1238,12 @@ function Editor({design,onSave,onDuplicate,onBack}){
           </div>
           {showNudge&&(<div style={{marginTop:8}}>
             {[{key:"x",label:"← → Nudge X",min:-30,max:30,step:0.5},{key:"y",label:"↑ ↓ Nudge Y",min:-30,max:30,step:0.5},{key:"s",label:"⊞ Scale",min:0.6,max:1.6,step:0.01}].map(({key,label,min,max,step})=>{const val=offsets[d.activeZone]?.[key]??(key==="s"?1:0);return(<div key={key} className="slider-row"><div className="slider-top"><span className="slider-key">{label}</span><span className="slider-val">{key==="s"?val.toFixed(2):Math.round(val)}</span></div><input type="range" min={min} max={max} step={step} value={val} onChange={e=>updOffset(d.activeZone,{[key]:parseFloat(e.target.value)})} /></div>);})}
-            <button className="btn btn-ghost" style={{width:"100%",fontSize:10,marginTop:4,padding:"5px 0"}} onClick={()=>{const lines=Object.keys(ZONE_OFFSET).map(k=>`  ${k.padEnd(13)}: { x: ${(offsets[k]?.x||0).toFixed(1)}, y: ${(offsets[k]?.y||0).toFixed(1)}, s: ${(offsets[k]?.s||1).toFixed(2)} },`).join('\n');navigator.clipboard.writeText(`const ZONE_OFFSET = {\n${lines}\n};`).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);});}}>{copied?"✅ Copied!":"📋 Copy config"}</button>
+            <button className="btn btn-ghost" style={{width:"100%",fontSize:10,marginTop:4,padding:"5px 0"}} onClick={()=>{const lines=Object.keys(ZONE_OFFSET).map(k=>`  ${k.padEnd(18)}: { x: ${(offsets[k]?.x||0).toFixed(1)}, y: ${(offsets[k]?.y||0).toFixed(1)}, s: ${(offsets[k]?.s||1).toFixed(2)} },`).join('\n');navigator.clipboard.writeText(`const ZONE_OFFSET = {\n${lines}\n};`).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000);});}}>{copied?"✅ Copied!":"📋 Copy config"}</button>
             <button className="btn btn-ghost" style={{width:"100%",fontSize:10,marginTop:4,padding:"5px 0"}} onClick={()=>updOffset(d.activeZone,{x:0,y:0,s:1.0})}>↺ Reset</button>
           </div>)}
         </div>
+
+        {/* Shirt Color */}
         <div className="panel-section">
           <div className="panel-label">Shirt Color</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:5}}>
@@ -1538,25 +1251,27 @@ function Editor({design,onSave,onDuplicate,onBack}){
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}><span style={{fontSize:10,color:"#555"}}>Custom:</span><input type="color" value={d.shirtColor} onChange={e=>upd({shirtColor:e.target.value})} style={{width:32,height:24,border:"1px solid #333",borderRadius:4,background:"none"}} /></div>
         </div>
+
+        {/* Art Layers list */}
         <div className="scrollable">
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <span className="panel-label" style={{margin:0}}>Art Layers ({zone.layers.length})</span>
+            <span className="panel-label" style={{margin:0}}>Art Layers ({(zone.layers||[]).length})</span>
             <button style={{fontSize:10,color:"#f97316",background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Mono',monospace"}} onClick={()=>artFileRef.current.click()}>+ Add</button>
           </div>
-          {zone.layers.length===0&&<div style={{color:"#3a3a3a",fontSize:11,textAlign:"center",paddingTop:16,lineHeight:1.8}}>No art layers yet.</div>}
-          {[...zone.layers].reverse().map((layer,i)=>(
+          {(zone.layers||[]).length===0&&<div style={{color:"#3a3a3a",fontSize:11,textAlign:"center",paddingTop:16,lineHeight:1.8}}>No art layers.<br/><span style={{fontSize:9,color:"#2a2a2a"}}>Upload · Paste · Draw · AI</span></div>}
+          {[...(zone.layers||[])].reverse().map((layer,i)=>(
             <div key={layer.id} className={`layer-row${selectedLayer===layer.id?" selected":""}`}
               onClick={()=>setSelectedLayer(layer.id===selectedLayer?null:layer.id)}
               onDoubleClick={()=>{setSelectedLayer(layer.id);setEditingLayerId(layer.id);setShowDrawing(true);}}>
               <div style={{width:28,height:28,borderRadius:4,overflow:"hidden",flexShrink:0,background:"#222"}}><img src={layer.src} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="" /></div>
-              <span style={{fontSize:11,flex:1,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{layer.locked?"🔒 ":""}Layer {zone.layers.length-i}</span>
+              <span style={{fontSize:11,flex:1,color:"#ccc",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{layer.locked?"🔒 ":""}Layer {(zone.layers||[]).length-i}</span>
               <button style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:13,padding:0,lineHeight:1}} onClick={e=>{e.stopPropagation();deleteLayer(layer.id);}}>✕</button>
             </div>
           ))}
         </div>
       </div>
 
-      {/* CENTER */}
+      {/* ── CENTER CANVAS ── */}
       <div className="center-area" style={{flexDirection:"column"}}>
         {(()=>{
           const COLLAR_PX=63,HEM_PX=500,BODY_H_PX=HEM_PX-COLLAR_PX,BODY_W_PX=340,BODY_LEFT_PX=(STAGE_W-BODY_W_PX)/2;
@@ -1570,9 +1285,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
           function makeDtfOverlay(showLabels){
             return(
               <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:2}}>
-                <div style={{position:"absolute",left:leftPx,top:COLLAR_PX,width:printW_px,height:collarGapPx,
-                  borderLeft:"1px dashed rgba(255,180,0,0.4)",borderRight:"1px dashed rgba(255,180,0,0.4)",
-                  borderBottom:"1px dashed rgba(255,180,0,0.7)",background:"rgba(255,180,0,0.05)"}}>
+                <div style={{position:"absolute",left:leftPx,top:COLLAR_PX,width:printW_px,height:collarGapPx,borderLeft:"1px dashed rgba(255,180,0,0.4)",borderRight:"1px dashed rgba(255,180,0,0.4)",borderBottom:"1px dashed rgba(255,180,0,0.7)",background:"rgba(255,180,0,0.05)"}}>
                   {showLabels&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",fontSize:8,color:"rgba(255,200,0,0.9)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",background:"rgba(0,0,0,0.65)",padding:"1px 5px",borderRadius:3}}>{fmtIn(sizeSpec.collarGap)}" from collar seam</div>}
                 </div>
                 <div style={{position:"absolute",left:leftPx,top:topPx,width:printW_px,height:usedH,border:"1.5px dashed rgba(249,115,22,0.75)",borderRadius:3,background:"rgba(249,115,22,0.05)"}}>
@@ -1581,9 +1294,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
                     <div style={{position:"absolute",top:"50%",right:-58,transform:"translateY(-50%)",fontSize:8,color:"rgba(249,115,22,0.95)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",background:"rgba(0,0,0,0.7)",padding:"1px 5px",borderRadius:3}}>↕ {fmtIn(sizeSpec.maxH)}" tall</div>
                   </>}
                 </div>
-                <div style={{position:"absolute",left:leftPx,top:topPx+usedH,width:printW_px,height:bottomGapPx,
-                  borderLeft:"1px dashed rgba(100,180,255,0.4)",borderRight:"1px dashed rgba(100,180,255,0.4)",
-                  borderTop:"1px dashed rgba(100,180,255,0.7)",background:"rgba(100,180,255,0.05)"}}>
+                <div style={{position:"absolute",left:leftPx,top:topPx+usedH,width:printW_px,height:bottomGapPx,borderLeft:"1px dashed rgba(100,180,255,0.4)",borderRight:"1px dashed rgba(100,180,255,0.4)",borderTop:"1px dashed rgba(100,180,255,0.7)",background:"rgba(100,180,255,0.05)"}}>
                   {showLabels&&<div style={{position:"absolute",top:3,left:"50%",transform:"translateX(-50%)",fontSize:8,color:"rgba(130,200,255,0.9)",whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",background:"rgba(0,0,0,0.65)",padding:"1px 5px",borderRadius:3}}>{fmtIn(sizeSpec.bottomGap)}" from bottom of shirt</div>}
                 </div>
               </div>
@@ -1591,6 +1302,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
           }
 
           return(<>
+            {/* Mode switcher */}
             <div style={{display:"flex",alignItems:"center",gap:0,marginBottom:10,background:"#111",border:"1px solid #222",borderRadius:8,overflow:"hidden"}}>
               <button onClick={()=>setStageMode('shirt')} style={{flex:1,padding:"7px 0",fontSize:11,border:"none",cursor:"pointer",fontFamily:"'DM Mono',monospace",transition:"all 0.15s",background:stageMode==='shirt'?"#f97316":"transparent",color:stageMode==='shirt'?"#000":"#666",fontWeight:stageMode==='shirt'?600:400}}>👕 Shirt View</button>
               <div style={{width:1,height:28,background:"#222"}} />
@@ -1604,17 +1316,30 @@ function Editor({design,onSave,onDuplicate,onBack}){
             </div>
 
             <div style={{fontSize:10,color:"#555",fontFamily:"'DM Mono',monospace",marginBottom:6,textAlign:"center",letterSpacing:"0.5px"}}>
-              {zoneInfo?.label} · {d.shirtSize} · max {activeMaxW}" × {activeMaxH}"
+              {zoneInfo?.label||d.activeZone} · {d.shirtSize} · max {activeMaxW}" × {activeMaxH}"
+              <span style={{color:"#333",marginLeft:8}}>· Ctrl+V to paste image</span>
             </div>
 
+            {/* Shirt stage */}
             {stageMode==='shirt'&&(
-              <div ref={stageRef} className="shirt-stage" style={{cursor:zone.layers.length>0?"crosshair":"default"}} onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}>
+              <div ref={stageRef} className="shirt-stage"
+                style={{cursor:(zone.layers||[]).length>0?"crosshair":"default"}}
+                onMouseDown={onMD} onMouseMove={onMM} onMouseUp={onMU} onMouseLeave={onMU}
+                onDragOver={e=>e.preventDefault()}
+                onDrop={onStageDrop}>
                 <div className="shirt-clip">
                   <ShirtBackground shirtImage={currentShirtImg} shirtColor={d.shirtColor} baseColor={ZONE_BASE_COLOR[d.activeZone]} offset={offsets[d.activeZone]} canvasRef={shirtCanvasRef} />
-                  {!isSleeveZone && showDTFOnShirt && makeDtfOverlay(false)}
-                  {isSleeveZone && <div className="print-guide" />}
+                  {!isSleeveZone&&showDTFOnShirt&&makeDtfOverlay(false)}
+                  {isSleeveZone&&<div className="print-guide" />}
+                  {/* Drop zone hint when no image */}
+                  {!currentShirtImg&&(
+                    <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,zIndex:1,pointerEvents:"none"}}>
+                      <div style={{fontSize:32,opacity:0.08}}>👕</div>
+                      <div style={{fontSize:10,color:"#2a2a2a",fontFamily:"'DM Mono',monospace",textAlign:"center"}}>No shirt image<br/>Click 📁 in left panel to upload</div>
+                    </div>
+                  )}
                 </div>
-                {zone.layers.map(layer=>{
+                {(zone.layers||[]).map(layer=>{
                   const lx=(layer.x/100)*STAGE_W,ly=(layer.y/100)*STAGE_H,lw=(layer.w/100)*STAGE_W,lh=(layer.h/100)*STAGE_H;const isSel=layer.id===selectedLayer;
                   return(<div key={layer.id}
                     style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:10,opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",outline:isSel?"2px solid #ef4444":"none",cursor:layer.locked?"not-allowed":"move"}}
@@ -1626,20 +1351,21 @@ function Editor({design,onSave,onDuplicate,onBack}){
               </div>
             )}
 
+            {/* DTF Guide stage */}
             {stageMode==='dtf'&&(
               <div style={{position:"relative",width:STAGE_W,height:STAGE_H,borderRadius:10,background:"#0d0d0d",boxShadow:"0 0 0 1px #1e1e1e, 0 30px 80px rgba(0,0,0,0.56)",overflow:"visible"}}>
                 <svg width={STAGE_W} height={STAGE_H} style={{position:"absolute",inset:0,borderRadius:10,overflow:"hidden"}}>
                   <defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="0.5"/></pattern></defs>
                   <rect width="100%" height="100%" fill="url(#grid)" rx="10"/>
                 </svg>
-                {zone.layers.map(layer=>{
+                {(zone.layers||[]).map(layer=>{
                   const lx=(layer.x/100)*STAGE_W,ly=(layer.y/100)*STAGE_H,lw=(layer.w/100)*STAGE_W,lh=(layer.h/100)*STAGE_H;
                   return(<div key={layer.id} style={{position:"absolute",left:lx,top:ly,width:lw,height:lh,zIndex:5,opacity:layer.opacity/100,transform:`rotate(${layer.rotation||0}deg)`,transformOrigin:"center center",pointerEvents:"none"}}>
                     <img src={layer.maskSrc||layer.src} style={{width:"100%",height:"100%",objectFit:"contain",display:"block"}} alt="" draggable={false} />
                   </div>);
                 })}
-                {!isSleeveZone && makeDtfOverlay(true)}
-                {isSleeveZone && <div className="print-guide" />}
+                {!isSleeveZone&&makeDtfOverlay(true)}
+                {isSleeveZone&&<div className="print-guide" />}
                 {!isSleeveZone&&(
                   <div style={{position:"absolute",bottom:-90,left:"50%",transform:"translateX(-50%)",display:"flex",gap:12,alignItems:"center",whiteSpace:"nowrap",background:"#111",border:"1px solid #1e1e1e",borderRadius:8,padding:"8px 16px"}}>
                     <div style={{textAlign:"center"}}><div style={{fontSize:8,color:"#444",textTransform:"uppercase",letterSpacing:1,fontFamily:"'DM Mono',monospace"}}>Size</div><div style={{fontFamily:"'Bebas Neue',cursive",fontSize:20,color:"#f97316",letterSpacing:1}}>{d.shirtSize}</div></div>
@@ -1654,6 +1380,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
               </div>
             )}
 
+            {/* DTF size badge for selected layer */}
             {dtfInfo&&selLayer&&(
               <div style={{position:"absolute",bottom:12,left:"50%",transform:"translateX(-50%)",background:"#161616",border:"1px solid rgba(249,115,22,0.2)",borderRadius:8,padding:"6px 16px",display:"flex",gap:14,alignItems:"center",zIndex:30,pointerEvents:"none",whiteSpace:"nowrap",boxShadow:"0 4px 20px rgba(0,0,0,0.6)"}}>
                 <span style={{fontSize:10,color:"#f97316",textTransform:"uppercase",letterSpacing:1,fontFamily:"'DM Mono',monospace"}}>DTF · {d.shirtSize}</span>
@@ -1663,53 +1390,55 @@ function Editor({design,onSave,onDuplicate,onBack}){
             )}
           </>);
         })()}
+
+        {/* Paste toast */}
+        {pasteToast&&<div className="paste-toast">📋 Image pasted to design!</div>}
       </div>
 
-      {/* RIGHT */}
+      {/* ── RIGHT PANEL ── */}
       <div className="right-panel">
         <div className="panel-section">
-          {editingName?<input className="name-input" autoFocus value={nameVal} onChange={e=>setNameVal(e.target.value)} onBlur={()=>{upd({name:nameVal});setEditingName(false);}} onKeyDown={e=>e.key==="Enter"&&(upd({name:nameVal}),setEditingName(false))} />:<div className="name-display" onClick={()=>setEditingName(true)}>{d.name} <span style={{color:"#444",fontSize:11}}>✏️</span></div>}
+          {editingName
+            ?<input className="name-input" autoFocus value={nameVal} onChange={e=>setNameVal(e.target.value)} onBlur={()=>{upd({name:nameVal});setEditingName(false);}} onKeyDown={e=>e.key==="Enter"&&(upd({name:nameVal}),setEditingName(false))} />
+            :<div className="name-display" onClick={()=>setEditingName(true)}>{d.name} <span style={{color:"#444",fontSize:11}}>✏️</span></div>
+          }
           <div style={{display:"flex",gap:6,marginTop:8}}>
             <button className="btn btn-primary" style={{flex:1,fontSize:10,padding:"6px 0"}} onClick={async()=>{const thumb=await generateThumbnail();onSave({...d,thumbnail:thumb});}}>💾 Save</button>
             <button className="btn btn-ghost" style={{fontSize:10,padding:"6px 8px"}} onClick={onDuplicate}>⧉</button>
             <button className="btn btn-ghost" style={{fontSize:10,padding:"6px 8px"}} onClick={onBack}>← Back</button>
           </div>
         </div>
+
+        {/* Upload / Add Art */}
         <div className="panel-section">
-          <div className="panel-label">Upload Art / Logo</div>
+          <div className="panel-label">Add Art / Logo</div>
           <input ref={artFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleArtFile} />
           <button className="btn btn-primary" style={{width:"100%",padding:"9px 0",fontSize:12,marginBottom:6}} onClick={()=>artFileRef.current.click()}>📁 Upload Image</button>
+          <button className="btn btn-ghost" style={{width:"100%",padding:"8px 0",fontSize:11,marginBottom:4,borderColor:"rgba(34,197,94,0.4)",color:"#22c55e"}}
+            onClick={async()=>{try{const text=await navigator.clipboard.read();for(const item of text){for(const t of item.types){if(t.startsWith("image/")){const blob=await item.getType(t);const reader=new FileReader();reader.onload=ev=>{addArtLayer(ev.target.result);setPasteToast(true);setTimeout(()=>setPasteToast(false),2500);};reader.readAsDataURL(blob);return;}}}alert("No image found in clipboard. Copy an image first, then click this button or press Ctrl+V.");}catch(e){alert("Press Ctrl+V (or Cmd+V) while on the canvas to paste an image from clipboard.");}}}>
+            📋 Paste from Clipboard
+          </button>
           <button className="btn btn-ghost" style={{width:"100%",padding:"9px 0",fontSize:12,marginBottom:6}} onClick={()=>{setEditingLayerId(null);setShowDrawing(true);}}>✏️ Open Drawing Board</button>
           <button className="btn btn-ghost" style={{width:"100%",padding:"9px 0",fontSize:12,borderColor:"rgba(249,115,22,0.4)",color:"#f97316"}} onClick={()=>setShowAI(true)}>✨ AI Image Generator</button>
+          <div style={{marginTop:8,padding:"6px 10px",background:"#0f0f0f",borderRadius:6,border:"1px solid #1e1e1e",fontSize:9,color:"#444",lineHeight:1.7,fontFamily:"'DM Mono',monospace"}}>
+            💡 Tip: <span style={{color:"#555"}}>Ctrl+V anywhere to paste · Drag &amp; drop onto shirt
+          </span></div>
         </div>
 
-        {showAIBgRemoval && selLayer && (
-          <AIBgRemovalModal src={selLayer.src} onClose={() => setShowAIBgRemoval(false)} onSave={dataUrl => updLayer(selLayer.id, { src: dataUrl })} />
-        )}
-        {showBgEraser && selLayer && (
-          <BgEraserModal src={selLayer.src} onClose={()=>setShowBgEraser(false)} onSave={dataUrl=>updLayer(selLayer.id,{src:dataUrl})} />
-        )}
-        {showDrawing && (
-          <DrawingModal onClose={()=>{setShowDrawing(false);setEditingLayerId(null);}} initialImage={editingLayerId?zone.layers.find(l=>l.id===editingLayerId)?.src:null} onAdd={dataUrl=>{if(editingLayerId){updLayer(editingLayerId,{src:dataUrl});setEditingLayerId(null);}else{addArtLayer(dataUrl);}}} />
-        )}
-        {showAI && <AIGeneratorModal onClose={()=>setShowAI(false)} onAdd={addArtLayer} />}
-        {showMaskEditor && maskLayerId && (() => {
-          const ml = zone.layers.find(l=>l.id===maskLayerId);
-          return ml ? (
-            <MaskEditorModal src={ml.src} existingMask={ml.maskSrc||null}
-              onClose={()=>{setShowMaskEditor(false);setMaskLayerId(null);}}
-              onSave={maskedDataUrl=>{updLayer(maskLayerId,{maskSrc:maskedDataUrl});setShowMaskEditor(false);setMaskLayerId(null);}}
-              onClearMask={()=>{updLayer(maskLayerId,{maskSrc:null});setShowMaskEditor(false);setMaskLayerId(null);}}
-            />
-          ) : null;
-        })()}
+        {/* Modals */}
+        {showAIBgRemoval&&selLayer&&(<AIBgRemovalModal src={selLayer.src} onClose={()=>setShowAIBgRemoval(false)} onSave={dataUrl=>updLayer(selLayer.id,{src:dataUrl})} />)}
+        {showBgEraser&&selLayer&&(<BgEraserModal src={selLayer.src} onClose={()=>setShowBgEraser(false)} onSave={dataUrl=>updLayer(selLayer.id,{src:dataUrl})} />)}
+        {showDrawing&&(<DrawingModal onClose={()=>{setShowDrawing(false);setEditingLayerId(null);}} initialImage={editingLayerId?((zone.layers||[]).find(l=>l.id===editingLayerId))?.src:null} onAdd={dataUrl=>{if(editingLayerId){updLayer(editingLayerId,{src:dataUrl});setEditingLayerId(null);}else{addArtLayer(dataUrl);}}} />)}
+        {showAI&&<AIGeneratorModal onClose={()=>setShowAI(false)} onAdd={addArtLayer} />}
+        {showMaskEditor&&maskLayerId&&(()=>{const ml=(zone.layers||[]).find(l=>l.id===maskLayerId);return ml?(<MaskEditorModal src={ml.src} existingMask={ml.maskSrc||null} onClose={()=>{setShowMaskEditor(false);setMaskLayerId(null);}} onSave={maskedDataUrl=>{updLayer(maskLayerId,{maskSrc:maskedDataUrl});setShowMaskEditor(false);setMaskLayerId(null);}} onClearMask={()=>{updLayer(maskLayerId,{maskSrc:null});setShowMaskEditor(false);setMaskLayerId(null);}} />):null;})()}
 
-        {selLayer ? (
+        {/* Layer Properties */}
+        {selLayer?(
           <div className="scrollable">
             <div className="panel-label">Layer Properties</div>
             <button className="btn btn-primary" style={{width:"100%",marginBottom:6,fontSize:11,padding:"7px 0"}} onClick={()=>{setEditingLayerId(selLayer.id);setShowDrawing(true);}}>✏️ Edit in Drawing Board</button>
             <div style={{marginBottom:10}}>
-              <button className="btn btn-primary" style={{width:"100%",fontSize:11,padding:"9px 0",background:"linear-gradient(135deg,#f97316,#dc2626)",marginBottom:4}} onClick={() => setShowAIBgRemoval(true)}>🤖 AI Remove Background</button>
+              <button className="btn btn-primary" style={{width:"100%",fontSize:11,padding:"9px 0",background:"linear-gradient(135deg,#f97316,#dc2626)",marginBottom:4}} onClick={()=>setShowAIBgRemoval(true)}>🤖 AI Remove Background</button>
               <button className="btn btn-ghost" style={{width:"100%",fontSize:10,padding:"6px 0",borderColor:"rgba(249,115,22,0.3)",color:"#888"}} onClick={()=>setShowBgEraser(true)}>🖌️ Manual Brush Eraser</button>
             </div>
             <Slider label="Width %" value={selLayer.w} min={5} max={200} onChange={v=>updLayer(selLayer.id,{w:v})} />
@@ -1719,17 +1448,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
             <Slider label="Opacity" value={selLayer.opacity} min={0} max={100} onChange={v=>updLayer(selLayer.id,{opacity:v})} />
             <Slider label="Rotation °" value={selLayer.rotation||0} min={-180} max={180} onChange={v=>updLayer(selLayer.id,{rotation:v})} />
             <button className="btn btn-ghost" style={{width:"100%",fontSize:11,padding:"8px 0",marginTop:10,borderColor:"rgba(249,115,22,0.4)",color:"#f97316"}}
-              onClick={()=>{
-                const img=new Image();
-                img.onload=()=>{
-                  const natW=img.naturalWidth||img.width,natH=img.naturalHeight||img.height;
-                  const imgAsp=natW/natH,lw=selLayer.w,lh=selLayer.h,boxAsp=lw/lh;
-                  let drawW,drawH;
-                  if(imgAsp>boxAsp){drawW=lw;drawH=lw/imgAsp;}else{drawH=lh;drawW=lh*imgAsp;}
-                  updLayer(selLayer.id,{x:50-lw/2,y:50-lh/2});
-                };
-                img.src=selLayer.maskSrc||selLayer.src;
-              }}>
+              onClick={()=>updLayer(selLayer.id,{x:50-selLayer.w/2,y:50-selLayer.h/2})}>
               ⊕ Center on Shirt
             </button>
             <div style={{marginTop:6,display:"flex",gap:5,flexWrap:"wrap"}}>
@@ -1745,7 +1464,7 @@ function Editor({design,onSave,onDuplicate,onBack}){
               {!isSleeveZone&&<>
                 <div style={{marginTop:6,height:1,background:"#1e1e1e"}} />
                 <div style={{marginTop:5,display:"flex",flexDirection:"column",gap:2}}>
-                  <div style={{fontSize:9,color:"rgba(255,180,0,0.7)",fontFamily:"'DM Mono',monospace"}}>↕ {sizeSpec.collarGap % 1 === 0.5 ? sizeSpec.collarGap.toString().replace(".5"," ½") : sizeSpec.collarGap}" from collar seam</div>
+                  <div style={{fontSize:9,color:"rgba(255,180,0,0.7)",fontFamily:"'DM Mono',monospace"}}>↕ {sizeSpec.collarGap%1===0.5?sizeSpec.collarGap.toString().replace(".5"," ½"):sizeSpec.collarGap}" from collar seam</div>
                   <div style={{fontSize:9,color:"rgba(100,180,255,0.7)",fontFamily:"'DM Mono',monospace"}}>↕ {sizeSpec.bottomGap}" from bottom of shirt</div>
                 </div>
               </>}
@@ -1754,11 +1473,13 @@ function Editor({design,onSave,onDuplicate,onBack}){
         ):(
           <div style={{flex:1,padding:12}}>
             <div style={{fontSize:10,color:"#3a3a3a",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>No Layer Selected</div>
-            <div style={{fontSize:11,color:"#333",lineHeight:1.8}}>Upload art using the button above, then click a layer to edit it.</div>
+            <div style={{fontSize:11,color:"#333",lineHeight:1.8}}>Upload art, paste an image (Ctrl+V), drag &amp; drop, or draw something — then click a layer to edit.</div>
           </div>
         )}
+
+        {/* Download */}
         <div style={{padding:12,borderTop:"1px solid #1e1e1e",display:"flex",flexDirection:"column",gap:6,flexShrink:0}}>
-          <div className="panel-label" style={{marginBottom:2}}>Download · {zoneInfo?.label.split("–")[1]?.trim()}</div>
+          <div className="panel-label" style={{marginBottom:2}}>Download · {(zoneInfo?.label||d.activeZone).split("–")[1]?.trim()||zoneInfo?.label||d.activeZone}</div>
           <button className="btn btn-primary" style={{fontSize:11}} onClick={()=>download(true)}>⬇ Design + Shirt</button>
           <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>download(false)}>⬇ Logo Only (PNG)</button>
         </div>
